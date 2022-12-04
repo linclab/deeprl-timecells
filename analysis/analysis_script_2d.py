@@ -1,6 +1,11 @@
-from analysis_helper import *
-from world import *
+from expts.envs.tunl_2d import Tunl, Tunl_vd, Tunl_nomem, Tunl_nomem_vd
 from linclab_utils import plot_utils
+import numpy as np
+from mutual_info.utils import *
+from cell_identification.time_ramp import separate_ramp_and_seq
+from plot_utils import make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
+    single_cell_visualization
+from analysis.decoder import plot_decode_sample_from_single_time, time_decode
 
 plot_utils.linclab_plt_defaults()
 plot_utils.set_font(font='Helvetica')
@@ -101,5 +106,70 @@ time_decode(delay_resp_seq, len_delay, n_seq_neurons, 1000, title=label+' Sequen
 print('Single-cell visualization...')
 single_cell_visualization(delay_resp, binary_stim, cell_nums_ramp, type='ramp')
 single_cell_visualization(delay_resp, binary_stim, cell_nums_seq, type='seq')
+
+
+# ==========================================
+
+# Mutual information analysis
+# ==========================================
+
+# separate left and right trials
+left_stim_resp = delay_resp[np.all(stim == [1, 1], axis=1)]
+right_stim_resp = delay_resp[np.any(stim != [1, 1], axis=1)]
+left_stim_loc = delay_loc[np.all(stim == [1, 1], axis=1)]  # delay locations on stim==left trials
+right_stim_loc = delay_loc[np.any(stim != [1, 1], axis=1)]
+# mutual information analysis
+seq_cell_idx = separate_ramp_and_seq(delay_resp)[2]
+ratemap, spatial_occupancy = construct_ratemap(delay_resp[:,:,seq_cell_idx], delay_loc)
+mutual_info = calculate_mutual_information(ratemap, spatial_occupancy)
+shuffled_mutual_info = calculate_shuffled_mutual_information(delay_resp, delay_loc, n_episodes)
+
+plot_mutual_info_distribution(mutual_info, compare=True, shuffled_mutual_info=shuffled_mutual_info)
+
+joint_encoding_info(delay_resp, delay_loc, analysis='selectivity', recalculate=True)
+plot_joint_encoding_information()
+
+ratemap_left_sti, spatial_occupancy_left_sti = construct_ratemap(left_stim_resp, left_stim_loc)
+ratemap_right_sti, spatial_occupancy_right_sti = construct_ratemap(right_stim_resp, right_stim_loc)
+mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_occupancy_left_sti)
+mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
+
+plot_stimulus_selective_place_celss(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti)
+
+decode_sample_from_trajectory(delay_loc, stim)
+print("Mutual info for ramping cells and sequence cells")
+seq_cell_idx = separate_ramp_and_seq(delay_resp)[2]
+ramp_cell_idx = separate_ramp_and_seq(delay_resp)[4]
+nontime_cell_idx = [x for x in range(n_neurons) if (x not in seq_cell_idx and x not in ramp_cell_idx)]
+print(np.shape(seq_cell_idx))
+print(np.shape(ramp_cell_idx))
+print(n_neurons)
+
+delay_resp_seq = delay_resp[:,:,seq_cell_idx]
+delay_resp_ramp = delay_resp[:,:,ramp_cell_idx]
+delay_resp_nontime = delay_resp[:,:,nontime_cell_idx]
+
+# ======= Starting Line 110 of analysis_place.py ==========
+ratemap_seq, spatial_occupancy_seq = construct_ratemap(delay_resp_seq, delay_loc)
+mutual_info_seq = calculate_mutual_information(ratemap_seq, spatial_occupancy_seq)
+shuffled_mutual_info_seq = calculate_shuffled_mutual_information(delay_resp_seq, delay_loc, n_episodes)
+#plot_mutual_info_distribution(mutual_info_seq, compare=True, shuffled_mutual_info=shuffled_mutual_info_seq)
+print("seq: ", np.nanmean(mutual_info_seq))
+print("shuffled seq: ", np.nanmean(shuffled_mutual_info_seq))
+
+ratemap_ramp, spatial_occupancy_ramp = construct_ratemap(delay_resp_ramp, delay_loc)
+mutual_info_ramp = calculate_mutual_information(ratemap_ramp, spatial_occupancy_ramp)
+shuffled_mutual_info_ramp = calculate_shuffled_mutual_information(delay_resp_ramp, delay_loc, n_episodes)
+#plot_mutual_info_distribution(mutual_info_ramp, compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp)
+print("ramp: ", np.nanmean(mutual_info_ramp))
+print("shuffled ramp: ", np.nanmean(shuffled_mutual_info_ramp))
+
+ratemap_nontime, spatial_occupancy_nontime = construct_ratemap(delay_resp_nontime, delay_loc)
+mutual_info_nontime = calculate_mutual_information(ratemap_nontime, spatial_occupancy_nontime)
+shuffled_mutual_info_nontime = calculate_shuffled_mutual_information(delay_resp_nontime, delay_loc, n_episodes)
+#plot_mutual_info_distribution(mutual_info_ramp, compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp)
+print("ramp: ", np.nanmean(mutual_info_nontime))
+print("shuffled ramp: ", np.nanmean(shuffled_mutual_info_nontime))
+
 
 print('Analysis finished')
