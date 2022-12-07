@@ -13,6 +13,8 @@ plot_utils.set_font(font='Helvetica')
 data = np.load('')  # data.npz file
 label = 'NoMem TUNL'
 
+global figpath
+figpath = "ccn_figures/" # path to save figure
 
 stim = data['stim']  # n_episode x 2
 delay_resp_hx = data['delay_resp_hx']  # n_episode x len_delay x n_neurons
