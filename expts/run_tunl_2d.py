@@ -1,7 +1,7 @@
 import random
 import os
-from model import *
-from world import *
+from envs.tunl_2d import *
+from agents.model_2d import *
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

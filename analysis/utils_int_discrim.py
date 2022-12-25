@@ -6,7 +6,7 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import KFold
 from sklearn import svm
 import os
-from plot_utils import make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
+from plot_functions import make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
     single_cell_visualization
 from analysis.decoder import plot_decode_sample_from_single_time, time_decode
 from analysis.cell_identification.time_ramp import separate_ramp_and_seq

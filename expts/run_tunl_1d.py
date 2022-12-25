@@ -2,8 +2,8 @@ import random
 import torch
 import numpy as np
 from numpy import array
-from world1d import *
-from model1d import *
+from envs.tunl_1d import *
+from agents.model_1d import *
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt

@@ -1,6 +1,6 @@
 import numpy as np
 from analysis.cell_identification.time_ramp import separate_ramp_and_seq
-from plot_utils import *
+from plot_functions import *
 from expts.envs.tunl_1d import *
 from linclab_utils import plot_utils
 
