@@ -60,7 +60,7 @@ torch.manual_seed(argsdict["seed"])
 np.random.seed(argsdict["seed"])
 
 env = TunlEnv(len_delay) if env_type=='mem' else TunlEnv_nomem(len_delay)
-net = AC_Net(3, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+net = AC_Net(3, 4, 1, ['linear', hidden_type, 'linear'], [n_neurons, n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
@@ -97,20 +97,20 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     while not done:
         pol, val, lin_act = net.forward(obs.float())
         if record_data and torch.equal(obs, torch.tensor([[0, 0, 0]])):
-            if net.hidden_types[0] == 'linear':
+            if net.hidden_types[1] == 'linear':
                 resp.append(
-                    net.cell_out[0].detach().numpy().squeeze())  # pre-relu activity of first layer of linear cell
-            elif net.hidden_types[0] == 'lstm':
-                resp.append(net.hx[0].clone().detach().numpy().squeeze())  # hidden state of LSTM cell
-            elif net.hidden_types[0] == 'gru':
-                resp.append(net.hx[0].clone().detach().numpy().squeeze())  # hidden state of GRU cell
+                    net.cell_out[1].detach().numpy().squeeze())  # pre-relu activity of first layer of linear cell
+            elif net.hidden_types[1] == 'lstm':
+                resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of LSTM cell
+            elif net.hidden_types[1] == 'gru':
+                resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of GRU cell
         act, p, v = select_action(net, pol, val)
         new_obs, reward, done, info = env.step(act)
         net.rewards.append(reward)
         obs = torch.as_tensor(new_obs)
 
     choice[i_episode] = act - 1  # 0=L, 1=R
-    if stim[i_episode] == choice[i_episode]:
+    if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
         correct_perc[i_episode] = 1
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
