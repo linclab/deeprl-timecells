@@ -29,7 +29,7 @@ parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total epis
 parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
 parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
 parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training")
-parser.add_argument("--save_ckpts", type=bool, default=True, help="Whether to save model every save_ckpt_per_epidoes episodes")
+parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
 parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
@@ -54,13 +54,13 @@ env_type = argsdict['env_type']
 hidden_type = argsdict['hidden_type']
 
 # Setting up cuda and seeds
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda:0" if use_cuda else "cpu")
+# use_cuda = torch.cuda.is_available()
+# device = torch.device("cuda:0" if use_cuda else "cpu")  # Not using cuda for TUNL 1d
 torch.manual_seed(argsdict["seed"])
 np.random.seed(argsdict["seed"])
 
 env = TunlEnv(len_delay) if env_type=='mem' else TunlEnv_nomem(len_delay)
-net = AC_Net(3, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons]).to(device)
+net = AC_Net(3, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
@@ -68,13 +68,13 @@ ld = len_delay + 1
 
 
 # Load existing model
-if load_model_path is 'None':
+if load_model_path=='None':
     ckpt_name = 'untrained_agent'  # placeholder ckptname in case we want to save data in the end
 else:
     ckpt_name = load_model_path.replace('/', '_')
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
-    assert n_neurons in ckpt_name, 'Must load network with the same number of hidden neurons'
+    assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
     net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training', load_model_path)))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -115,8 +115,8 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
-    if (i_episode != 0) and (i_episode % save_ckpt_per_episodes == 0):
-        print(f'Episode {i_episode}, {np.mean(correct_perc)*100:.3f}% correct')
+    if (i_episode+1) % save_ckpt_per_episodes == 0:
+        print(f'Episode {i_episode}, {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_Epi{i_episode}.pt')
 binned_correct_perc = bin_rewards(correct_perc, window_size=window_size)
@@ -127,11 +127,15 @@ fig.suptitle(env_title)
 ax1.plot(np.arange(n_total_episodes), binned_correct_perc, label=net_title)
 ax1.set_xlabel('Episode')
 ax1.set_ylabel('Fraction Nonmatch')
+ax1.set_ylim(0,1)
+ax1.set_title(f'{env_title} TUNL')
 ax1.legend()
-plt.show()
-fig.savefig(save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_{n_total_episodes}episodes_performance.svg', type='svg')
+#plt.show()
+fig.savefig(save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_{n_total_episodes}episodes_performance.svg')
 
 # save data
 if record_data:
     np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_resp=delay_resp)
+else:
+    np.savez_compressed(save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice)
 
