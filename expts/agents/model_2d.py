@@ -60,7 +60,7 @@ class AC_Net(nn.Module):
         self.batch_size = batch_size
 
         # check that the correct number of hidden dimensions are specified
-        assert len(hidden_types) is len(hidden_dimensions)
+        assert len(hidden_types) == len(hidden_dimensions)
 
         # use gpu
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
@@ -88,7 +88,7 @@ class AC_Net(nn.Module):
                 assert htype in ['linear', 'lstm', 'gru', 'conv', 'pool','rnn']
 
                 # get the input dimensions
-                if i is 0:  # the first hidden layer
+                if i == 0:  # the first hidden layer
                     input_d = input_dimensions
                 else:  # subsequent hidden layers
                     if hidden_types[i - 1] in ['conv', 'pool'] and not htype in ['conv', 'pool']:
@@ -101,14 +101,14 @@ class AC_Net(nn.Module):
                     output_d = hidden_dimensions[i]
                 elif htype in ['conv', 'pool']:
                     output_d = list((0, 0, 0))
-                    if htype is 'conv':
+                    if htype == 'conv':
                         output_d[0] = int(
                             np.floor((input_d[0] + 2 * padding - (rfsize - 1) - 1) / stride) + 1)  # assume dilation = 1
                         output_d[1] = int(np.floor((input_d[1] + 2 * padding - (rfsize - 1) - 1) / stride) + 1)
                         assert output_d[0] == hidden_dimensions[i][0], (hidden_dimensions[i][0], output_d[0])
                         assert output_d[1] == hidden_dimensions[i][1]
                         output_d[2] = hidden_dimensions[i][2]
-                    elif htype is 'pool':
+                    elif htype == 'pool':
                         output_d[0] = int(np.floor((input_d[0] + 2 * padding - (rfsize - 1) - 1) / stride + 1))
                         output_d[1] = int(np.floor((input_d[1] + 2 * padding - (rfsize - 1) - 1) / stride + 1))
                         assert output_d[0] == hidden_dimensions[i][0]
@@ -117,34 +117,34 @@ class AC_Net(nn.Module):
                     output_d = tuple(output_d)
 
                 # construct the layer
-                if htype is 'linear':
+                if htype == 'linear':
                     self.hidden.append(nn.Linear(input_d, output_d))
                     self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))  ##
                     self.hx.append(None)
                     self.cx.append(None)
-                elif htype is 'lstm':
+                elif htype == 'lstm':
                     self.hidden.append(nn.LSTMCell(input_d, output_d))
                     self.cell_out.append(None)
                     self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                elif htype is 'gru':
+                elif htype == 'gru':
                     self.hidden.append(nn.GRUCell(input_d, output_d))
                     self.cell_out.append(None)
                     self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     self.cx.append(None)
-                elif htype is 'rnn':
+                elif htype == 'rnn':
                     self.hidden.append(nn.RNNCell(input_d, output_d))
                     self.cell_out.append(None)
                     self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     self.cx.append(None)
-                elif htype is 'conv':
+                elif htype == 'conv':
                     in_channels = input_d[2]
                     out_channels = output_d[2]
                     self.hidden.append(nn.Conv2d(in_channels, out_channels, rfsize, padding=padding, stride=stride))
                     self.cell_out.append(None)
                     self.hx.append(None)
                     self.cx.append(None)
-                elif htype is 'pool':
+                elif htype == 'pool':
                     self.hidden.append(nn.MaxPool2d(rfsize, padding=padding, stride=stride))
                     self.cell_out.append(None)
                     self.hx.append(None)

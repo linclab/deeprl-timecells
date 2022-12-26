@@ -43,7 +43,7 @@ class AC_Net(nn.Module):
         self.batch_size = batch_size
 
         # check that the correct number of hidden dimensions are specified
-        assert len(hidden_types) is len(hidden_dimensions)
+        assert len(hidden_types) == len(hidden_dimensions)
 
         # check whether we're using hidden layers
         if not hidden_types:
@@ -65,20 +65,20 @@ class AC_Net(nn.Module):
                 assert htype in ['linear', 'lstm', 'gru']
                 # get the input dimensions
                 # first hidden layer
-                if i is 0:
+                if i == 0:
                     input_d = input_dimensions
                     output_d = hidden_dimensions[i]
-                    if htype is 'linear':
+                    if htype == 'linear':
                         self.hidden.append(nn.Linear(input_d, output_d))
                         self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d))) ##
                         self.hx.append(None) ##
                         self.cx.append(None) ##
-                    elif htype is 'lstm':
+                    elif htype == 'lstm':
                         self.hidden.append(nn.LSTMCell(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
                         self.cx.append(Variable(torch.zeros(self.batch_size, output_d)))
-                    elif htype is 'gru':
+                    elif htype == 'gru':
                         self.hidden.append(nn.GRUCell(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
@@ -89,17 +89,17 @@ class AC_Net(nn.Module):
                     # get the output dimension
                     output_d = hidden_dimensions[i]
                     # construct the layer
-                    if htype is 'linear':
+                    if htype == 'linear':
                         self.hidden.append(nn.Linear(input_d, output_d))
                         self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d))) ##
                         self.hx.append(None)
                         self.cx.append(None)
-                    elif htype is 'lstm':
+                    elif htype == 'lstm':
                         self.hidden.append(nn.LSTMCell(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
                         self.cx.append(Variable(torch.zeros(self.batch_size, output_d)))
-                    elif htype is 'gru':
+                    elif htype == 'gru':
                         self.hidden.append(nn.GRUCell(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
