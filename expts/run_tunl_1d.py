@@ -24,11 +24,11 @@ def bin_rewards(epi_rewards, window_size):
     return avg_rewards
 
 parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
-parser.add_argument("--save_dir",type=str,default='/network/scratch/l/lindongy/timecell/training', help='Path to save data and models')
+parser.add_argument("--save_dir",type=str,default='/network/scratch/l/lindongy/timecell/training/$datetime', help='Path to save data and models')
 parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
 parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
 parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
-parser.add_argument("--load_model_path", type=str, default=None, help="path RELATIVE TO $SCRATCH/timecell/training")
+parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training")
 parser.add_argument("--save_ckpts", type=bool, default=True, help="Whether to save model every save_ckpt_per_epidoes episodes")
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
@@ -43,8 +43,8 @@ print(argsdict)
 save_dir = argsdict['save_dir']
 n_total_episodes = argsdict['n_total_episodes']
 save_ckpt_per_episodes = argsdict['save_ckpt_per_episodes']
-save_ckpts = argsdict['save_ckpts']
-record_data = argsdict['record_data']
+save_ckpts = True if argsdict['save_ckpts'] == True or argsdict['save_ckpts'] == 'True' else False
+record_data = True if argsdict['record_data'] == True or argsdict['record_data'] == 'True' else False
 load_model_path = argsdict['load_model_path']
 window_size = n_total_episodes // 10
 n_neurons = argsdict["n_neurons"]
@@ -68,7 +68,7 @@ ld = len_delay + 1
 
 
 # Load existing model
-if load_model_path is None:
+if load_model_path is 'None':
     ckpt_name = 'untrained_agent'  # placeholder ckptname in case we want to save data in the end
 else:
     ckpt_name = load_model_path.replace('/', '_')
@@ -115,7 +115,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
-    if i_episode % save_ckpt_per_episodes == 0:
+    if (i_episode != 0) and (i_episode % save_ckpt_per_episodes == 0):
         print(f'Episode {i_episode}, {np.mean(correct_perc)*100:.3f}% correct')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_Epi{i_episode}.pt')
