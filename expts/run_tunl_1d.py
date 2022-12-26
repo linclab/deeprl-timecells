@@ -24,11 +24,10 @@ def bin_rewards(epi_rewards, window_size):
     return avg_rewards
 
 parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
-parser.add_argument("--save_dir",type=str,default='/network/scratch/l/lindongy/timecell/training/$datetime', help='Path to save data and models')
 parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
 parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
 parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
-parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training")
+parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d")
 parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
@@ -40,7 +39,6 @@ args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
 
-save_dir = argsdict['save_dir']
 n_total_episodes = argsdict['n_total_episodes']
 save_ckpt_per_episodes = argsdict['save_ckpt_per_episodes']
 save_ckpts = True if argsdict['save_ckpts'] == True or argsdict['save_ckpts'] == 'True' else False
@@ -52,6 +50,16 @@ len_delay = argsdict['len_delay']
 lr = argsdict['lr']
 env_type = argsdict['env_type']
 hidden_type = argsdict['hidden_type']
+
+# Make directory in /training or /data_collecting to save data and model
+if record_data:
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d'
+else:
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d'
+save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
+if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+print(f'Saved tp {save_dir}')
 
 # Setting up cuda and seeds
 # use_cuda = torch.cuda.is_available()
@@ -75,7 +83,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training', load_model_path)))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d', load_model_path)))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -118,7 +126,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         print(f'Episode {i_episode}, {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
-            torch.save(net.state_dict(), save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_Epi{i_episode}.pt')
+            torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 binned_correct_perc = bin_rewards(correct_perc, window_size=window_size)
 
 
@@ -131,11 +139,11 @@ ax1.set_ylim(0,1)
 ax1.set_title(f'{env_title} TUNL')
 ax1.legend()
 #plt.show()
-fig.savefig(save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_{n_total_episodes}episodes_performance.svg')
+fig.savefig(save_dir + f'/total_{n_total_episodes}episodes_performance.svg')
 
 # save data
 if record_data:
     np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_resp=delay_resp)
 else:
-    np.savez_compressed(save_dir + f'/{hidden_type}_{env_type}_{n_neurons}_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice)
+    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice)
 
