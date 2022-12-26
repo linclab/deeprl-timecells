@@ -59,7 +59,7 @@ else:
 save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-print(f'Saved tp {save_dir}')
+print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
 # use_cuda = torch.cuda.is_available()
