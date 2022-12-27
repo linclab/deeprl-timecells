@@ -180,7 +180,7 @@ for i_episode in tqdm(range(n_total_episodes)):
     epi_nav_reward[i_episode] = env.nav_reward
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
-        print(f'Episode {i_episode}, {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
+        print(f'Episode {i_episode}, {np.mean(correct_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 
@@ -201,7 +201,7 @@ ax2.set_xlabel('Episode')
 ax2.set_ylabel('Fraction Nonmatch')
 ax2.set_ylim(0,1)
 ax2.legend()
-fig.savefig(save_dir + f'/total_{n_total_episodes}episodes_performance.svg')
+fig.savefig(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance.svg')
 
 # save data
 if record_data:
@@ -219,11 +219,11 @@ if record_data:
                             ideal_nav_rwds=ideal_nav_rwds)
 else:
     if env_type=='mem':
-        np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
+        np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
                             ct=ct,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds)
     else:
-        np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
+        np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds)
