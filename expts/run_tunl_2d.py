@@ -145,7 +145,7 @@ if env_type == 'mem':
 
 stim = np.zeros((n_total_episodes, 2), dtype=np.int8)
 epi_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
-correct_perc = np.zeros(n_total_episodes, dtype=np.float16)
+nonmatch_perc = np.zeros(n_total_episodes, dtype=np.float16)
 choice = np.zeros((n_total_episodes, 2), dtype=np.int8)  # record the location when done
 ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
 if record_data:
@@ -175,17 +175,17 @@ for i_episode in tqdm(range(n_total_episodes)):
         new_obs, reward, done, info = env.step(act)
         net.rewards.append(reward)
     choice[i_episode] = env.current_loc
-    if env.reward == rwd:
-        correct_perc[i_episode] = 1
+    if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
+        nonmatch_perc[i_episode] = 1
     epi_nav_reward[i_episode] = env.nav_reward
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
-        print(f'Episode {i_episode}, {np.mean(correct_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
+        print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 
 avg_nav_rewards = bin_rewards(epi_nav_reward, window_size)
-binned_correct_perc = bin_rewards(correct_perc, window_size)
+binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size)
 
 
 fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex='all', figsize=(6, 6))
@@ -196,7 +196,7 @@ ax1.set_xlabel('Episode')
 ax1.set_ylabel('Navigation reward')
 ax1.legend()
 
-ax2.plot(np.arange(n_total_episodes), binned_correct_perc, label=net_title)
+ax2.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
 ax2.set_xlabel('Episode')
 ax2.set_ylabel('Fraction Nonmatch')
 ax2.set_ylim(0,1)
