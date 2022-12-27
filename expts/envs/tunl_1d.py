@@ -48,13 +48,13 @@ class TunlEnv(object):
         3 = do nothing meaningful
 
         """
-        self.observation = array([[1, 0, 0]])
+        self.observation = array([[1,1, 0, 0]])
         self.sample = "undefined"
         self.episode_sample = None
         self.delay_t = 0  # time since delay
         self.delay_length = delay
         self.action_space = spaces.Discrete(4)
-        self.observation_space = spaces.MultiBinary(3)
+        self.observation_space = spaces.MultiBinary(4)
         self.reward = 0
         self.done = False
         self.seed()
@@ -70,32 +70,32 @@ class TunlEnv(object):
         :return: observation, reward, done, info
         """
         assert self.action_space.contains(action)
-        if np.all(self.observation == array([[1, 0, 0]])):  # initiation
+        if np.all(self.observation == array([[1,1, 0, 0]])):  # initiation
             if action == 0:
                 if self.sample == "undefined":  # initiate sample phase
                     self.observation = self.episode_sample  # either array([[0,0,1,0]]) or array([[0,0,0,1]])
                     self.sample = self.observation
                 else:  # initiate choice phase
-                    self.observation = array([[0, 1, 1]])
-        elif np.all(self.observation == array([[0, 1, 0]])):  # L touchscreen on
+                    self.observation = array([[0,0, 1, 1]])
+        elif np.all(self.observation == array([[0,0, 1, 0]])):  # L touchscreen on
             if action == 1:  # poke L to continue
-                self.observation = array([[0, 0, 0]])  # enters delay period
-        elif np.all(self.observation == array([[0, 0, 1]])):  # R touchscreen on
+                self.observation = array([[0,0, 0, 0]])  # enters delay period
+        elif np.all(self.observation == array([[0,0, 0, 1]])):  # R touchscreen on
             if action == 2:  # poke R to continue
-                self.observation = array([[0, 0, 0]])  # enters delay period
-        elif np.all(self.observation == array([[0, 0, 0]])):  # delay period
+                self.observation = array([[0,0, 0, 0]])  # enters delay period
+        elif np.all(self.observation == array([[0,0, 0, 0]])):  # delay period
             if self.delay_t < self.delay_length:
                 self.delay_t += 1
             else:
-                self.observation = array([[1, 0, 0]])  # enters initiation
-        elif np.all(self.observation == array([[0, 1, 1]])):  # choice phase
-            if (np.all(self.sample == array([[0, 1, 0]])) and action == 2) or (
-                    np.all(self.sample == array([[0, 0, 1]])) and action == 1):  # choosing nonmatch
+                self.observation = array([[1,1, 0, 0]])  # enters initiation
+        elif np.all(self.observation == array([[0,0, 1, 1]])):  # choice phase
+            if (np.all(self.sample == array([[0,0, 1, 0]])) and action == 2) or (
+                    np.all(self.sample == array([[0,0, 0, 1]])) and action == 1):  # choosing nonmatch
                 self.reward = 1
                 self.correction_trial = False  # reset correction_trial flag
                 self.done = True
-            elif (np.all(self.sample == array([[0, 1, 0]])) and action == 1) or (
-                    np.all(self.sample == array([[0, 0, 1]])) and action == 2):  # choosing mat h
+            elif (np.all(self.sample == array([[0,0, 1, 0]])) and action == 1) or (
+                    np.all(self.sample == array([[0,0, 0, 1]])) and action == 2):  # choosing mat h
                 self.reward = -1
                 self.correction_trial = True  # set correction_trial flag to true to have the same sample in next trial
                 self.done = True
@@ -104,13 +104,13 @@ class TunlEnv(object):
         return self.observation, self.reward, self.done, {}
 
     def reset(self):
-        self.observation = array([[1, 0, 0]])
+        self.observation = array([[1,1, 0, 0]])
         self.delay_t = 0  # time since delay
         self.reward = 0
         self.done = False
         self.sample = "undefined"  # {array([0,1,0])=L, array([0,0,1])=R}
         if self.correction_trial is False:
-            self.episode_sample = random.choices((array([[0, 1, 0]]), array([[0, 0, 1]])))[0]
+            self.episode_sample = random.choices((array([[0,0, 1, 0]]), array([[0,0, 0, 1]])))[0]
 
 
 class TunlEnv_nomem(object):
