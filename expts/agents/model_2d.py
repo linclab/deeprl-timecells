@@ -59,6 +59,9 @@ class AC_Net(nn.Module):
         # store the batch size
         self.batch_size = batch_size
 
+        # store the hidden types
+        self.hidden_types = hidden_types
+
         # check that the correct number of hidden dimensions are specified
         assert len(hidden_types) == len(hidden_dimensions)
 
