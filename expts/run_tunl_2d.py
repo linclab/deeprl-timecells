@@ -122,7 +122,7 @@ net = AC_Net(
     batch_size=1,
     rfsize=rfsize,
     padding=padding,
-    stride=stride).to(device)
+    stride=stride)
 
 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
@@ -147,11 +147,11 @@ stim = np.zeros((n_total_episodes, 2), dtype=np.int8)
 epi_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 correct_perc = np.zeros(n_total_episodes, dtype=np.float16)
 choice = np.zeros((n_total_episodes, 2), dtype=np.int8)  # record the location when done
+ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
 if record_data:
     delay_loc = np.zeros((n_total_episodes, len_delay, 2), dtype=np.int16)  # location during delay
     delay_resp_hx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # hidden states during delay
     delay_resp_cx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # cell states during delay
-    ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
 
 
 for i_episode in tqdm(range(n_total_episodes)):
@@ -163,10 +163,9 @@ for i_episode in tqdm(range(n_total_episodes)):
     if env_type=='mem':
         ct[i_episode] = int(env.correction_trial)
     while not done:
-        pol, val = net.forward(
-            torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float()
-        )  # forward
-        if env.indelay:  # record location and neural responses
+        obs = torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
+        pol, val = net.forward(obs)  # forward
+        if record_data and env.indelay:  # record location and neural responses
             delay_loc[i_episode, env.delay_t - 1, :] = np.asarray(env.current_loc)
             delay_resp_hx[i_episode, env.delay_t - 1, :] = net.hx[
                 net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
