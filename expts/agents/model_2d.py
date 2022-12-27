@@ -174,7 +174,7 @@ class AC_Net(nn.Module):
         Required arguments:
             - x (torch.Tensor): sensory input to the network, should be of size batch x input_d
         """
-        x = torch.Tensor(x).to(self.device)
+        # x = x.to(self.device)
         # check the inputs
         if type(self.input_d) == int:  # eg. input_d = 4, as in tunl 1d
             assert x.shape[-1] == self.input_d
