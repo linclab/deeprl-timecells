@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --array=0-15%15
-#SBATCH --job-name=tunl1d_hparam
-#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl1d/slurm-%j.out
-#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl1d/slurm-%j.err
+#SBATCH --job-name=tunl2d_hparam
+#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl2d/slurm-%j.out
+#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl2d/slurm-%j.err
 #SBATCH --partition=long
-#SBATCH --gres=gpu:2g.20gb:1
+#SBATCH --gres=gpu:2g.20gb:1  # 2g:20gb for tunl1d, rtx8000 for tunl2d
 #SBATCH --cpus-per-gpu=6
 #SBATCH --mem=20G
 #SBATCH --mail-type=END,FAL
@@ -49,10 +49,14 @@ lr=${lr_arr[$lridx]}
 n_neurons=${n_neurons_arr[$nidx]}
 
 # Run 1d experiment
-python expts/run_tunl_1d.py --n_total_episodes 1000000 --save_ckpt_per_episodes 100000 --load_model_path 'None' --save_ckpts True --n_neurons $n_neurons --len_delay $len_delay --lr $lr --seed 1 --env_type $env_type --hidden_type $hidden_type
+# python expts/run_tunl_1d.py --n_total_episodes 1000000 --save_ckpt_per_episodes 100000 --load_model_path 'None' --save_ckpts True --n_neurons $n_neurons --len_delay $len_delay --lr $lr --seed 1 --env_type $env_type --hidden_type $hidden_type
 # Note: if want record_data to be False, don't pass anything. Otherwise it will parse at True.
 
 
 # Save data from 1d experiment checkpoint
 #python expts/run_tunl_1d.py --n_total_episodes 500 --save_ckpt_per_episodes 250 --record_data True --load_model_path '2022-12-25_21-07/lstm_mem_512_Epi499.pt' --n_neurons 512 --len_delay 40 --lr 0.0001 --seed 1 --env_type 'mem' --hidden_type 'lstm'
 # Note: if want save_ckpts to be False, don't pass anything. Otherwise it will parse at True.
+
+# Run 2d experiment
+python expts/run_tunl_2d.py --n_total_episodes 500 --save_ckpt_per_episodes 250 --load_model_path 'None' --save_ckpts True --n_neurons $n_neurons --len_delay $len_delay --lr $lr --seed 1 --env_type $env_type --hidden_type $hidden_type
+# Note: if want record_data to be False, don't pass anything. Otherwise it will parse at True.
