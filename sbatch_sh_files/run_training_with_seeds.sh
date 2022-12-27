@@ -1,3 +1,4 @@
+#!/bin/bash
 #SBATCH --job-name=tunl2d_seed
 #SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl2d/seed_slurm-%j.out
 #SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl2d/seed_slurm-%j.err
@@ -16,5 +17,5 @@ source $HOME/testenv/bin/activate
 
 # Run 2d experiment with selected HParam on 5 seeds
 for seed in {2..5}
-do python expts/run_tunl_2d.py --n_total_episodes 60000 --save_ckpt_per_episodes 10000 --load_model_path 'None' --n_neurons 512 --len_delay 40 --lr 0.00001 --seed $seed --env_type 'mem'
+do python expts/run_tunl_2d.py --n_total_episodes 60000 --save_ckpt_per_episodes 10000 --load_model_path 'None' --n_neurons 512 --len_delay 40 --lr 0.00001 --seed $seed --env_type 'nomem'
 done
