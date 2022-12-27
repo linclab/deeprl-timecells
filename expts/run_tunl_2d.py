@@ -1,89 +1,13 @@
 import random
 import os
-from envs.tunl_2d import *
+from envs.tunl_2d import Tunl, Tunl_nomem
 from agents.model_2d import *
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
-
-mem, nomem, mem_vd, nomem_vd = [False, False, False, False]
-mem = True
-env_title = 'Tunl Mem'
-
-if mem or nomem:
-    ld = 40
-elif mem_vd or nomem_vd:
-    len_delays = [20, 40, 60]
-    len_delays_p = [1, 1, 1]
-    ld = max(len_delays)
-
-len_edge = 7
-rwd = 100
-inc_rwd = -20
-step_rwd = -0.1
-poke_rwd = 5
-rng_seed = 1234
-
-if mem:
-    env = Tunl(ld, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, rng_seed)
-elif nomem:
-    env = Tunl_nomem(ld, len_edge, rwd, step_rwd, poke_rwd, rng_seed)
-elif mem_vd:
-    env = Tunl_vd(len_delays, len_delays_p, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, rng_seed)
-elif nomem_vd:
-    env = Tunl_nomem_vd(len_delays, len_delays_p, len_edge, rwd, step_rwd, poke_rwd, rng_seed)
-
-n_neurons = 512
-lr = 1e-5
-batch_size = 1
-rfsize = 2
-padding = 0
-stride = 1
-dilation = 1
-conv_1_features = 16
-conv_2_features = 32
-hidden_types = ['conv', 'pool', 'conv', 'pool', 'lstm', 'linear']
-net_title = hidden_types[4]
-l2_reg = False
-
-n_total_episodes = 50000
-window_size = 5000  # for plotting
-
-# Define conv & pool layer sizes
-layer_1_out_h, layer_1_out_w = conv_output(env.h, env.w, padding, dilation, rfsize, stride)
-layer_2_out_h, layer_2_out_w = conv_output(layer_1_out_h, layer_1_out_w, padding, dilation, rfsize, stride)
-layer_3_out_h, layer_3_out_w = conv_output(layer_2_out_h, layer_2_out_w, padding, dilation, rfsize, stride)
-layer_4_out_h, layer_4_out_w = conv_output(layer_3_out_h, layer_3_out_w, padding, dilation, rfsize, stride)
-
-# Initializes network
-
-net = AC_Net(
-    input_dimensions=(env.h, env.w, 3),  # input dim
-    action_dimensions=6,  # action dim
-    hidden_types=hidden_types,  # hidden types
-    hidden_dimensions=[
-        (layer_1_out_h, layer_1_out_w, conv_1_features),  # conv
-        (layer_2_out_h, layer_2_out_w, conv_1_features),  # pool
-        (layer_3_out_h, layer_3_out_w, conv_2_features),  # conv
-        (layer_4_out_h, layer_4_out_w, conv_2_features),  # pool
-        n_neurons,
-        n_neurons],  # hidden_dims
-    batch_size=batch_size,
-    rfsize=rfsize,
-    padding=padding,
-    stride=stride)
-
-# If load pre-trained network
-'''
-load_dir = '2021_03_07_21_58_43_7_10_1e-05/net.pt'
-parent_dir = '/home/mila/l/lindongy/tunl2d/data'
-net.load_state_dict(torch.load(os.path.join(parent_dir, load_dir)))
-'''
-
-# Initializes optimizer
-optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-
+import argparse
+from tqdm import tqdm
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -110,34 +34,134 @@ def ideal_nav_rwd(env, len_edge, len_delay, step_rwd, poke_rwd):
     return ideal_nav_reward
 
 
-# Train and record
-# Initialize arrays for recording
-if mem_vd or nomem_vd:
-    len_delay = np.zeros(n_total_episodes, dtype=np.int8)  # length of delay for each trial
+parser = argparse.ArgumentParser(description="Non-location-fixed TUNL 2D task simulation")
+parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
+parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
+parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
+parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl2d")
+parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
+parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
+parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
+parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
+parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproducibility")
+parser.add_argument("--env_type", type=str, default='mem', help="type of environment: mem or nomem")
+parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
+parser.add_argument("--len_edge", type=int, default=7, help="Length of the longer edge of the triangular arena. Must be odd number >=5")
+parser.add_argument("--nonmatch_reward", type=int, default=100, help="Magnitude of reward when agent chooses nonmatch side")
+parser.add_argument("--incorrect_reward", type=int, default=-20, help="Magnitude of reward when agent chooses match side")
+parser.add_argument("--step_reward", type=float, default=-0.1, help="Magnitude of reward for each action agent takes, to ensure shortest path")
+parser.add_argument("--poke_reward", type=int, default=5, help="Magnitude of reward when agent pokes signal to proceed")
+args = parser.parse_args()
+argsdict = args.__dict__
+print(argsdict)
 
-if mem or mem_vd:
+n_total_episodes = argsdict['n_total_episodes']
+save_ckpt_per_episodes = argsdict['save_ckpt_per_episodes']
+save_ckpts = True if argsdict['save_ckpts'] == True or argsdict['save_ckpts'] == 'True' else False
+record_data = True if argsdict['record_data'] == True or argsdict['record_data'] == 'True' else False
+load_model_path = argsdict['load_model_path']
+window_size = n_total_episodes // 10
+n_neurons = argsdict["n_neurons"]
+len_delay = argsdict['len_delay']
+lr = argsdict['lr']
+env_type = argsdict['env_type']
+hidden_type = argsdict['hidden_type']
+len_edge = argsdict['len_edge']
+rwd = argsdict['nonmatch_reward']
+inc_rwd = argsdict['incorrect_reward']
+step_rwd = argsdict['step_reward']
+poke_rwd = argsdict['poke_reward']
+seed = argsdict['seed']
+
+
+# Make directory in /training or /data_collecting to save data and model
+if record_data:
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl2d'
+else:
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl2d'
+save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
+if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+print(f'Saved to {save_dir}')
+
+# Setting up cuda and seeds
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda:0" if use_cuda else "cpu")
+torch.manual_seed(argsdict["seed"])
+np.random.seed(argsdict["seed"])
+
+
+env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, step_rwd, poke_rwd, seed)
+
+rfsize = 2
+padding = 0
+stride = 1
+dilation = 1
+conv_1_features = 16
+conv_2_features = 32
+
+# Define conv & pool layer sizes
+layer_1_out_h, layer_1_out_w = conv_output(env.h, env.w, padding, dilation, rfsize, stride)
+layer_2_out_h, layer_2_out_w = conv_output(layer_1_out_h, layer_1_out_w, padding, dilation, rfsize, stride)
+layer_3_out_h, layer_3_out_w = conv_output(layer_2_out_h, layer_2_out_w, padding, dilation, rfsize, stride)
+layer_4_out_h, layer_4_out_w = conv_output(layer_3_out_h, layer_3_out_w, padding, dilation, rfsize, stride)
+
+# Initializes network
+
+net = AC_Net(
+    input_dimensions=(env.h, env.w, 3),  # input dim
+    action_dimensions=6,  # action dim
+    hidden_types=['conv', 'pool', 'conv', 'pool', hidden_type, 'linear'],  # hidden types
+    hidden_dimensions=[
+        (layer_1_out_h, layer_1_out_w, conv_1_features),  # conv
+        (layer_2_out_h, layer_2_out_w, conv_1_features),  # pool
+        (layer_3_out_h, layer_3_out_w, conv_2_features),  # conv
+        (layer_4_out_h, layer_4_out_w, conv_2_features),  # pool
+        n_neurons,
+        n_neurons],  # hidden_dims
+    batch_size=1,
+    rfsize=rfsize,
+    padding=padding,
+    stride=stride).to(device)
+
+optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
+net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
+
+# Load existing model
+if load_model_path=='None':
+    ckpt_name = 'untrained_agent'  # placeholder ckptname in case we want to save data in the end
+else:
+    ckpt_name = load_model_path.replace('/', '_')
+    # assert loaded model has congruent hidden type and n_neurons
+    assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
+    assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl2d', load_model_path)))
+
+
+# Initialize arrays for recording
+if env_type == 'mem':
     ct = np.zeros(n_total_episodes, dtype=np.int8)  # whether it's a correction trial or not
 
 stim = np.zeros((n_total_episodes, 2), dtype=np.int8)
 epi_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 correct_perc = np.zeros(n_total_episodes, dtype=np.float16)
 choice = np.zeros((n_total_episodes, 2), dtype=np.int8)  # record the location when done
-delay_loc = np.zeros((n_total_episodes, ld, 2), dtype=np.int16)  # location during delay
-delay_resp_hx = np.zeros((n_total_episodes, ld, n_neurons), dtype=np.float32)  # hidden states during delay
-delay_resp_cx = np.zeros((n_total_episodes, ld, n_neurons), dtype=np.float32)  # cell states during delay
-ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
+if record_data:
+    delay_loc = np.zeros((n_total_episodes, len_delay, 2), dtype=np.int16)  # location during delay
+    delay_resp_hx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # hidden states during delay
+    delay_resp_cx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # cell states during delay
+    ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
 
 
-for i_episode in range(n_total_episodes):
+for i_episode in tqdm(range(n_total_episodes)):
     done = False
     env.reset()
     ideal_nav_rwds[i_episode] = ideal_nav_rwd(env, len_edge, env.len_delay, step_rwd, poke_rwd)
     net.reinit_hid()
     stim[i_episode] = env.sample_loc
-    if mem or mem_vd:
+    if env_type=='mem':
         ct[i_episode] = int(env.correction_trial)
-    if mem_vd or nomem_vd:
-        len_delay[i_episode] = env.len_delay  # For vd or it only
     while not done:
         pol, val = net.forward(
             torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float()
@@ -145,9 +169,9 @@ for i_episode in range(n_total_episodes):
         if env.indelay:  # record location and neural responses
             delay_loc[i_episode, env.delay_t - 1, :] = np.asarray(env.current_loc)
             delay_resp_hx[i_episode, env.delay_t - 1, :] = net.hx[
-                hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+                net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
             delay_resp_cx[i_episode, env.delay_t - 1, :] = net.cx[
-                hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+                net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
         act, p, v = select_action(net, pol, val)
         new_obs, reward, done, info = env.step(act)
         net.rewards.append(reward)
@@ -156,49 +180,52 @@ for i_episode in range(n_total_episodes):
         correct_perc[i_episode] = 1
     epi_nav_reward[i_episode] = env.nav_reward
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+    if (i_episode+1) % save_ckpt_per_episodes == 0:
+        print(f'Episode {i_episode}, {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
+        if save_ckpts:
+            torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 
 avg_nav_rewards = bin_rewards(epi_nav_reward, window_size)
-correct_perc = bin_rewards(correct_perc, window_size)
+binned_correct_perc = bin_rewards(correct_perc, window_size)
 
-# Make directory to save data and figures
-directory = datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + f"_{env_title}_{net_title}"
-parent_dir = '/home/mila/l/lindongy/tunl2d/data'
-path = os.path.join(parent_dir, directory)
-os.mkdir(path)
 
-fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=True, figsize=(6, 6))
-
-fig.suptitle(env_title)
-
+fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex='all', figsize=(6, 6))
+fig.suptitle(f'{env_title} TUNL')
 ax1.plot(np.arange(n_total_episodes), avg_nav_rewards, label=net_title)
-ax1.plot(np.arange(n_total_episodes), ideal_nav_rwds, label="Ideal navig reward")
-ax1.set_xlabel('episode')
-ax1.set_ylabel('navigation reward')
+ax1.plot(np.arange(n_total_episodes), ideal_nav_rwds, label="Ideal navigation reward")
+ax1.set_xlabel('Episode')
+ax1.set_ylabel('Navigation reward')
 ax1.legend()
 
-ax2.plot(np.arange(n_total_episodes), correct_perc, label=net_title)
-ax2.set_xlabel('episode')
-ax2.set_ylabel('correct %')
+ax2.plot(np.arange(n_total_episodes), binned_correct_perc, label=net_title)
+ax2.set_xlabel('Episode')
+ax2.set_ylabel('Fraction Nonmatch')
+ax2.set_ylim(0,1)
 ax2.legend()
-
-
-# plt.show()
-fig.savefig(path+'/fig.png')
+fig.savefig(save_dir + f'/total_{n_total_episodes}episodes_performance.svg')
 
 # save data
-if mem:
-    np.savez_compressed(path + '/data.npz', stim=stim, choice=choice, ct=ct, delay_loc=delay_loc,
-                        delay_resp_hx=delay_resp_hx,
-                        delay_resp_cx=delay_resp_cx)
-elif nomem:
-    np.savez_compressed(path + '/data.npz', stim=stim, choice=choice, delay_loc=delay_loc, delay_resp_hx=delay_resp_hx,
-                        delay_resp_cx=delay_resp_cx)
-elif mem_vd:
-    np.savez_compressed(path + '/data.npz', stim=stim, choice=choice, ct=ct, len_delay=len_delay, delay_loc=delay_loc,
-                        delay_resp_hx=delay_resp_hx, delay_resp_cx=delay_resp_cx)
-elif nomem_vd:
-    np.savez_compressed(path + '/data.npz', stim=stim, choice=choice, len_delay=len_delay, delay_loc=delay_loc,
-                        delay_resp_hx=delay_resp_hx, delay_resp_cx=delay_resp_cx)
+if record_data:
+    if env_type=='mem':
+        np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, ct=ct, delay_loc=delay_loc,
+                            delay_resp_hx=delay_resp_hx,
+                            delay_resp_cx=delay_resp_cx,
+                            epi_nav_reward=epi_nav_reward,
+                            ideal_nav_rwds=ideal_nav_rwds)
+    else:
+        np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_loc=delay_loc,
+                            delay_resp_hx=delay_resp_hx,
+                            delay_resp_cx=delay_resp_cx,
+                            epi_nav_reward=epi_nav_reward,
+                            ideal_nav_rwds=ideal_nav_rwds)
+else:
+    if env_type=='mem':
+        np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
+                            ct=ct,
+                            epi_nav_reward=epi_nav_reward,
+                            ideal_nav_rwds=ideal_nav_rwds)
+    else:
+        np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
+                            epi_nav_reward=epi_nav_reward,
+                            ideal_nav_rwds=ideal_nav_rwds)
 
-# save net
-torch.save(net.state_dict(), path+'/net.pt')
