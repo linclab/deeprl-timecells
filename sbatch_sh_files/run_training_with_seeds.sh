@@ -16,6 +16,11 @@ source $HOME/testenv/bin/activate
 
 
 # Run 2d experiment with selected HParam on 5 seeds
+#for seed in {2..5}
+#do python expts/run_tunl_2d.py --n_total_episodes 60000 --save_ckpt_per_episodes 10000 --load_model_path 'None' --n_neurons 512 --len_delay 40 --lr 0.00001 --seed $seed --env_type 'nomem'
+#done
+
+# Run timing experiment with selected HParam on 5 seeds
 for seed in {2..5}
-do python expts/run_tunl_2d.py --n_total_episodes 60000 --save_ckpt_per_episodes 10000 --load_model_path 'None' --n_neurons 512 --len_delay 40 --lr 0.00001 --seed $seed --env_type 'nomem'
+do python expts/run_int_discrim.py --n_total_episodes 150000 --save_ckpt_per_episodes 30000 --load_model_path 'None' --n_neurons 128 --lr 0.00001 --seed $seed --hidden_type 'lstm'
 done
