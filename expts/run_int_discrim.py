@@ -7,11 +7,11 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
-from linclab_utils import plot_utils
+#from linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
 
-plot_utils.linclab_plt_defaults()
+#plot_utils.linclab_plt_defaults()
 # plot_utils.set_font(font='Helvetica')
 
 parser = argparse.ArgumentParser(description="Head-fixed Interval Discrimination task simulation")
@@ -113,8 +113,7 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode,0] = env.first_stim
     stim[i_episode,1] = env.second_stim
     while not done:
-        # perform the task
-        pol, val = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))  # forward
+        pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))  # forward
         if env.task_stage in ['init', 'choice_init']:
             act, p, v = select_action(net, pol, val)
             new_obs, reward, done = env.step(act)
@@ -146,7 +145,6 @@ for i_episode in tqdm(range(n_total_episodes)):
         if env.task_stage == 'choice_init':
             action_hist[i_episode] = act
             correct_trial[i_episode] = env.correct_trial
-    breakpoint()  # check if np.all(action_hist==correct_trial) and if they're all binary
     p_loss, v_loss = finish_trial(net, 1, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         print(f'Episode {i_episode}, {np.mean(correct_trial[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_trial[:i_episode+1])*100:.3f}% correct')
@@ -169,7 +167,5 @@ if record_data:
                         stim=stim, stim1_resp_hx=stim1_resp,
                         stim2_resp_hx=stim2_resp, delay_resp_hx=delay_resp)
 else:
-    np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', action_hist=action_hist, correct_trial=correct_trial,
-                        stim=stim, stim1_resp_hx=stim1_resp,
-                        stim2_resp_hx=stim2_resp, delay_resp_hx=delay_resp)
+    np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', action_hist=action_hist, correct_trial=correct_trial, stim=stim)
 
