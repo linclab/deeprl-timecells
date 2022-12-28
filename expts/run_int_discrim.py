@@ -133,13 +133,13 @@ for i_episode in tqdm(range(n_total_episodes)):
                     net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
         elif record_data and hidden_type=='linear':
             if env.task_stage == 'first_stim' and env.elapsed_t > 0:
-                stim1_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                stim1_resp[i_episode, env.elapsed_t-1, :] = net.cell_out[
                     net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
             elif env.task_stage == 'second_stim' and env.elapsed_t > 0:
-                stim2_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                stim2_resp[i_episode, env.elapsed_t-1, :] = net.cell_out[
                     net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
             elif env.task_stage == 'delay' and env.elapsed_t > 0:
-                delay_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                delay_resp[i_episode, env.elapsed_t-1, :] = net.cell_out[
                     net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
 
         if env.task_stage == 'choice_init':
