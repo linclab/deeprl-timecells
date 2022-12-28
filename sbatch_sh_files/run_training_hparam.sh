@@ -47,7 +47,8 @@ hidden_type=${hidden_type_arr[$htidx]}
 lr=${lr_arr[$lridx]}
 n_neurons=${n_neurons_arr[$nidx]}
 
-load_model_path='$env_type_$len_delay_$hidden_type_$n_neurons_$lr/seed_1_epi999999.pt'
+load_model_path="$env_type $len_delay $hidden_type $n_neurons $lr/seed_1_epi999999.pt"
+load_model_path=$(echo $load_model_path | sed 's/ /_/g')
 
 # Run 1d experiment
 python expts/run_tunl_1d.py --n_total_episodes 1000000 --save_ckpt_per_episodes 100000 --load_model_path $load_model_path --save_ckpts True --n_neurons $n_neurons --len_delay $len_delay --lr $lr --seed 1 --env_type $env_type --hidden_type $hidden_type
