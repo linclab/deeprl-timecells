@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --array=0-15%15
-#SBATCH --job-name=tunl1d_inp4_hparam
-#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl1d_inp4/slurm-%A.%a.out
-#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl1d_inp4/slurm-%A.%a.err
+#SBATCH --job-name=tunl1d_hparam
+#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl1d/slurm-%A.%a.out
+#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl1d/slurm-%A.%a.err
 #SBATCH --partition=long
 #SBATCH --gres=gpu:rtx8000:1  # 2g:20gb for tunl1d, rtx8000 for tunl2d
 #SBATCH --cpus-per-gpu=6

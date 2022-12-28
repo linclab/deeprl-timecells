@@ -55,7 +55,7 @@ hidden_type = argsdict['hidden_type']
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_inp4'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d'
 save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
@@ -68,7 +68,7 @@ torch.manual_seed(argsdict["seed"])
 np.random.seed(argsdict["seed"])
 
 env = TunlEnv(len_delay) if env_type=='mem' else TunlEnv_nomem(len_delay)
-net = AC_Net(4, 4, 1, ['linear', hidden_type, 'linear'], [n_neurons, n_neurons, n_neurons])
+net = AC_Net(3, 4, 1, ['linear', hidden_type, 'linear'], [n_neurons, n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
@@ -83,7 +83,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_inp4', load_model_path), map_location=torch.device('cpu')))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -94,9 +94,9 @@ if record_data:
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
     env.reset()
-    if np.all(env.episode_sample == array([[0,0, 1, 0]])):  # L
+    if np.all(env.episode_sample == array([[0, 1, 0]])):  # L
         stim[i_episode] = 0
-    elif np.all(env.episode_sample == array([[0,0, 0, 1]])):  # R
+    elif np.all(env.episode_sample == array([[0, 0, 1]])):  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
@@ -104,7 +104,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     obs = torch.as_tensor(env.observation)
     while not done:
         pol, val, lin_act = net.forward(obs.float())
-        if record_data and torch.equal(obs, torch.tensor([[0,0, 0, 0]])):
+        if record_data and torch.equal(obs, torch.tensor([[0, 0, 0]])):
             if net.hidden_types[1] == 'linear':
                 resp.append(
                     net.cell_out[1].detach().numpy().squeeze())  # pre-relu activity of first layer of linear cell
