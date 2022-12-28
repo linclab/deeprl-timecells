@@ -1,7 +1,5 @@
-from cmath import nan
 from utils_int_discrim import *
-from expts.envs.int_discrim import *
-from linclab_utils import plot_utils
+from analysis.linclab_utils import plot_utils
 import numpy as np
 
 plot_utils.linclab_plt_defaults()

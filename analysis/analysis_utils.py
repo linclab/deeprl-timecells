@@ -1,14 +1,27 @@
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn import svm
 import torch
 import numpy as np
-from linclab_utils import plot_utils
+from analysis.linclab_utils import plot_utils
+import os
 
-global figpath
-figpath = "ccn_figures/" # path to save figure
+
+def bin_rewards(epi_rewards, window_size):
+    """
+    Average the epi_rewards with a moving window.
+    """
+    epi_rewards = epi_rewards.astype(np.float32)
+    avg_rewards = np.zeros_like(epi_rewards)
+    for i_episode in range(1, len(epi_rewards)+1):
+        if 1 < i_episode < window_size:
+            avg_rewards[i_episode-1] = np.mean(epi_rewards[:i_episode])
+        elif window_size <= i_episode <= len(epi_rewards):
+            avg_rewards[i_episode-1] = np.mean(epi_rewards[i_episode - window_size: i_episode])
+    return avg_rewards
+
 
 def make_autopct(values):
     def my_autopct(pct):
@@ -18,20 +31,18 @@ def make_autopct(values):
 
     return my_autopct
 
-def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, figpath, label, filename=None):
+
+def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, label):
     neuron_counts = np.array([n_ramp_neurons, n_seq_neurons, (512 - n_neurons)])
-    neuron_labels = ['Ramping cells', 'Sequence cells', 'Not included in analysis']
+    neuron_labels = ['Ramping cells', 'Sequence cells', 'Other cells']
     plt.figure()
     plt.pie(neuron_counts, labels=neuron_labels, autopct=make_autopct(neuron_counts))
     plt.title(label)
-    #plt.show()
-    if not filename==None:
-        plt.savefig(figpath + filename + '.png')
-    #else:
-    #    plt.savefig(figpath + '/neuron_counts.png')
+    plt.show()
+    # plt.savefig(os.path.join(save_dir, 'piechart.svg'))
 
 
-def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, filepath=None, filename=None):
+def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, save_dir=None, filename=None):
     """
     Plot sorted normalized average-response matrix. On y-axis, display where in the layer the cell is.
     Note: normalize whole range, not just absolute value
@@ -59,14 +70,10 @@ def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, 
     ax.set_ylabel('Unit #')
     ax.set_title(title + f' \n PE={entropy:.2f} \n TS={ts:.2f} \n SqI={sqi:.2f}')
     plt.show()
-    #plt.savefig(figpath + filename +'.png')
-
-#def population_rescale(resp, stim):
+    #plt.savefig(os.path.join(save_dir,  f'{title}.svg'))
 
 
-
-
-def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_delay, n_neurons, remove_nan=True):
+def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_delay, n_neurons, save_dir, remove_nan=True):
     """
     Given response matrices a and b (plotted on the left and right, respectively),
     plot sorted_averaged_resp (between 0 and 1) for matrix a, then sort matrix b
@@ -77,7 +84,6 @@ def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_d
     - len_delay
     - n_neurons
     """
-    global figpath
     segments_a = np.moveaxis(resp_a, 0, 1)
     segments_b = np.moveaxis(resp_b, 0, 1)
     unsorted_matrix_a = np.zeros((n_neurons, len_delay))
@@ -126,8 +132,7 @@ def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_d
     ax.set_aspect('auto')
     ax2.set_aspect('auto')
     plt.show()
-    #plt.savefig(figpath + f'/sorted_in_same_order_{big_title}.png')
-
+    #plt.savefig(os.path.join(save_dir, f'sorted_in_same_order_{big_title}.svg'))
 
 
 def split_train_and_test(percent_train, total_resp, total_stim, seed):
@@ -196,7 +201,7 @@ def decode_sample_from_single_time(total_resp, total_stim, n_fold=5):
     return accuracies, accuracies_shuff
 
 
-def plot_decode_sample_from_single_time(total_resp, total_stim, title, n_fold=5, max_iter=100):
+def plot_decode_sample_from_single_time(total_resp, total_stim, title, save_dir, n_fold=5, max_iter=100):
     """
     Arguments:
     - total_resp (eg. lstm, or first delay)
@@ -204,20 +209,156 @@ def plot_decode_sample_from_single_time(total_resp, total_stim, title, n_fold=5,
     - title: str
     - max_iter: for LogisticRegression (default = 100)
     """
-    global figpath
     accuracies, accuracies_shuff = decode_sample_from_single_time(total_resp, total_stim, n_fold=n_fold)
     len_delay = np.shape(total_resp)[1]
     fig, ax = plt.subplots()
     ax.plot(np.arange(len_delay), np.mean(accuracies, axis=0), label='unshuffled', color=plot_utils.LINCLAB_COLS['green']) # TODO: green/purple for mem/nomem
-    ax.fill_between(np.arange(len_delay), np.mean(accuracies, axis=0) - np.std(accuracies, axis=0), np.mean(accuracies, axis=0) + np.std(accuracies, axis=0), facecolor=plot_utils.LINCLAB_COLS['green'], alpha=0.5)
+    ax.fill_between(np.arange(len_delay), np.mean(accuracies, axis=0) - np.std(accuracies, axis=0), np.mean(accuracies, axis=0) + np.std(accuracies, axis=0), facecolor=
+    plot_utils.LINCLAB_COLS['green'], alpha=0.5)
     ax.plot(np.arange(len_delay), np.mean(accuracies_shuff, axis=0), label='unit-shuffled', color=plot_utils.LINCLAB_COLS['grey'])
-    ax.fill_between(np.arange(len_delay), np.mean(accuracies_shuff, axis=0) - np.std(accuracies_shuff, axis=0), np.mean(accuracies_shuff, axis=0) + np.std(accuracies_shuff, axis=0), facecolor=plot_utils.LINCLAB_COLS['grey'], alpha=0.5)
+    ax.fill_between(np.arange(len_delay), np.mean(accuracies_shuff, axis=0) - np.std(accuracies_shuff, axis=0), np.mean(accuracies_shuff, axis=0) + np.std(accuracies_shuff, axis=0), facecolor=
+    plot_utils.LINCLAB_COLS['grey'], alpha=0.5)
     ax.set(xlabel='Time since delay onset', ylabel='Stimulus decoding accuracy',
            title=title)
     ax.set_xticks(np.arange(len_delay, step=10))
     ax.legend()
     plt.show()
-    #plt.savefig(figpath + f'/decode_stim_{title}.png')
+    #plt.savefig(os.path.join(save_dir, f'decode_stim_{title}.svg'))
+
+def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_dir):
+    """
+    Decode time with linear regression.
+    :param delay_resp: n_episodes x len_delay x n_neurons
+    :param len_delay: int
+    :param n_neurons: int
+    :param bin_size: int (1000)
+    :param title: str
+    :param plot: bool (default=False). Plot p_matrix as heatmap, with blue line indicating highest-probability decoded bin
+    :return: p_matrix: len_delay (decoded) x len_delay (elapsed), each entry is probability of decoded time given resp at elapsed time
+    :return: time_decode_error: mean absolute value of error-percentage
+    :return: time_deocde_entropy: entropy of the probability matrix
+    """
+    global figpath
+    clf = LinearRegression()
+    epi_t = np.array(np.meshgrid(np.arange(0, bin_size), np.arange(len_delay))).T.reshape(-1, 2)
+    np.random.shuffle(epi_t)  # random combination of episode number and time
+    percent_train = 0.6
+    epi_t_train = epi_t[:int(percent_train * len_delay * bin_size)]  # 0.6*40000 by 2
+    epi_t_test = epi_t[int(percent_train * len_delay * bin_size):]
+    r_train = np.zeros((len(epi_t_train), n_neurons))
+    r_test = np.zeros((len(epi_t_test), n_neurons))
+    for i in range(len(epi_t_train)):
+        r_train[i] = delay_resp[epi_t_train[i, 0], epi_t_train[i, 1], :]
+    for i in range(len(epi_t_test)):
+        r_test[i] = delay_resp[epi_t_test[i, 0], epi_t_test[i, 1], :]
+    t_train = np.squeeze(epi_t_train[:, 1])
+    t_test = np.squeeze(epi_t_test[:, 1])
+
+    reg = clf.fit(r_train, t_train)
+    print("R2 on train: ", reg.score(r_train, t_train))
+    t_test_pred = reg.predict(r_test)
+    mean_pred = np.zeros(len_delay)
+    std_pred = np.zeros(len_delay)
+    for t_elapsed in range(len_delay):
+        mean_pred[t_elapsed] = np.mean(t_test_pred[t_test == t_elapsed])
+        std_pred[t_elapsed] = np.std(t_test_pred[t_test == t_elapsed])# 1 x len_delay
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    ax.scatter(x=t_test, y=t_test_pred,s=1)
+    ax.set_xlabel('Time since delay onset')
+    ax.set_ylabel('Decoded time')
+    ax.plot(np.arange(len_delay), np.arange(len_delay),color='k')
+    ax.plot(np.arange(len_delay), mean_pred, color=plot_utils.LINCLAB_COLS['blue'])
+    ax.fill_between(np.arange(len_delay), mean_pred-std_pred,  mean_pred+std_pred, color='skyblue',alpha=0.4)
+    ax.set_xticks([0, len_delay])
+    ax.set_xticklabels(['0', str(len_delay)])
+    ax.set_yticks([0, len_delay])
+    ax.set_yticklabels(['0', str(len_delay)])
+    ax.set_title(f'Decode Time {title}')
+    #ax.set_xlim((np.min(t_test_pred),np.max(t_test_pred)))
+    #ax.set_ylim((0,len_delay))
+    plt.show()
+    #plt.savefig(os.path.join(save_dir, f'decode_time_linreg_{title}.svg'))
+
+
+
+def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir):
+    len_delay = np.shape(total_resp)[1]
+    n_neurons = np.shape(total_resp)[2]
+    print("Number of correct trials: ", np.sum(binary_stim==1))
+    print("Number of incorrect trials: ", np.sum(binary_stim==0))
+
+    assert len(total_resp) == len(binary_stim)
+    assert all(elem in list(np.arange(n_neurons)) for elem in cell_nums)
+
+    for i_neuron in cell_nums:
+        #idx = np.random.permutation(np.min(np.sum(binary_stim==0), np.sum(binary_stim==1)))[:100]
+        xl = total_resp[binary_stim == 0, :, i_neuron][-100:]
+        xr = total_resp[binary_stim == 1, :, i_neuron][-100:]
+        norm_xl = stats.zscore(xl, axis=1)
+        norm_xr = stats.zscore(xr, axis=1)
+
+        fig, (ax1, ax2, ax3) = plt.subplots(ncols=1, nrows=3, figsize=(5, 8), sharex=True,
+                                            gridspec_kw={'height_ratios': [2, 2, 1.5]})
+        fig.suptitle(f'Unit #{i_neuron}')
+
+        im = ax1.imshow(norm_xl, cmap='jet')
+        ax1.set_aspect('auto')
+        ax1.set_xticks(np.arange(len_delay, step=10))
+        ax1.set_yticks([0, len(norm_xl)])
+        ax1.set_yticklabels(['1', '100'])
+        ax1.set_ylabel(f'Correct trials')
+
+        im2 = ax2.imshow(norm_xr, cmap='jet')
+        ax2.set_aspect('auto')
+        ax2.set_xticks(np.arange(len_delay, step=10))
+        ax2.set_yticks([0, len(norm_xr)])
+        ax2.set_yticklabels(['1', '100'])
+        ax2.set_ylabel(f'Incorrect trials')
+
+        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Correct', color=plot_utils.LINCLAB_COLS['yellow'])
+        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Incorrect', color=plot_utils.LINCLAB_COLS['brown'])
+        ax3.set_xlabel('Time since delay period onset')
+        ax3.legend(loc='upper right', fontsize='medium')
+        ax3.set_ylabel('Avg activation')
+        # plt.show()
+        if not os.path.exists(os.path.join(save_dir, 'single_unit_v_time')):
+            os.mkdir(os.path.join(save_dir, 'single_unit_v_time'))
+        if not os.path.exists(os.path.join(save_dir, 'single_unit_v_time', type)):
+            os.mkdir(os.path.join(save_dir, 'single_unit_v_time', type))
+        plt.savefig(os.path.join(save_dir, 'single_unit_v_time', type, f'{i_neuron}.svg'))
+
+
+# ================= TO CHUCK =================================
+
+def plot_dim_vs_delay_t(delay_resp, title, save_dir, n_trials=5, var_explained=0.9):
+    """
+    Plot dimension (by default explains 90% variance) of single-time activities vs elapsed time.
+    :param delay_resp: n_episodes x len_delay x n_neurons. Use a single analysis bin (eg. 1000 episodes) rather than
+    entire training session.
+    :param n_trials: number of trials to average over
+    :param var_explained: how much variance you want the dimension. Default = 0.9
+    """
+    len_delay = np.shape(delay_resp)[1]
+    dim = np.zeros((n_trials, len_delay-1))
+    epi_shuff = np.arange(int(len(delay_resp)))
+    np.random.shuffle(epi_shuff)
+    for i_trial in range(n_trials):
+        episode = epi_shuff[i_trial]
+        for t in range(1, len_delay):
+            delay_resp_t = delay_resp[episode, :t+1, :]
+            pca_model = PCA()
+            pca_model.fit(delay_resp_t)
+            cumsum = pca_model.explained_variance_ratio_.cumsum()
+            dim[i_trial, t-1] = next(x[0] for x in enumerate(cumsum) if x[1] > var_explained)
+    fig, ax0 = plt.subplots()
+    ax0.plot(np.arange(len_delay-1), np.mean(dim, axis=0), color=plot_utils.LINCLAB_COLS['blue'])
+    ax0.fill_between(np.arange(len_delay-1), np.mean(dim, axis=0) - np.std(dim, axis=0), np.mean(dim, axis=0) + np.std(dim, axis=0), color='skyblue')
+    ax0.set_xlabel('Time since delay onset')
+    ax0.set_ylabel('Cumulative Dimensionality')
+    ax0.set_title(title)
+    plt.show()
+    # plt.savefig(os.path.join(save_dir + f'dim_v_delay_{title}.svg'))
 
 
 def separate_vd_resp(resp, len_delay):
@@ -331,7 +472,7 @@ def plot_sorted_vd(resp_dict, remove_nan=True):
     plt.show()
 
 
-def time_decode(delay_resp, len_delay, n_neurons, bin_size, title, plot=False):
+def time_decode(delay_resp, len_delay, n_neurons, bin_size, save_dir, title, plot=False):
     """
     Decode time with multiclass logistic regression.
     :param delay_resp: n_episodes x len_delay x n_neurons
@@ -344,9 +485,8 @@ def time_decode(delay_resp, len_delay, n_neurons, bin_size, title, plot=False):
     :return: time_decode_error: mean absolute value of error-percentage
     :return: time_deocde_entropy: entropy of the probability matrix
     """
-    global figpath
     p_matrix = np.zeros((len_delay, len_delay))
-    clf = LogisticRegression(multi_class='multinomial')
+    clf = LogisticRegression(multi_class='multinomial')  # TODO: find the code that use linear regression
     epi_t = np.array(np.meshgrid(np.arange(0, bin_size), np.arange(len_delay))).T.reshape(-1, 2)
     np.random.shuffle(epi_t)  # random combination of episode number and time
     percent_train = 0.6
@@ -372,6 +512,7 @@ def time_decode(delay_resp, len_delay, n_neurons, bin_size, title, plot=False):
 
     if plot:
         fig, ax = plt.subplots(figsize=(6, 6))
+        fig.suptitle(title)
         cax = ax.imshow(p_matrix, cmap='hot')
         ax.set_xlabel('Time since delay onset')
         ax.set_ylabel('Decoded time')
@@ -383,81 +524,7 @@ def time_decode(delay_resp, len_delay, n_neurons, bin_size, title, plot=False):
         ax.set_yticks([0, len_delay])
         ax.set_yticklabels(['0', str(len_delay)])
         plt.show()
-        #plt.savefig(figpath + f'/decode_time_{title}.png')
-
+        #plt.savefig(os.path.join(save_dir, f'decode_time_{title}.svg'))
     return p_matrix, time_decode_error, time_decode_entropy
 
 
-def plot_dim_vs_delay_t(delay_resp, title, n_trials=5, var_explained=0.9):
-    """
-    Plot dimension (by default explains 90% variance) of single-time activities vs elapsed time.
-    :param delay_resp: n_episodes x len_delay x n_neurons. Use a single analysis bin (eg. 1000 episodes) rather than
-    entire training session.
-    :param n_trials: number of trials to average over
-    :param var_explained: how much variance you want the dimension. Default = 0.9
-    """
-    global figpath
-    len_delay = np.shape(delay_resp)[1]
-    dim = np.zeros((n_trials, len_delay-1))
-    epi_shuff = np.arange(int(len(delay_resp)))
-    np.random.shuffle(epi_shuff)
-    for i_trial in range(n_trials):
-        episode = epi_shuff[i_trial]
-        for t in range(1, len_delay):
-            delay_resp_t = delay_resp[episode, :t+1, :]
-            pca_model = PCA()
-            pca_model.fit(delay_resp_t)
-            cumsum = pca_model.explained_variance_ratio_.cumsum()
-            dim[i_trial, t-1] = next(x[0] for x in enumerate(cumsum) if x[1] > var_explained)
-    fig, ax0 = plt.subplots()
-    ax0.plot(np.arange(len_delay-1), np.mean(dim, axis=0), color=plot_utils.LINCLAB_COLS['blue'])
-    ax0.fill_between(np.arange(len_delay-1), np.mean(dim, axis=0) - np.std(dim, axis=0), np.mean(dim, axis=0) + np.std(dim, axis=0), color='skyblue')
-    ax0.set_xlabel('Time since delay onset')
-    ax0.set_ylabel('Cumulative Dimensionality')
-    ax0.set_title(title)
-    #plt.show()
-    plt.savefig(figpath + f'/dim_v_delay_{title}.png')
-
-
-def single_cell_visualization(total_resp, binary_stim, cell_nums, type):
-    global figpath
-    len_delay = np.shape(total_resp)[1]
-    n_neurons = np.shape(total_resp)[2]
-    print("Number of correct trials: ", np.sum(binary_stim==1))
-    print("Number of incorrect trials: ", np.sum(binary_stim==0))
-
-    assert len(total_resp) == len(binary_stim)
-    assert all(elem in list(np.arange(n_neurons)) for elem in cell_nums)
-
-    for i_neuron in cell_nums:
-        #idx = np.random.permutation(np.min(np.sum(binary_stim==0), np.sum(binary_stim==1)))[:100]
-        xl = total_resp[binary_stim == 0, :, i_neuron][-100:]
-        xr = total_resp[binary_stim == 1, :, i_neuron][-100:]
-        norm_xl = stats.zscore(xl, axis=1)
-        norm_xr = stats.zscore(xr, axis=1)
-
-        fig, (ax1, ax2, ax3) = plt.subplots(ncols=1, nrows=3, figsize=(5, 8), sharex=True,
-                                            gridspec_kw={'height_ratios': [2, 2, 1.5]})
-        fig.suptitle(f'Unit #{i_neuron}')
-
-        im = ax1.imshow(norm_xl, cmap='jet')
-        ax1.set_aspect('auto')
-        ax1.set_xticks(np.arange(len_delay, step=10))
-        ax1.set_yticks([0, len(norm_xl)])
-        ax1.set_yticklabels(['1', '100'])
-        ax1.set_ylabel(f'Correct trials')
-
-        im2 = ax2.imshow(norm_xr, cmap='jet')
-        ax2.set_aspect('auto')
-        ax2.set_xticks(np.arange(len_delay, step=10))
-        ax2.set_yticks([0, len(norm_xr)])
-        ax2.set_yticklabels(['1', '100'])
-        ax2.set_ylabel(f'Incorrect trials')
-
-        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Correct', color=plot_utils.LINCLAB_COLS['yellow'])
-        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Incorrect', color=plot_utils.LINCLAB_COLS['brown'])
-        ax3.set_xlabel('Time since delay period onset')
-        ax3.legend(loc='upper right', fontsize='medium')
-        ax3.set_ylabel('Avg activation')
-        # plt.show()
-        plt.savefig(figpath + '/single_unit_v_time/' + type + f'/{i_neuron}.png')
