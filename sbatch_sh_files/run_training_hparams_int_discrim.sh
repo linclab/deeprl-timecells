@@ -1,3 +1,4 @@
+#!/bin/bash
 #SBATCH --array=0-30%30
 #SBATCH --job-name=timing_hparam
 #SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/timing/slurm-%A.%a.out
