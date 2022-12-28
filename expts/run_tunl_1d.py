@@ -55,7 +55,7 @@ hidden_type = argsdict['hidden_type']
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_inp4'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_gamma1'
 save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
@@ -122,7 +122,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         correct_perc[i_episode] = 1
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-    p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+    p_loss, v_loss = finish_trial(net, 1, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         print(f'Episode {i_episode}, {np.mean(correct_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
