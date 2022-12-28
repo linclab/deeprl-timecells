@@ -15,16 +15,6 @@ class IntervalDiscrimination(object):
     '''
 
     def __init__(self, rwd=10, inc_rwd=-10):
-        """
-        :param len_delay_short: int
-        :param len_delay_long: int, has to be bigger than len_delay_short
-        :param len_edge: odd int -- length of long edge in triangle (minimum = 5)
-        :param rwd: int -- size of reward when make a correct choice (eg. 100)
-        :param inc_rwd: int  -- size of reward when make an incorrect choice (eg. -10)
-        :param step_rwd: float -- size of reward for each step (eg. -0.5)
-        :param poke_rwd: float -- size of reward when poke correctly (eg. 1)
-        :param rng_seed: int -- seed for rng that generates initial location (default=1234)
-        """
         self.stimulus_set = [10,15,20,25,30,35,40]
         self.delay_duration = 20
         self.action_space = spaces.Discrete(2)      # Boolean variable that stim_1 > stim_2
@@ -48,7 +38,7 @@ class IntervalDiscrimination(object):
         self.done = False
         self.first_stim = np.random.choice(self.stimulus_set)
         self.second_stim = self.select_second_stim()
-        self.groundtruth = self.first_stim > self.second_stim
+        self.groundtruth = self.first_stim > self.second_stim  # 1 if L1>L2, 0 if L1<L2
         self.elapsed_t = 0
         self.correct_trial = False
         self.observation = [1,1]

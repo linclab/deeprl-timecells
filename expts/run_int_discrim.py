@@ -2,56 +2,84 @@ import random
 import os
 from re import I
 from agents.model_1d import *
-from envs.int_discrim import *
+from envs.int_discrim import IntervalDiscrimination
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
 from linclab_utils import plot_utils
+import argparse
+from tqdm import tqdm
 
 plot_utils.linclab_plt_defaults()
-plot_utils.set_font(font='Helvetica')
+# plot_utils.set_font(font='Helvetica')
 
-# ------------- Control parameters ----------------------------
-[ip, it, it_multistimuli, id, ib] = [False, False, False, True, False]
-load_net = False
-n_total_episodes = 20
+parser = argparse.ArgumentParser(description="Head-fixed Interval Discrimination task simulation")
+parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
+parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
+parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
+parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/timing")
+parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
+parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
+# parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
+parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
+parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproducibility")
+# parser.add_argument("--env_type", type=str, default='mem', help="type of environment: mem or nomem")
+parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
+args = parser.parse_args()
+argsdict = args.__dict__
+print(argsdict)
 
-# -------------- Define the environment -----------------------
+n_total_episodes = argsdict['n_total_episodes']
+save_ckpt_per_episodes = argsdict['save_ckpt_per_episodes']
+save_ckpts = True if argsdict['save_ckpts'] == True or argsdict['save_ckpts'] == 'True' else False
+record_data = True if argsdict['record_data'] == True or argsdict['record_data'] == 'True' else False
+load_model_path = argsdict['load_model_path']
+window_size = n_total_episodes // 10
+n_neurons = argsdict["n_neurons"]
+# len_delay = argsdict['len_delay']
+lr = argsdict['lr']
+# env_type = argsdict['env_type']
+hidden_type = argsdict['hidden_type']
+seed = argsdict['seed']
+
+# Make directory in /training or /data_collecting to save data and model
+if record_data:
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing'
+else:
+    main_dir = '/network/scratch/l/lindongy/timecell/training/timing'
+save_dir = os.path.join(main_dir, f'{hidden_type}_{n_neurons}_{lr}')
+if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+print(f'Saved to {save_dir}')
+
+# Setting up cuda and seeds
+# use_cuda = torch.cuda.is_available()
+# device = torch.device("cuda:0" if use_cuda else "cpu")  # Not using cuda for 1D IntDiscrm
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 env = IntervalDiscrimination()
-env_title = "Interval_Discrimination"
-
-
-# -------------- Define the agent -----------------------
-
-n_neurons = 512
-lr = 1e-5
-l2_reg = False
-window_size = 100 # for plotting
-
-hidden_types = ['lstm', 'linear']
-net_title = 'lstm'
-batch_size = 1
-
-# Initializes network
 net = AC_Net(
     input_dimensions=2,  # input dim
     action_dimensions=2,  # action dim
-    hidden_types=hidden_types,  # hidden types
+    hidden_types=[hidden_type, 'linear'],  # hidden types
     hidden_dimensions=[n_neurons, n_neurons], # hidden dims
-    batch_size=batch_size)
-
-if load_net:
-    load_dir = '2022_02_27_20_01_03_IntervalTiming_lstm/net.pt'
-    parent_dir = '/Users/ann/Desktop/LiNC_Lab/IntervalDisc/data'
-    net.load_state_dict(torch.load(os.path.join(parent_dir, load_dir), map_location=torch.device('cpu')))
-    print("Net loaded.")
-
-# -------------- Train the agent -----------------------
-
-# Initializes optimizer
+    batch_size=1)
+env_title = "Interval Discrimination"
+net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+
+# Load existing model
+if load_model_path=='None':
+    ckpt_name = 'untrained_agent'  # placeholder ckptname in case we want to save data in the end
+else:
+    ckpt_name = load_model_path.replace('/', '_')
+    # assert loaded model has congruent hidden type and n_neurons
+    assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
+    assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing', load_model_path), map_location=torch.device('cpu')))
+
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -67,31 +95,18 @@ def bin_rewards(epi_rewards, window_size):
             avg_rewards[i_episode-1] = np.mean(epi_rewards[i_episode - window_size: i_episode])
     return avg_rewards
 
-def plot_training_rewards(reward_hist):
-    avg_reward = bin_rewards(np.sum(reward_hist, axis=1), 1000)
-    max_reward = np.ones(n_total_episodes) * 100
-    fig, ax = plt.subplots()
-    ax.plot(np.arange(n_total_episodes), avg_reward, label='Actual')
-    ax.plot(np.arange(n_total_episodes), max_reward, label="Ideal")
-    ax.set_xlabel("Number of episodes")
-    ax.set_ylabel("Average reward")
-    ax.legend(frameon=False)
-    ax.set_title("Training performance")
-    fig.savefig(path+'/fig.png')
-
 # Train and record
 # Initialize arrays for recording
 
 action_hist = np.zeros(n_total_episodes, dtype=np.int8)
 correct_trial = np.zeros(n_total_episodes, dtype=np.int8)
 stim = np.zeros((n_total_episodes, 2), dtype=np.int8)
-stim1_resp_hx = np.zeros((n_total_episodes, 40, n_neurons), dtype=np.float32)
-stim2_resp_hx = np.zeros((n_total_episodes, 40, n_neurons), dtype=np.float32)
-delay_resp_hx = np.zeros((n_total_episodes, 20, n_neurons), dtype=np.float32)
+if record_data:
+    stim1_resp = np.zeros((n_total_episodes, 40, n_neurons), dtype=np.float32)
+    stim2_resp = np.zeros((n_total_episodes, 40, n_neurons), dtype=np.float32)
+    delay_resp = np.zeros((n_total_episodes, 20, n_neurons), dtype=np.float32)
 
-for i_episode in range(n_total_episodes):
-    if i_episode % 50 == 0:
-        print(str(i_episode), "episodes has completed.")
+for i_episode in tqdm(range(n_total_episodes)):
     done = False
     env.reset()
     net.reinit_hid()
@@ -107,38 +122,54 @@ for i_episode in range(n_total_episodes):
         else:
             new_obs, reward, done = env.step()
 
-        # record data
-        if env.task_stage == 'first_stim' and env.elapsed_t > 0:
-            stim1_resp_hx[i_episode, env.elapsed_t-1, :] = net.hx[
-                hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
-        elif env.task_stage == 'second_stim' and env.elapsed_t > 0:
-            stim2_resp_hx[i_episode, env.elapsed_t-1, :] = net.hx[
-                hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
-        elif env.task_stage == 'delay' and env.elapsed_t > 0:
-            delay_resp_hx[i_episode, env.elapsed_t-1, :] = net.hx[
-                hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+        if record_data and hidden_type=='lstm':
+            if env.task_stage == 'first_stim' and env.elapsed_t > 0:
+                stim1_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                    net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+            elif env.task_stage == 'second_stim' and env.elapsed_t > 0:
+                stim2_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                    net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+            elif env.task_stage == 'delay' and env.elapsed_t > 0:
+                delay_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                    net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+        elif record_data and hidden_type=='linear':
+            if env.task_stage == 'first_stim' and env.elapsed_t > 0:
+                stim1_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                    net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
+            elif env.task_stage == 'second_stim' and env.elapsed_t > 0:
+                stim2_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                    net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
+            elif env.task_stage == 'delay' and env.elapsed_t > 0:
+                delay_resp[i_episode, env.elapsed_t-1, :] = net.hx[
+                    net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
 
         if env.task_stage == 'choice_init':
             action_hist[i_episode] = act
             correct_trial[i_episode] = env.correct_trial
-
+    breakpoint()  # check if np.all(action_hist==correct_trial) and if they're all binary
     p_loss, v_loss = finish_trial(net, 1, optimizer)
+    if (i_episode+1) % save_ckpt_per_episodes == 0:
+        print(f'Episode {i_episode}, {np.mean(correct_trial[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_trial[:i_episode+1])*100:.3f}% correct')
+        if save_ckpts:
+            torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
+
+binned_correct_trial = bin_rewards(correct_trial, window_size)
+fig, ax = plt.subplots()
+fig.suptitle(env_title)
+ax.plot(np.arange(n_total_episodes), binned_correct_trial, label=net_title)
+ax.set_xlabel("Episode")
+ax.set_ylabel("Correct rate")
+ax.set_ylim(0,1)
+ax.legend(frameon=False)
+fig.savefig(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance.svg')
 
 
-# Make directory to save data and figures
-directory = datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + f"_{env_title}_{net_title}"
-#parent_dir = '/home/mila/z/zixiang.huang/IntervalTiming/data'
-parent_dir = '/Users/ann/Desktop/LiNC_Lab/IntervalDisc/data'
-path = os.path.join(parent_dir, directory)
-os.mkdir(path)
+if record_data:
+    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', action_hist=action_hist, correct_trial=correct_trial,
+                        stim=stim, stim1_resp_hx=stim1_resp,
+                        stim2_resp_hx=stim2_resp, delay_resp_hx=delay_resp)
+else:
+    np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', action_hist=action_hist, correct_trial=correct_trial,
+                        stim=stim, stim1_resp_hx=stim1_resp,
+                        stim2_resp_hx=stim2_resp, delay_resp_hx=delay_resp)
 
-
-# save data
-
-keep_epi = 50000
-np.savez_compressed(path + '/data.npz', action_hist = action_hist[-keep_epi:],
-                    stim=stim[-keep_epi:,:], stim1_resp_hx=stim1_resp_hx[-keep_epi:,:,:],
-                    stim2_resp_hx=stim2_resp_hx[-keep_epi:,:,:], delay_resp_hx=delay_resp_hx[-keep_epi:,:,:])
-
-# save net
-torch.save(net.state_dict(), path+'/net.pt')
