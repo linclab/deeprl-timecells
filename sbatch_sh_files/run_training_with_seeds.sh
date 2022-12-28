@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tunl2d_seed
-#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl2d/seed_slurm-%j.out
-#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl2d/seed_slurm-%j.err
+#SBATCH --job-name=timing_seed
+#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/timing/seed_slurm-%j.out
+#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/timing/seed_slurm-%j.err
 #SBATCH --partition=long
 #SBATCH --gres=gpu:rtx8000:1  # 2g:20gb for tunl1d, rtx8000 for tunl2d
 #SBATCH --cpus-per-gpu=6
