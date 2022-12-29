@@ -7,7 +7,6 @@ import sklearn
 
 plot_utils.linclab_plt_defaults()
 plot_utils.set_font(font='Helvetica')
-seed = 1
 
 main_dir = '/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/data/tunl2d/trained'
 data_dir = 'nomem_40_lstm_512_1e-05'

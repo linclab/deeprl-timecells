@@ -141,36 +141,6 @@ def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_d
         plt.show()
 
 
-def split_train_and_test(percent_train, total_resp, total_stim, seed):
-    """
-    Split a neural activity matrix of shape n_stimuli x n_features into training
-    (contains percent_train of data) and testing sets.
-    Arguments:
-    - percent_train (a number between 0 and 1)
-    - total_resp (np.array of shape n_stimuli x n_features)
-    - total_stim (np.array of shape n_stimuli x 1, each entry is 0 or 1)
-    - seed
-    Returns:
-    - resp_train
-    - resp_test
-    - stimuli_train
-    - stimuli_test
-    """
-    # Set random seeds for reproducibility
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    n_stimuli = total_resp.shape[0]
-    n_train = int(percent_train * n_stimuli)  # use 60% of all data for training set
-    ishuffle = torch.randperm(n_stimuli)
-    itrain = ishuffle[:n_train]  # indices of data samples to include in training set
-    itest = ishuffle[n_train:]  # indices of data samples to include in testing set
-    stimuli_test = total_stim[itest]
-    resp_test = total_resp[itest]
-    stimuli_train = total_stim[itrain]
-    resp_train = total_resp[itrain]
-    return resp_train, resp_test, stimuli_train, stimuli_test
-
 
 def decode_sample_from_single_time(total_resp, total_stim, n_fold=5):
     """
@@ -539,3 +509,32 @@ def time_decode(delay_resp, len_delay, n_neurons, bin_size, save_dir, title, plo
     return p_matrix, time_decode_error, time_decode_entropy
 
 
+def split_train_and_test(percent_train, total_resp, total_stim, seed):
+    """
+    Split a neural activity matrix of shape n_stimuli x n_features into training
+    (contains percent_train of data) and testing sets.
+    Arguments:
+    - percent_train (a number between 0 and 1)
+    - total_resp (np.array of shape n_stimuli x n_features)
+    - total_stim (np.array of shape n_stimuli x 1, each entry is 0 or 1)
+    - seed
+    Returns:
+    - resp_train
+    - resp_test
+    - stimuli_train
+    - stimuli_test
+    """
+    # Set random seeds for reproducibility
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    n_stimuli = total_resp.shape[0]
+    n_train = int(percent_train * n_stimuli)  # use 60% of all data for training set
+    ishuffle = torch.randperm(n_stimuli)
+    itrain = ishuffle[:n_train]  # indices of data samples to include in training set
+    itest = ishuffle[n_train:]  # indices of data samples to include in testing set
+    stimuli_test = total_stim[itest]
+    resp_test = total_resp[itest]
+    stimuli_train = total_stim[itrain]
+    resp_train = total_resp[itrain]
+    return resp_train, resp_test, stimuli_train, stimuli_test
