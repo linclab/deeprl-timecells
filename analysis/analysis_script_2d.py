@@ -9,12 +9,12 @@ plot_utils.linclab_plt_defaults()
 plot_utils.set_font(font='Helvetica')
 seed = 1
 
-main_dir = '/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/data/tunl2d'
-data_dir = 'mem_40_lstm_128_1e-05'
-save_dir = os.path.join('/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/figure/tunl2d', data_dir)
+main_dir = '/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/data/tunl2d/trained'
+data_dir = 'nomem_40_lstm_512_1e-05'
+save_dir = os.path.join('/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/figure/tunl2d/trained', data_dir)
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-data = np.load(os.path.join(main_dir, data_dir, 'mem_40_lstm_128_1e-05_seed_1_epi59999.pt_data.npz'), allow_pickle=True)  # data.npz file
+data = np.load(os.path.join(main_dir, data_dir, data_dir+'_seed_1_epi59999.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')
 env_type = hparams[0]
@@ -52,7 +52,6 @@ if behaviour_only:
         ax2.legend()
         fig.savefig(save_dir + f'/performance.svg')
     # TODO: exit script
-
 
 
 stim = data['stim']  # n_total_episodes x 2
@@ -100,8 +99,10 @@ incorrect_loc = delay_loc[binary_nonmatch == 0]
 
 cell_nums_all, sorted_matrix_all, cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_seq(
     delay_resp, norm=True)
+nontime_cell_idx = [x for x in range(n_neurons) if (x not in cell_nums_seq and x not in cell_nums_ramp)]
 delay_resp_ramp = delay_resp[:, :, cell_nums_ramp]
 delay_resp_seq = delay_resp[:, :, cell_nums_seq]
+delay_resp_nontime = delay_resp[:,:,nontime_cell_idx]
 left_stim_resp_ramp = delay_resp_ramp[np.all(stim == [1, 1], axis=1)]
 right_stim_resp_ramp = delay_resp_ramp[np.any(stim != [1, 1], axis=1)]
 left_stim_resp_seq = delay_resp_seq[np.all(stim == [1, 1], axis=1)]
@@ -109,33 +110,33 @@ right_stim_resp_seq = delay_resp_seq[np.any(stim != [1, 1], axis=1)]
 n_ramp_neurons = len(cell_nums_ramp)
 n_seq_neurons = len(cell_nums_seq)
 #
-# print('Make a pie chart of neuron counts...')
-# make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, env_title)
-#
-# print('Sort avg resp analysis...')
-# plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=env_title+' Sequence cells', remove_nan=True, save_dir=save_dir)
-# plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=env_title+' Ramping cells', remove_nan=True, save_dir=save_dir)
-# plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=env_title+' All cells', remove_nan=True, save_dir=save_dir)
+print('Make a pie chart of neuron counts...')
+make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, env_title, save=False)
 
-# print('sort in same order analysis...')
-# plot_sorted_in_same_order(left_stim_resp_ramp, right_stim_resp_ramp, 'Left', 'Right', big_title=env_title+' Ramping cells', len_delay=len_delay, n_neurons=n_ramp_neurons, save_dir=save_dir)
-# plot_sorted_in_same_order(left_stim_resp_seq, right_stim_resp_seq, 'Left', 'Right', big_title=env_title+' Sequence cells', len_delay=len_delay, n_neurons=n_seq_neurons, save_dir=save_dir)
-# plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_title=env_title+' All cells', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir)
-# plot_sorted_in_same_order(correct_resp, incorrect_resp, 'Correct', 'Incorrect', big_title=env_title+' All cells ic', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir)
-#
-# print('decode stim analysis...')
-# plot_decode_sample_from_single_time(delay_resp, binary_stim, env_title+' All Cells', n_fold=5, max_iter=100, save_dir=save_dir)
-# plot_decode_sample_from_single_time(delay_resp_ramp, binary_stim, env_title+' Ramping Cells', n_fold=5, max_iter=100, save_dir=save_dir)
-# plot_decode_sample_from_single_time(delay_resp_seq, binary_stim, env_title+' Sequence Cells', n_fold=7, max_iter=100, save_dir=save_dir)
+print('Sort avg resp analysis...')
+plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=env_title+' Sequence cells', remove_nan=True, save_dir=save_dir, save=False)
+plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=env_title+' Ramping cells', remove_nan=True, save_dir=save_dir, save=False)
+plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=env_title+' All cells', remove_nan=True, save_dir=save_dir, save=False)
+
+print('sort in same order analysis...')
+plot_sorted_in_same_order(left_stim_resp_ramp, right_stim_resp_ramp, 'Left', 'Right', big_title=env_title+' Ramping cells', len_delay=len_delay, n_neurons=n_ramp_neurons, save_dir=save_dir, save=False)
+plot_sorted_in_same_order(left_stim_resp_seq, right_stim_resp_seq, 'Left', 'Right', big_title=env_title+' Sequence cells', len_delay=len_delay, n_neurons=n_seq_neurons, save_dir=save_dir, save=False)
+plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_title=env_title+' All cells', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=False)
+plot_sorted_in_same_order(correct_resp, incorrect_resp, 'Correct', 'Incorrect', big_title=env_title+' All cells ic', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=False)
+
+print('decode stim analysis...')
+plot_decode_sample_from_single_time(delay_resp, binary_stim, env_title+' All Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=False)
+plot_decode_sample_from_single_time(delay_resp_ramp, binary_stim, env_title+' Ramping Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=False)
+plot_decode_sample_from_single_time(delay_resp_seq, binary_stim, env_title+' Sequence Cells', n_fold=7, max_iter=100, save_dir=save_dir, save=False)
 
 print('decode time analysis...')
-time_decode_lin_reg(delay_resp, len_delay, n_neurons, 1000, title=env_title+' All cells', save_dir=save_dir)
-time_decode_lin_reg(delay_resp_ramp, len_delay, n_ramp_neurons, 1000, title=env_title+' Ramping cells', save_dir=save_dir)
-time_decode_lin_reg(delay_resp_seq, len_delay, n_seq_neurons, 1000, title=env_title+' Sequence cells', save_dir=save_dir)
+time_decode_lin_reg(delay_resp, len_delay, n_neurons, 1000, title=env_title+' All cells', save_dir=save_dir, save=False)
+time_decode_lin_reg(delay_resp_ramp, len_delay, n_ramp_neurons, 1000, title=env_title+' Ramping cells', save_dir=save_dir, save=False)
+time_decode_lin_reg(delay_resp_seq, len_delay, n_seq_neurons, 1000, title=env_title+' Sequence cells', save_dir=save_dir, save=False)
 
-# print('Single-cell visualization...')
-# single_cell_visualization(delay_resp, binary_stim, cell_nums_ramp, type='ramp', save_dir=save_dir)
-# single_cell_visualization(delay_resp, binary_stim, cell_nums_seq, type='seq', save_dir=save_dir)
+print('Single-cell visualization... SAVE AUTOMATICALLY')
+single_cell_visualization(delay_resp, binary_stim, cell_nums_ramp, type='ramp', save_dir=save_dir)
+single_cell_visualization(delay_resp, binary_stim, cell_nums_seq, type='seq', save_dir=save_dir)
 
 
 # ==========================================
@@ -143,63 +144,50 @@ time_decode_lin_reg(delay_resp_seq, len_delay, n_seq_neurons, 1000, title=env_ti
 # Mutual information analysis
 # ==========================================
 
-# separate left and right trials
-# left_stim_resp = delay_resp[np.all(stim == [1, 1], axis=1)]
-# right_stim_resp = delay_resp[np.any(stim != [1, 1], axis=1)]
-# left_stim_loc = delay_loc[np.all(stim == [1, 1], axis=1)]  # delay locations on stim==left trials
-# right_stim_loc = delay_loc[np.any(stim != [1, 1], axis=1)]
-# # mutual information analysis
-# seq_cell_idx = separate_ramp_and_seq(delay_resp)[2]
-# ratemap, spatial_occupancy = construct_ratemap(delay_resp[:,:,seq_cell_idx], delay_loc)
-# mutual_info = calculate_mutual_information(ratemap, spatial_occupancy)
-# shuffled_mutual_info = calculate_shuffled_mutual_information(delay_resp, delay_loc, n_total_episodes)
-#
-# plot_mutual_info_distribution(mutual_info, compare=True, shuffled_mutual_info=shuffled_mutual_info)
-#
-# joint_encoding_info(delay_resp, delay_loc, analysis='selectivity', recalculate=True)
-# plot_joint_encoding_information()
-#
-# ratemap_left_sti, spatial_occupancy_left_sti = construct_ratemap(left_stim_resp, left_stim_loc)
-# ratemap_right_sti, spatial_occupancy_right_sti = construct_ratemap(right_stim_resp, right_stim_loc)
-# mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_occupancy_left_sti)
-# mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
-#
-# plot_stimulus_selective_place_celss(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti)
-#
-# decode_sample_from_trajectory(delay_loc, stim)
-# print("Mutual info for ramping cells and sequence cells")
-# seq_cell_idx = separate_ramp_and_seq(delay_resp)[2]
-# ramp_cell_idx = separate_ramp_and_seq(delay_resp)[4]
-# nontime_cell_idx = [x for x in range(n_neurons) if (x not in seq_cell_idx and x not in ramp_cell_idx)]
-# print(np.shape(seq_cell_idx))
-# print(np.shape(ramp_cell_idx))
-# print(n_neurons)
-#
-# delay_resp_seq = delay_resp[:,:,seq_cell_idx]
-# delay_resp_ramp = delay_resp[:,:,ramp_cell_idx]
-# delay_resp_nontime = delay_resp[:,:,nontime_cell_idx]
-#
-# # ======= Starting Line 110 of analysis_place.py ==========
-# ratemap_seq, spatial_occupancy_seq = construct_ratemap(delay_resp_seq, delay_loc)
-# mutual_info_seq = calculate_mutual_information(ratemap_seq, spatial_occupancy_seq)
-# shuffled_mutual_info_seq = calculate_shuffled_mutual_information(delay_resp_seq, delay_loc, n_total_episodes)
-# #plot_mutual_info_distribution(mutual_info_seq, compare=True, shuffled_mutual_info=shuffled_mutual_info_seq)
-# print("seq: ", np.nanmean(mutual_info_seq))
-# print("shuffled seq: ", np.nanmean(shuffled_mutual_info_seq))
-#
-# ratemap_ramp, spatial_occupancy_ramp = construct_ratemap(delay_resp_ramp, delay_loc)
-# mutual_info_ramp = calculate_mutual_information(ratemap_ramp, spatial_occupancy_ramp)
-# shuffled_mutual_info_ramp = calculate_shuffled_mutual_information(delay_resp_ramp, delay_loc, n_total_episodes)
-# #plot_mutual_info_distribution(mutual_info_ramp, compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp)
-# print("ramp: ", np.nanmean(mutual_info_ramp))
-# print("shuffled ramp: ", np.nanmean(shuffled_mutual_info_ramp))
-#
-# ratemap_nontime, spatial_occupancy_nontime = construct_ratemap(delay_resp_nontime, delay_loc)
-# mutual_info_nontime = calculate_mutual_information(ratemap_nontime, spatial_occupancy_nontime)
-# shuffled_mutual_info_nontime = calculate_shuffled_mutual_information(delay_resp_nontime, delay_loc, n_total_episodes)
-# #plot_mutual_info_distribution(mutual_info_ramp, compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp)
-# print("ramp: ", np.nanmean(mutual_info_nontime))
-# print("shuffled ramp: ", np.nanmean(shuffled_mutual_info_nontime))
-#
-#
-# print('Analysis finished')
+# mutual information analysis
+
+ratemap, spatial_occupancy = construct_ratemap(delay_resp, delay_loc)
+mutual_info = calculate_mutual_information(ratemap, spatial_occupancy)
+shuffled_mutual_info = calculate_shuffled_mutual_information(delay_resp, delay_loc, n_total_episodes)
+
+plot_mutual_info_distribution(mutual_info, title='all_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info, save_dir=save_dir, save=False)
+
+joint_encoding_info(delay_resp, delay_loc, analysis='selectivity', recalculate=True)
+plot_joint_encoding_information(save_dir=save_dir, title='all_cells')
+
+ratemap_left_sti, spatial_occupancy_left_sti = construct_ratemap(left_stim_resp, left_stim_loc)
+ratemap_right_sti, spatial_occupancy_right_sti = construct_ratemap(right_stim_resp, right_stim_loc)
+mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_occupancy_left_sti)
+mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
+
+print("Plot splitter cells... SAVE AUTOMATICALLY")
+plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=save_dir)
+
+decode_sample_from_trajectory(delay_loc, stim, save_dir=save_dir, save=False)
+
+print("Mutual info for ramping cells and sequence cells")
+
+# ======= Starting Line 110 of analysis_place.py ==========
+ratemap_seq, spatial_occupancy_seq = construct_ratemap(delay_resp_seq, delay_loc)
+mutual_info_seq = calculate_mutual_information(ratemap_seq, spatial_occupancy_seq)
+shuffled_mutual_info_seq = calculate_shuffled_mutual_information(delay_resp_seq, delay_loc, n_total_episodes)
+plot_mutual_info_distribution(mutual_info_seq, title='seq_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_seq, save_dir=save_dir, save=False)
+print("seq: ", np.nanmean(mutual_info_seq))
+print("shuffled seq: ", np.nanmean(shuffled_mutual_info_seq))
+
+ratemap_ramp, spatial_occupancy_ramp = construct_ratemap(delay_resp_ramp, delay_loc)
+mutual_info_ramp = calculate_mutual_information(ratemap_ramp, spatial_occupancy_ramp)
+shuffled_mutual_info_ramp = calculate_shuffled_mutual_information(delay_resp_ramp, delay_loc, n_total_episodes)
+plot_mutual_info_distribution(mutual_info_ramp, title='ramp_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp, save_dir=save_dir, save=False)
+print("ramp: ", np.nanmean(mutual_info_ramp))
+print("shuffled ramp: ", np.nanmean(shuffled_mutual_info_ramp))
+
+ratemap_nontime, spatial_occupancy_nontime = construct_ratemap(delay_resp_nontime, delay_loc)
+mutual_info_nontime = calculate_mutual_information(ratemap_nontime, spatial_occupancy_nontime)
+shuffled_mutual_info_nontime = calculate_shuffled_mutual_information(delay_resp_nontime, delay_loc, n_total_episodes)
+plot_mutual_info_distribution(mutual_info_ramp, title='non_time_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp, save_dir=save_dir, save=False)
+print("Non-time: ", np.nanmean(mutual_info_nontime))
+print("shuffled non-time: ", np.nanmean(shuffled_mutual_info_nontime))
+
+
+print('Analysis finished')

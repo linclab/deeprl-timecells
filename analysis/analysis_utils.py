@@ -32,17 +32,19 @@ def make_autopct(values):
     return my_autopct
 
 
-def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, label):
+def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, label, save=Fale):
     neuron_counts = np.array([n_ramp_neurons, n_seq_neurons, (512 - n_neurons)])
     neuron_labels = ['Ramping cells', 'Sequence cells', 'Other cells']
     plt.figure()
     plt.pie(neuron_counts, labels=neuron_labels, autopct=make_autopct(neuron_counts))
     plt.title(label)
-    plt.show()
-    # plt.savefig(os.path.join(save_dir, 'piechart.svg'))
+    if save:
+        plt.savefig(os.path.join(save_dir, 'piechart.svg'))
+    else:
+        plt.show()
 
 
-def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, save_dir=None, filename=None):
+def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, save_dir=None, save=False):
     """
     Plot sorted normalized average-response matrix. On y-axis, display where in the layer the cell is.
     Note: normalize whole range, not just absolute value
@@ -69,11 +71,13 @@ def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, 
     ax.set_xlabel('Time since delay onset')
     ax.set_ylabel('Unit #')
     ax.set_title(title + f' \n PE={entropy:.2f} \n TS={ts:.2f} \n SqI={sqi:.2f}')
-    plt.show()
-    #plt.savefig(os.path.join(save_dir,  f'{title}.svg'))
+    if save:
+        plt.savefig(os.path.join(save_dir,  f'{title}.svg'))
+    else:
+        plt.show()
 
 
-def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_delay, n_neurons, save_dir, remove_nan=True):
+def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_delay, n_neurons, save_dir, remove_nan=True, save=False):
     """
     Given response matrices a and b (plotted on the left and right, respectively),
     plot sorted_averaged_resp (between 0 and 1) for matrix a, then sort matrix b
@@ -131,8 +135,10 @@ def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_d
     fig.suptitle(big_title)
     ax.set_aspect('auto')
     ax2.set_aspect('auto')
-    plt.show()
-    #plt.savefig(os.path.join(save_dir, f'sorted_in_same_order_{big_title}.svg'))
+    if save:
+        plt.savefig(os.path.join(save_dir, f'sorted_in_same_order_{big_title}.svg'))
+    else:
+        plt.show()
 
 
 def split_train_and_test(percent_train, total_resp, total_stim, seed):
@@ -201,7 +207,7 @@ def decode_sample_from_single_time(total_resp, total_stim, n_fold=5):
     return accuracies, accuracies_shuff
 
 
-def plot_decode_sample_from_single_time(total_resp, total_stim, title, save_dir, n_fold=5, max_iter=100):
+def plot_decode_sample_from_single_time(total_resp, total_stim, title, save_dir, n_fold=5, max_iter=100, save=False):
     """
     Arguments:
     - total_resp (eg. lstm, or first delay)
@@ -222,10 +228,13 @@ def plot_decode_sample_from_single_time(total_resp, total_stim, title, save_dir,
            title=title)
     ax.set_xticks(np.arange(len_delay, step=10))
     ax.legend()
-    plt.show()
-    #plt.savefig(os.path.join(save_dir, f'decode_stim_{title}.svg'))
+    if save:
+        plt.savefig(os.path.join(save_dir, f'decode_stim_{title}.svg'))
+    else:
+        plt.show()
 
-def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_dir):
+
+def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_dir, save=False):
     """
     Decode time with linear regression.
     :param delay_resp: n_episodes x len_delay x n_neurons
@@ -275,10 +284,12 @@ def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_
     ax.set_yticks([0, len_delay])
     ax.set_yticklabels(['0', str(len_delay)])
     ax.set_title(f'Decode Time {title}')
-    #ax.set_xlim((np.min(t_test_pred),np.max(t_test_pred)))
-    #ax.set_ylim((0,len_delay))
-    plt.show()
-    #plt.savefig(os.path.join(save_dir, f'decode_time_linreg_{title}.svg'))
+    ax.set_xlim((np.min(t_test_pred),np.max(t_test_pred)))
+    ax.set_ylim((0,len_delay))
+    if save:
+        plt.savefig(os.path.join(save_dir, f'decode_time_linreg_{title}.svg'))
+    else:
+        plt.show()
 
 
 

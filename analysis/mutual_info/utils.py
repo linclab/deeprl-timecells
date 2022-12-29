@@ -11,6 +11,7 @@ import matplotlib.cbook as cbook
 from numpy import nan
 from scipy import stats
 from sklearn import svm
+from sklearn.model_selection import cross_val_score
 np.seterr(invalid='ignore')
 
 import itertools
@@ -274,11 +275,11 @@ def plot_place_cells(mutual_info, ratemap, stimulus=None, number=200):
         plt.colorbar()
         #plt.show()
         if stimulus=='left':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.png')
+            plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.svg')
         elif stimulus=='right':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.png')
+            plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.svg')
         else:
-            plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.png')
+            plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.svg')
 '''
 
 def plot_place_cells(resp, loc, stimulus, num_units=400):
@@ -290,14 +291,14 @@ def plot_place_cells(resp, loc, stimulus, num_units=400):
         ax.imshow(np.squeeze(ratemap[i,:,:]), cmap='jet')
         ax.axis("off")
         if stimulus=='left':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.png')
+            plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.svg')
         elif stimulus=='right':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.png')
+            plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.svg')
         else:
-            plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.png')
+            plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.svg')
 
 
-def plot_stimulus_selective_place_celss(mutual_info_left, ratemap_left, mutual_info_right, ratemap_right, percentile=0.2):
+def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_info_right, ratemap_right, save_dir, percentile=0.2):
     idx = np.squeeze(np.logical_and(np.isfinite(mutual_info_left), np.isfinite(mutual_info_right)))
     mutual_info_left = np.squeeze(mutual_info_left[idx])
     ratemap_left = ratemap_left[idx, :, :]
@@ -307,36 +308,53 @@ def plot_stimulus_selective_place_celss(mutual_info_left, ratemap_left, mutual_i
     ratemap_right = ratemap_right[idx, :, :]
     ratemap_right = set_background(ratemap_right)
 
-    n_plot_neurons = int(np.floor(np.shape(mutual_info_left)[0] * percentile))
+    n_plot_neurons = int(np.floor(np.shape(mutual_info_left)[0] * percentile))  # TODO: check what these are
     order = np.argsort((mutual_info_left+mutual_info_right) * (-1))
+
+    if not os.path.exists(os.path.join(save_dir, "place_cells")):
+        os.mkdir(os.path.join(save_dir, "place_cells"))
+        os.mkdir(os.path.join(save_dir, "place_cells", "left_stimuli"))
+        os.mkdir(os.path.join(save_dir, "place_cells", "right_stimuli"))
 
     for i in range(200):
         plt.figure()
-        plt.imshow(np.squeeze(ratemap_left[i,:,:]), cmap='jet')
+        plt.imshow(np.squeeze(ratemap_left[i,:,:]), cmap='jet')  # TODO: cbar=0-1, where 0 is lowest on ratemap. 1 is highest. Step1: Normalize ratemap.
         plt.colorbar()
-        plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.png')
+        plt.savefig(os.path.join(save_dir, "place_cells", "left_stimuli", f'{i}.svg'))
 
         plt.figure()
         plt.imshow(np.squeeze(ratemap_right[i,:,:]), cmap='jet')
         plt.colorbar()
-        plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.png')
+        plt.savefig(os.path.join(save_dir, "place_cells", "right_stimuli", f'{i}.svg'))
 
 
 
-def plot_mutual_info_distribution(mutual_info, color='cadetblue', compare=False, shuffled_mutual_info=None):
+def plot_mutual_info_distribution(mutual_info, save_dir, title, color='cadetblue', compare=False, shuffled_mutual_info=None, save=False):
     if not compare:
         plt.figure()
+        plt.title(title)
         plt.hist(mutual_info, color=color)
         plt.xlabel('Mutual information (bits)')
-        plt.ylabel('# LSTM units')
-        plt.show()
+        plt.ylabel('Number of LSTM units')
+        plt.xlim(0, 0.5)
+        if save:
+            plt.savefig(os.path.join(save_dir, f'mutual_info_{title}.svg'))
+        else:
+            plt.show()
     else:
         plt.figure()
-        plt.hist(mutual_info, color='cadetblue')
-        plt.hist(shuffled_mutual_info, color='chocolate')
+        plt.title(title)
+        plt.hist(mutual_info, color='cadetblue', label='Non-shuffled')
+        plt.hist(shuffled_mutual_info, color='chocolate', label='shuffled')
         plt.xlabel('Mutual information (bits)')
-        plt.ylabel('# LSTM units')
-        plt.show()
+        plt.ylabel('Number of LSTM units')
+        plt.xlim(0, 0.5)
+        plt.legend()
+        if save:
+            plt.savefig(os.path.join(save_dir, f'mutual_info_{title}.svg'))
+        else:
+            plt.show()
+
 
 
 def decode_location(delay_resp, delay_loc, n_folds):
@@ -541,9 +559,9 @@ def joint_encoding_info(delay_resp, delay_loc, variables="place+time", analysis=
             I_unsfl_unrmd, I_unsfl_posrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_posrmd[sig_cells], I_unsfl_timermd[sig_cells]
             I_sfl_unrmd, I_sfl_posrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_posrmd[sig_cells], I_sfl_timermd[sig_cells]
 
-            np.savez_compressed(os.getcwd() + '/joint_encoding.npz', analysis="20211112_place_time_joint_encoding",
-                                I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_posrmd=I_unsfl_posrmd, I_unsfl_timermd=I_unsfl_timermd,
-                                I_sfl_unrmd=I_sfl_unrmd, I_sfl_posrmd=I_sfl_posrmd, I_sfl_timermd=I_sfl_timermd)
+            # np.savez_compressed(os.getcwd() + '/joint_encoding.npz', analysis="20211112_place_time_joint_encoding",
+            #                     I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_posrmd=I_unsfl_posrmd, I_unsfl_timermd=I_unsfl_timermd,
+            #                     I_sfl_unrmd=I_sfl_unrmd, I_sfl_posrmd=I_sfl_posrmd, I_sfl_timermd=I_sfl_timermd)
         else:
             info = np.load('joint_encoding.npz')
             I_unsfl_unrmd,  I_unsfl_posrmd, I_unsfl_timermd = info["I_unsfl_unrmd"], info["I_unsfl_posrmd"], info["I_unsfl_timermd"]
@@ -565,7 +583,7 @@ def joint_encoding_info(delay_resp, delay_loc, variables="place+time", analysis=
 
 
 
-def plot_joint_encoding_information(logInfo=False):
+def plot_joint_encoding_information(save_dir, title, logInfo=False, save=False):
     I = np.load('joint_encoding.npz')
     if logInfo:
         unrmd, posrmd, timermd = np.log(I['I_unsfl_unrmd']), np.log(I['I_unsfl_posrmd']), np.log(I['I_unsfl_timermd'])
@@ -575,12 +593,13 @@ def plot_joint_encoding_information(logInfo=False):
     print(n_neurons)
     info = np.transpose([unrmd, timermd, posrmd])
 
-    stats = cbook.boxplot_stats(info, labels=['YxT', r'$YxR_T$', r'$TxR_Y$'], bootstrap=10000)
+    stats = cbook.boxplot_stats(info, labels=['Loc x Time', r'$Loc x R_Time$', r'$Time x R_Loc$'], bootstrap=10000)
     for i in range(len(stats)):
         stats[i]['whislo'] = np.min(info[:,i], axis=0)
         stats[i]['whishi'] = np.max(info[:,i], axis=0)
 
     fig, axs = plt.subplots(1,1)
+    fig.suptitle(title)
     for i in range(n_neurons):
         plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
 
@@ -591,11 +610,14 @@ def plot_joint_encoding_information(logInfo=False):
         plt.ylabel("log(mutual information)", fontsize=19)
     else:
         plt.ylabel("Mutual information", fontsize=19)
-    plt.show()
+    if save:
+        plt.savefig(os.path.join(save_dir, f'joint_encoding_info_{title}.svg'))
+    else:
+        plt.show()
 
 
 
-def decode_sample_from_trajectory(delay_loc, stim, load_data=False):
+def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_data=False):
     '''
     Train a SVM to decode sample identity from the agent's trajectory in the delay period
     '''
@@ -616,7 +638,7 @@ def decode_sample_from_trajectory(delay_loc, stim, load_data=False):
             clf = svm.SVC(kernel='linear', C=1, random_state=42)
             accuracy[:,round]= cross_val_score(clf, trajectory, sample, cv=num_cv)
             round = round + 1
-        np.savez_compressed(os.getcwd() + '/decode_from_trajec.npz', accuracy=accuracy)
+        # np.savez_compressed(os.getcwd() + '/decode_from_trajec.npz', accuracy=accuracy)
 
     mean_acc = np.mean(accuracy, axis=0)
     std_acc = np.std(accuracy, axis=0)
@@ -627,7 +649,10 @@ def decode_sample_from_trajectory(delay_loc, stim, load_data=False):
     plt.xlabel('Time')
     plt.ylabel('Accuracy')
     plt.title("Decode from 5 steps' trajectory")
-    plt.show()
+    if save:
+        plt.savefig(os.path.join(save_dir, 'decode_sample_from_trajectory.svg'))
+    else:
+        plt.show()
 
 
 
