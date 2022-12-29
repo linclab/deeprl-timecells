@@ -26,6 +26,7 @@ parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
 parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproducibility")
 # parser.add_argument("--env_type", type=str, default='mem', help="type of environment: mem or nomem")
 parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
+parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -42,6 +43,7 @@ lr = argsdict['lr']
 # env_type = argsdict['env_type']
 hidden_type = argsdict['hidden_type']
 seed = argsdict['seed']
+save_performance_fig = True if argsdict['save_performance_fig'] == True or argsdict['save_performance_fig'] == 'True' else False
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
@@ -159,7 +161,8 @@ ax.set_xlabel("Episode")
 ax.set_ylabel("Correct rate")
 ax.set_ylim(0,1)
 ax.legend(frameon=False)
-fig.savefig(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance.svg')
+if save_performance_fig:
+    fig.savefig(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance.svg')
 
 
 if record_data:
