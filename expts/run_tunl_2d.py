@@ -37,9 +37,9 @@ def ideal_nav_rwd(env, len_edge, len_delay, step_rwd, poke_rwd):
 parser = argparse.ArgumentParser(description="Non-location-fixed TUNL 2D task simulation")
 parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
 parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
-parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
+parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training. If False, don't pass anything. If true, pass True.")
 parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl2d")
-parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
+parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes. If False, don't pass anything. If true, pass True.")
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
 parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
@@ -51,6 +51,7 @@ parser.add_argument("--nonmatch_reward", type=int, default=100, help="Magnitude 
 parser.add_argument("--incorrect_reward", type=int, default=-20, help="Magnitude of reward when agent chooses match side")
 parser.add_argument("--step_reward", type=float, default=-0.1, help="Magnitude of reward for each action agent takes, to ensure shortest path")
 parser.add_argument("--poke_reward", type=int, default=5, help="Magnitude of reward when agent pokes signal to proceed")
+parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -59,6 +60,7 @@ n_total_episodes = argsdict['n_total_episodes']
 save_ckpt_per_episodes = argsdict['save_ckpt_per_episodes']
 save_ckpts = True if argsdict['save_ckpts'] == True or argsdict['save_ckpts'] == 'True' else False
 record_data = True if argsdict['record_data'] == True or argsdict['record_data'] == 'True' else False
+save_performance_fig = True if argsdict['save_performance_fig'] == True or argsdict['save_performance_fig'] == 'True' else False
 load_model_path = argsdict['load_model_path']
 window_size = n_total_episodes // 10
 n_neurons = argsdict["n_neurons"]
@@ -201,7 +203,8 @@ ax2.set_xlabel('Episode')
 ax2.set_ylabel('Fraction Nonmatch')
 ax2.set_ylim(0,1)
 ax2.legend()
-fig.savefig(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance.svg')
+if save_performance_fig:
+    fig.savefig(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance.svg')
 
 # save data
 if record_data:
