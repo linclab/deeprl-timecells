@@ -113,6 +113,80 @@ class TunlEnv(object):
             self.episode_sample = random.choices((array([[0, 1, 0]]), array([[0, 0, 1]])))[0]
 
 
+class Tunl_simple(object):
+    """
+    States:
+    [1,1]: init
+    [0,0]: delay
+    [1,0]: left sample
+    [0,1]: right sample
+
+    Actions:
+    0: poke left & initiation
+    1: poke right
+    """
+    def __init__(self, len_delay=40, rwd=10, inc_rwd=10, seed=1):
+        self.len_delay = len_delay
+        self.rwd = rwd
+        self.inc_rwd = inc_rwd
+        self.action_space = spaces.Discrete(2)
+        self.observation_space = spaces.MultiBinary(2)
+        self.rng, self.np_seed = seeding.np_random(seed)
+        self.reward = 0  # reward at this time step, not the cumulative reward of this episode
+        self.task_stage = 'init'
+        self.done = False
+        self.delay_t = 0  # time since delay
+        self.observation = [1,1]
+        self.sample = 'undefined'
+        self.correction_trial = False
+
+    def reset(self):
+        self.reward = 0
+        self.task_stage = 'init'
+        self.done = False
+        self.observation = [1,1]
+        self.delay_t = 0  # time since delay
+        if not self.correction_trial:  # receives new sample. Otherwise repeat old sample.
+            self.sample = random.choices(([1,0],[0,1]))[0]  # [1,0] or [0,1]
+
+    def step(self, action=None):
+        if self.task_stage == 'init':
+            if action == 1:
+                self.task_stage = 'sample'
+                self.observation = self.sample
+                self.reward = 1
+            else:
+                self.reward = -1
+
+        elif self.task_stage == "sample":
+            if (self.observation == [1,0] and action == 0) or (self.observation == [0,1] and action == 1):  # touch sample to enter delay
+                self.task_stage = 'delay'
+                self.observation = [0,0]
+                self.reward = 1
+            else:
+                self.reward = -1
+
+        elif self.task_stage == 'delay':
+            if self.delay_t < self.len_delay:
+                self.delay_t += 1
+            else:
+                self.task_stage = 'choice'
+                self.observation = [1,1]
+
+        elif self.task_stage == 'choice':
+            if (self.sample == [1,0] and action == 1) or (self.sample == [0,1] and action == 0):  # choose nonmatch
+                self.reward = self.rwd
+                self.correction_trial = False
+            else:
+                self.reward = self.inc_rwd
+                self.correction_trial = True
+            self.done = True
+
+        return self.observation, self.reward, self.done
+
+
+
+
 class TunlEnv_nomem(object):
     """
     For each episode, the agent receives a sample (L/R), experiences a delay,

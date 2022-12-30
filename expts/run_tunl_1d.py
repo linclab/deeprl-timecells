@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 from numpy import array
-from envs.tunl_1d import TunlEnv, TunlEnv_nomem
+from envs.tunl_1d import TunlEnv, TunlEnv_nomem, Tunl_simple
 from agents.model_1d import *
 import os
 from datetime import datetime
@@ -50,12 +50,13 @@ len_delay = argsdict['len_delay']
 lr = argsdict['lr']
 env_type = argsdict['env_type']
 hidden_type = argsdict['hidden_type']
+seed = argsdict["seed"]
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_simple'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_simple'
 save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
@@ -64,15 +65,17 @@ print(f'Saved to {save_dir}')
 # Setting up cuda and seeds
 # use_cuda = torch.cuda.is_available()
 # device = torch.device("cuda:0" if use_cuda else "cpu")  # Not using cuda for TUNL 1d
-torch.manual_seed(argsdict["seed"])
-np.random.seed(argsdict["seed"])
 
-env = TunlEnv(len_delay) if env_type=='mem' else TunlEnv_nomem(len_delay)
-net = AC_Net(3, 4, 1, ['linear', hidden_type, 'linear'], [n_neurons, n_neurons, n_neurons])
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+
+env = Tunl_simple(len_delay, seed=seed)
+# env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay)
+net = AC_Net(2, 2, 1, ['linear', hidden_type, 'linear'], [n_neurons, n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
-ld = len_delay + 1
 
 
 # Load existing model
@@ -89,14 +92,14 @@ stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 correct_perc = np.zeros(n_total_episodes, dtype=np.float16)
 if record_data:
-    delay_resp = np.zeros((n_total_episodes, ld, n_neurons), dtype=np.float32)
+    delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # TODO: ld->len_delay. record data when env.indelay
 
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
     env.reset()
-    if np.all(env.episode_sample == array([[0, 1, 0]])):  # L
+    if env.sample == [1,0]:  # L
         stim[i_episode] = 0
-    elif np.all(env.episode_sample == array([[0, 0, 1]])):  # R
+    elif env.sample == [1,1]:  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
@@ -104,25 +107,31 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     obs = torch.as_tensor(env.observation)
     while not done:
         pol, val, lin_act = net.forward(obs.float())
-        if record_data and torch.equal(obs, torch.tensor([[0, 0, 0]])):
-            if net.hidden_types[1] == 'linear':
-                resp.append(
-                    net.cell_out[1].detach().numpy().squeeze())  # pre-relu activity of first layer of linear cell
-            elif net.hidden_types[1] == 'lstm':
-                resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of LSTM cell
-            elif net.hidden_types[1] == 'gru':
-                resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of GRU cell
-        act, p, v = select_action(net, pol, val)
-        new_obs, reward, done, info = env.step(act)
-        net.rewards.append(reward)
+        if env.task_stage in ['delay']:
+            if record_data:
+                if net.hidden_types[1] == 'linear':
+                    resp.append(
+                        net.cell_out[1].detach().numpy().squeeze())  # pre-relu activity of first layer of linear cell
+                elif net.hidden_types[1] == 'lstm':
+                    resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of LSTM cell
+                elif net.hidden_types[1] == 'gru':
+                    resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of GRU cell
+
+            new_obs, reward, done = env.step()
+
+        else:
+            act, p, v = select_action(net, pol, val)
+            new_obs, reward, done = env.step(act)
+            net.rewards.append(reward)
+
         obs = torch.as_tensor(new_obs)
 
-    choice[i_episode] = act - 1  # 0=L, 1=R
+    choice[i_episode] = act  # 0=L, 1=R
     if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
         correct_perc[i_episode] = 1
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-    p_loss, v_loss = finish_trial(net, 0.9999, optimizer)
+    p_loss, v_loss = finish_trial(net, 0.999, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         print(f'Episode {i_episode}, {np.mean(correct_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
