@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 from numpy import array
-from envs.tunl_1d import TunlEnv, TunlEnv_nomem, Tunl_simple
+from envs.tunl_1d import TunlEnv, TunlEnv_nomem, Tunl_simple, Tunl_simple_nomem
 from agents.model_1d import *
 import os
 from datetime import datetime
