@@ -4,6 +4,7 @@ from cell_identification.time_ramp import separate_ramp_and_seq
 from analysis_utils import bin_rewards, make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
     single_cell_visualization, plot_decode_sample_from_single_time, time_decode_lin_reg
 import sklearn
+import sys
 
 plot_utils.linclab_plt_defaults()
 plot_utils.set_font(font='Helvetica')
@@ -50,7 +51,7 @@ if behaviour_only:
         ax2.set_ylim(0,1)
         ax2.legend()
         fig.savefig(save_dir + f'/performance.svg')
-    # TODO: exit script
+    sys.exit()
 
 
 stim = data['stim']  # n_total_episodes x 2

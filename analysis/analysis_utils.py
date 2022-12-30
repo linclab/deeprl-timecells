@@ -32,7 +32,7 @@ def make_autopct(values):
     return my_autopct
 
 
-def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, label, save=Fale):
+def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, label, save=False):
     neuron_counts = np.array([n_ramp_neurons, n_seq_neurons, (512 - n_neurons)])
     neuron_labels = ['Ramping cells', 'Sequence cells', 'Other cells']
     plt.figure()
@@ -262,7 +262,6 @@ def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_
         plt.show()
 
 
-
 def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir):
     len_delay = np.shape(total_resp)[1]
     n_neurons = np.shape(total_resp)[2]
@@ -279,7 +278,7 @@ def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir
         norm_xl = stats.zscore(xl, axis=1)
         norm_xr = stats.zscore(xr, axis=1)
 
-        fig, (ax1, ax2, ax3) = plt.subplots(ncols=1, nrows=3, figsize=(5, 8), sharex=True,
+        fig, (ax1, ax2, ax3) = plt.subplots(ncols=1, nrows=3, figsize=(5, 8), sharex='all',
                                             gridspec_kw={'height_ratios': [2, 2, 1.5]})
         fig.suptitle(f'Unit #{i_neuron}')
 
@@ -309,6 +308,64 @@ def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir
             os.mkdir(os.path.join(save_dir, 'single_unit_v_time', type))
         plt.savefig(os.path.join(save_dir, 'single_unit_v_time', type, f'{i_neuron}.svg'))
 
+
+def time_decode(delay_resp, len_delay, n_neurons, bin_size, save_dir, title, plot=False, save=False):
+    """
+    Decode time with multiclass logistic regression.
+    :param delay_resp: n_episodes x len_delay x n_neurons
+    :param len_delay: int
+    :param n_neurons: int
+    :param bin_size: int
+    :param title: str
+    :param plot: bool (default=False). Plot p_matrix as heatmap, with blue line indicating highest-probability decoded bin
+    :return: p_matrix: len_delay (decoded) x len_delay (elapsed), each entry is probability of decoded time given resp at elapsed time
+    :return: time_decode_error: mean absolute value of error-percentage
+    :return: time_deocde_entropy: entropy of the probability matrix
+    """
+    p_matrix = np.zeros((len_delay, len_delay))
+    clf = LogisticRegression(multi_class='multinomial')
+    epi_t = np.array(np.meshgrid(np.arange(0, bin_size), np.arange(len_delay))).T.reshape(-1, 2)
+    np.random.shuffle(epi_t)  # random combination of episode number and time
+    percent_train = 0.6
+    epi_t_train = epi_t[:int(percent_train * len_delay * bin_size)]  # 0.6*40000 by 2
+    epi_t_test = epi_t[int(percent_train * len_delay * bin_size):]
+    r_train = np.zeros((len(epi_t_train), n_neurons))
+    r_test = np.zeros((len(epi_t_test), n_neurons))
+    for i in range(len(epi_t_train)):
+        r_train[i] = delay_resp[epi_t_train[i, 0], epi_t_train[i, 1], :]
+    for i in range(len(epi_t_test)):
+        r_test[i] = delay_resp[epi_t_test[i, 0], epi_t_test[i, 1], :]
+    t_train = np.squeeze(epi_t_train[:, 1])
+    t_test = np.squeeze(epi_t_test[:, 1])
+
+    clf.fit(r_train, t_train)
+    for t_elapsed in range(len_delay):
+        p_matrix[:, t_elapsed] = np.mean(clf.predict_proba(r_test[t_test == t_elapsed]), axis=0)  # 1 x len_delay
+    decoded_time = np.argmax(p_matrix, axis=0)
+    # time_decode_rmsep = np.sqrt(np.mean(((decoded_time - np.arange(len_delay)) / len_delay)**2))  # root mean squared error-percentage
+    time_decode_error = np.mean(
+        np.abs((decoded_time - np.arange(len_delay)) / len_delay))  # mean absolute error-percentage
+    time_decode_entropy = np.mean(stats.entropy(p_matrix, axis=0))
+
+    if plot:
+        fig, ax = plt.subplots(figsize=(6, 6))
+        fig.suptitle(title)
+        cax = ax.imshow(p_matrix, cmap='hot')
+        ax.set_xlabel('Time since delay onset')
+        ax.set_ylabel('Decoded time')
+        cbar = plt.colorbar(cax, ax=ax, label='p', aspect=10, shrink=0.5)
+        ax.set_title(f'Accuracy={100 * (1 - time_decode_error):.2f}%')
+        ax.plot(np.arange(len_delay), decoded_time)
+        ax.set_xticks([0, len_delay])
+        ax.set_xticklabels(['0', str(len_delay)])
+        ax.set_yticks([0, len_delay])
+        ax.set_yticklabels(['0', str(len_delay)])
+        if save:
+            plt.savefig(os.path.join(save_dir, f'decode_time_{title}.svg'))
+        else:
+            plt.show()
+
+    return p_matrix, time_decode_error, time_decode_entropy
 
 # ================= TO CHUCK =================================
 
@@ -453,60 +510,6 @@ def plot_sorted_vd(resp_dict, remove_nan=True):
     plt.show()
 
 
-def time_decode(delay_resp, len_delay, n_neurons, bin_size, save_dir, title, plot=False):
-    """
-    Decode time with multiclass logistic regression.
-    :param delay_resp: n_episodes x len_delay x n_neurons
-    :param len_delay: int
-    :param n_neurons: int
-    :param bin_size: int
-    :param title: str
-    :param plot: bool (default=False). Plot p_matrix as heatmap, with blue line indicating highest-probability decoded bin
-    :return: p_matrix: len_delay (decoded) x len_delay (elapsed), each entry is probability of decoded time given resp at elapsed time
-    :return: time_decode_error: mean absolute value of error-percentage
-    :return: time_deocde_entropy: entropy of the probability matrix
-    """
-    p_matrix = np.zeros((len_delay, len_delay))
-    clf = LogisticRegression(multi_class='multinomial')  # TODO: find the code that use linear regression
-    epi_t = np.array(np.meshgrid(np.arange(0, bin_size), np.arange(len_delay))).T.reshape(-1, 2)
-    np.random.shuffle(epi_t)  # random combination of episode number and time
-    percent_train = 0.6
-    epi_t_train = epi_t[:int(percent_train * len_delay * bin_size)]  # 0.6*40000 by 2
-    epi_t_test = epi_t[int(percent_train * len_delay * bin_size):]
-    r_train = np.zeros((len(epi_t_train), n_neurons))
-    r_test = np.zeros((len(epi_t_test), n_neurons))
-    for i in range(len(epi_t_train)):
-        r_train[i] = delay_resp[epi_t_train[i, 0], epi_t_train[i, 1], :]
-    for i in range(len(epi_t_test)):
-        r_test[i] = delay_resp[epi_t_test[i, 0], epi_t_test[i, 1], :]
-    t_train = np.squeeze(epi_t_train[:, 1])
-    t_test = np.squeeze(epi_t_test[:, 1])
-
-    clf.fit(r_train, t_train)
-    for t_elapsed in range(len_delay):
-        p_matrix[:, t_elapsed] = np.mean(clf.predict_proba(r_test[t_test == t_elapsed]), axis=0)  # 1 x len_delay
-    decoded_time = np.argmax(p_matrix, axis=0)
-    # time_decode_rmsep = np.sqrt(np.mean(((decoded_time - np.arange(len_delay)) / len_delay)**2))  # root mean squared error-percentage
-    time_decode_error = np.mean(
-        np.abs((decoded_time - np.arange(len_delay)) / len_delay))  # mean absolute error-percentage
-    time_decode_entropy = np.mean(stats.entropy(p_matrix, axis=0))
-
-    if plot:
-        fig, ax = plt.subplots(figsize=(6, 6))
-        fig.suptitle(title)
-        cax = ax.imshow(p_matrix, cmap='hot')
-        ax.set_xlabel('Time since delay onset')
-        ax.set_ylabel('Decoded time')
-        cbar = plt.colorbar(cax, ax=ax, label='p', aspect=10, shrink=0.5)
-        ax.set_title(f'Accuracy={100 * (1 - time_decode_error):.2f}%')
-        ax.plot(np.arange(len_delay), decoded_time)
-        ax.set_xticks([0, len_delay])
-        ax.set_xticklabels(['0', str(len_delay)])
-        ax.set_yticks([0, len_delay])
-        ax.set_yticklabels(['0', str(len_delay)])
-        plt.show()
-        #plt.savefig(os.path.join(save_dir, f'decode_time_{title}.svg'))
-    return p_matrix, time_decode_error, time_decode_entropy
 
 
 def split_train_and_test(percent_train, total_resp, total_stim, seed):
