@@ -14,12 +14,12 @@ class IntervalDiscrimination(object):
     or "1" to indicate whether the first stimulus was longer in duration or the second one.
     '''
 
-    def __init__(self, rwd=10, inc_rwd=-10):
+    def __init__(self, rwd=10, inc_rwd=-10, seed=1):
         self.stimulus_set = [10,15,20,25,30,35,40]
         self.delay_duration = 20
         self.action_space = spaces.Discrete(2)      # Boolean variable that stim_1 > stim_2
         self.observation_space = spaces.MultiBinary(2)
-        self.rng = np.random.RandomState(1234)
+        self.rng = np.random.RandomState(seed)
         self.reward = 0
         self.task_stage = 'init'
         self.done = False

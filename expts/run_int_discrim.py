@@ -61,7 +61,7 @@ print(f'Saved to {save_dir}')
 torch.manual_seed(seed)
 np.random.seed(seed)
 
-env = IntervalDiscrimination()
+env = IntervalDiscrimination(seed=seed)
 net = AC_Net(
     input_dimensions=2,  # input dim
     action_dimensions=2,  # action dim
