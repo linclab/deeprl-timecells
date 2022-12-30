@@ -70,9 +70,9 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-env = Tunl_simple(len_delay, seed=seed)
+env = Tunl_simple(len_delay, seed=seed) if env_type=='mem' else Tunl_simple_nomem(len_delay, seed=seed)
 # env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay)
-net = AC_Net(2, 2, 1, ['linear', hidden_type, 'linear'], [n_neurons, n_neurons, n_neurons])
+net = AC_Net(2, 2, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
@@ -86,7 +86,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d', load_model_path), map_location=torch.device('cpu')))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_simple', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -104,10 +104,9 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     if record_data:
         resp = []
     net.reinit_hid()
-    obs = torch.as_tensor(env.observation)
     while not done:
-        pol, val, lin_act = net.forward(obs.float())
-        if env.task_stage in ['delay']:
+        pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))
+        if env.task_stage in ['delay'] and env.delay_t>0:
             if record_data:
                 if net.hidden_types[1] == 'linear':
                     resp.append(
