@@ -35,6 +35,7 @@ parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
 parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproducibility")
 parser.add_argument("--env_type", type=str, default='mem', help="type of environment: mem or nomem")
 parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
+parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -43,6 +44,7 @@ n_total_episodes = argsdict['n_total_episodes']
 save_ckpt_per_episodes = argsdict['save_ckpt_per_episodes']
 save_ckpts = True if argsdict['save_ckpts'] == True or argsdict['save_ckpts'] == 'True' else False
 record_data = True if argsdict['record_data'] == True or argsdict['record_data'] == 'True' else False
+save_performance_fig = True if argsdict['save_performance_fig'] == True or argsdict['save_performance_fig'] == 'True' else False
 load_model_path = argsdict['load_model_path']
 window_size = n_total_episodes // 10
 n_neurons = argsdict["n_neurons"]
@@ -146,7 +148,8 @@ ax1.set_ylabel('Fraction Nonmatch')
 ax1.set_ylim(0,1)
 ax1.legend()
 #plt.show()
-fig.savefig(save_dir + f'/total_{n_total_episodes}episodes_performance.svg')
+if save_performance_fig:
+    fig.savefig(save_dir + f'/total_{n_total_episodes}episodes_performance.svg')
 
 # save data
 if record_data:
