@@ -367,6 +367,67 @@ def time_decode(delay_resp, len_delay, n_neurons, bin_size, save_dir, title, plo
 
     return p_matrix, time_decode_error, time_decode_entropy
 
+
+def sort_resp(total_resp, norm=True):
+    """
+    Average the responses across episodes, normalize the activity according to the
+    maximum and minimum of each cell (optional), and sort cells by when their maximum response happens.
+    returns: cell_nums, sorted_matrix
+    """
+    np.seterr(divide='ignore', invalid='ignore')
+    n_neurons = np.shape(total_resp)[2]
+    segments = np.moveaxis(total_resp, 0, 1)
+    unsorted_matrix = np.zeros((n_neurons, len(segments)))  # len(segments) is also len_delay
+    sorted_matrix = np.zeros((n_neurons, len(segments)))
+    for i in range(len(segments)):  # at timestep i
+        averages = np.mean(segments[i],
+                           axis=0)  # 1 x n_neurons, each entry is the average response of this neuron at this time step across episodes
+        unsorted_matrix[:, i] = np.transpose(
+            averages)  # goes into the i-th column of unsorted_matrix, each row is one neuron
+        if norm is True:
+            normalized_matrix = (unsorted_matrix - np.min(unsorted_matrix, axis=1, keepdims=True)) / np.ptp(
+                unsorted_matrix, axis=1, keepdims=True)
+            # 0=minimum response of this neuron over time, 1=maximum response of this neuro over time
+            max_indeces = np.argmax(normalized_matrix, axis=1)  # which time step does the maximum firing occur
+            cell_nums = np.argsort(max_indeces)  # returns the order of cell number that should go into sorted_matrix
+            for i, i_cell in enumerate(list(cell_nums)):
+                sorted_matrix[i] = normalized_matrix[i_cell]
+        else:
+            max_indeces = np.argmax(unsorted_matrix, axis=1)  # which time step does the maximum firing occur
+            cell_nums = np.argsort(max_indeces)  # returns the order of cell number that should go into sorted_matrix
+            for i, i_cell in enumerate(list(cell_nums)):
+                sorted_matrix[i] = unsorted_matrix[i_cell]
+    # At this point, sorted_matrix should contain all cells
+    assert len(sorted_matrix) == n_neurons
+
+    return cell_nums, sorted_matrix
+
+
+def plot_half_split_resp(total_resp, save_dir, split='random', save=False):
+    n_total_episodes = np.shape(total_resp)[0]
+    len_delay = np.shape(total_resp)[1]
+    n_neurons = np.shape(total_resp)[2]
+
+    if split == 'random':
+        split_1_idx = np.random.choice(n_total_episodes, n_total_episodes//2, replace=False)
+        ind = np.zeros(n_total_episodes, dtype=bool)
+        ind[split_1_idx] = True
+        rest = ~ind
+        split_2_idx = np.arange(n_total_episodes)[rest]
+        title_1 = "Random split 1st half"
+        title_2 = "Random split 2nd half"
+    elif split == 'odd-even':
+        split_1_idx = np.arange(start=0, stop=n_total_episodes, step=2)
+        split_2_idx = np.arange(start=1, stop=n_total_episodes+1, step=2)
+        title_1 = "Odd trials"
+        title_2 = "Even trials"
+
+    resp_1 = total_resp[split_1_idx]
+    resp_2 = total_resp[split_2_idx]
+
+    plot_sorted_in_same_order(resp_1, resp_2, title_1, title_2, "", len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=save)
+
+
 # ================= TO CHUCK =================================
 
 def plot_dim_vs_delay_t(delay_resp, title, save_dir, n_trials=5, var_explained=0.9):
@@ -508,8 +569,6 @@ def plot_sorted_vd(resp_dict, remove_nan=True):
     for cax in grid.cbar_axes:
         cax.toggle_label(True)
     plt.show()
-
-
 
 
 def split_train_and_test(percent_train, total_resp, total_stim, seed):
