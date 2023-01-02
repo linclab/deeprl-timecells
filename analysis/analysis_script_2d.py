@@ -65,7 +65,9 @@ n_total_episodes = np.shape(stim)[0]
 
 normalize = True
 if normalize:
-    delay_resp = sklearn.preprocessing.normalize(np.reshape(delay_resp_hx, (n_total_episodes*len_delay, n_neurons)), axis=0, norm='l1').reshape((n_total_episodes, len_delay, n_neurons))
+    reshape_resp = np.reshape(delay_resp_hx, (n_total_episodes*len_delay, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
 else:
     delay_resp = delay_resp_hx
 

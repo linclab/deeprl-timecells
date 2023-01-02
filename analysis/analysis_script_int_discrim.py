@@ -63,9 +63,17 @@ else:
 
 normalize = False
 if normalize:
-    stim1_resp = sklearn.preprocessing.normalize(np.reshape(stim1_resp, (n_total_episodes*40, n_neurons)), axis=0, norm='l1').reshape((n_total_episodes, 40, n_neurons))
-    stim2_resp = sklearn.preprocessing.normalize(np.reshape(stim2_resp, (n_total_episodes*40, n_neurons)), axis=0, norm='l1').reshape((n_total_episodes, 40, n_neurons))
-    delay_resp = sklearn.preprocessing.normalize(np.reshape(delay_resp, (n_total_episodes*20, n_neurons)), axis=0, norm='l1').reshape((n_total_episodes, 20, n_neurons))
+    reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
+
+    reshape_resp = np.reshape(stim2_resp, (n_total_episodes*ld, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
+
+    reshape_resp = np.reshape(delay_resp, (n_total_episodes*20, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
 
 resp_hx = np.concatenate((stim1_resp, delay_resp, stim2_resp), axis=1)
 last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
@@ -74,7 +82,7 @@ last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
 
 plot_time_cell(stim[:,0], stim1_resp, label="First_Stim_", save_dir=save_dir, save=False)  # Plots time cell sequences and pie charts
 plot_time_cell_sorted_same_order(stim, stim1_resp, stim2_resp,save_dir=save_dir, save=False)  # Plot stim1 and stim2 time cells sorted in same order
-single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir=save_dir, compare_correct=True)  # if compare_correct, then SAVE AUTOMATICALLY
+single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir=save_dir, compare_correct=False)  # if compare_correct, then SAVE AUTOMATICALLY
 retiming(stim, stim1_resp, stim2_resp, save_dir=save_dir, verbose=True)  # SAVE AUTOMATICALLY. Takes ~10 minutes
 linear_readout(stim, stim1_resp, stim2_resp, save_dir=save_dir)  # SAVE AUTOMATICALLY
 decoding(stim, last_step_resp, save_dir=save_dir, save=False)  # decodes stim1, stim2, stim1>stim2, and stim1-stim2
