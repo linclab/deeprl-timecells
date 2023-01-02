@@ -191,7 +191,7 @@ def discount_rwds(r, gamma):  # takes [1,1,1,1] and makes it [3.439,2.71,1.9,1]
     return disc_rwds
 
 
-def finish_trial(model, discount_factor, optimizer, **kwargs):
+def finish_trial(model, discount_factor, optimizer, scheduler, **kwargs):
     '''
     Finishes a given training trial and backpropagates.
     '''
@@ -217,6 +217,8 @@ def finish_trial(model, discount_factor, optimizer, **kwargs):
     total_loss = p_loss + v_loss
     total_loss.backward(retain_graph=True) # calculate gradient
     optimizer.step()  # move down gradient
+    if scheduler is not None:
+        scheduler.step()
 
     del model.rewards[:]
     del model.saved_actions[:]

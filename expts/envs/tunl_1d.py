@@ -6,7 +6,7 @@ from gym.utils import seeding
 
 
 class TunlEnv(object):
-    def __init__(self, delay):
+    def __init__(self, delay, seed=1):
         """Trial-unique, delayed nonmatch-to-location (TUNL) task (Talpos et al., 2010)
 
         In each trial/episode, there are 5 stages:
@@ -33,69 +33,73 @@ class TunlEnv(object):
         If the agent does not do anything meaningful, it will receive neither reward nor punishment (i.e, reward = 0).
 
 
-        The observation space consists of 5 possible arrays, each with 3elements: initiation, L touchscreen, and
-        R touchscreen. Each element is either 0 (off) or 1 on.
+        The observation space consists of 5 possible arrays, each with 3 elements: initiation, L touchscreen, and
+        R touchscreen. Each element is either 0 (off) or 1 (on).
         [1,0,0] = initiation on; this signals the animal to initiate sample / choice phase
         [0,1,0] = L touchscreen on
         [0,0,1] = R touchscreen on
         [0,0,0] = delay period, no signal
         [0,1,1] = both L and R touchscreen on; this signals the animal to make a choice
 
-        The action space consists of 4 possible actions:
+        The action space consists of 3 possible actions:
         0 = initiate
         1 = choose L on the touchscreen
         2 = choose R on the touchscreen
-        3 = do nothing meaningful
 
         """
-        self.observation = array([[1, 0, 0]])
+        self.observation = [1, 0, 0]
         self.sample = "undefined"
         self.episode_sample = None
         self.delay_t = 0  # time since delay
         self.delay_length = delay
-        self.action_space = spaces.Discrete(4)
-        self.observation_space = spaces.MultiBinary(4)
+        self.action_space = spaces.Discrete(3)
+        self.observation_space = spaces.MultiBinary(3)
         self.reward = 0
         self.done = False
-        self.seed()
+        self.rng, self.np_seed = seeding.np_random(seed)
         self.correction_trial = False
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
-
+        
+    def reset(self):
+        self.observation = [1, 0, 0]
+        self.delay_t = 0  # time since delay
+        self.reward = 0
+        self.done = False
+        self.sample = "undefined"  # {[0,1,0]=L, [0,0,1]=R}
+        if self.correction_trial is False:
+            self.episode_sample = random.choices(([0, 1, 0], [0, 0, 1]))[0]
+            
     def step(self, action):
         """
         :param action:
         :return: observation, reward, done, info
         """
         assert self.action_space.contains(action)
-        if np.all(self.observation == array([[1, 0, 0]])):  # initiation
+        if self.observation == [1, 0, 0]:  # initiation
             if action == 0:
                 if self.sample == "undefined":  # initiate sample phase
                     self.observation = self.episode_sample  # either array([[0,1,0]]) or array([[0,0,1]])
                     self.sample = self.observation
                 else:  # initiate choice phase
-                    self.observation = array([[0, 1, 1]])
-        elif np.all(self.observation == array([[0, 1, 0]])):  # L touchscreen on
+                    self.observation = [0, 1, 1]
+        elif self.observation == [0, 1, 0]:  # L touchscreen on
             if action == 1:  # poke L to continue
-                self.observation = array([[0, 0, 0]])  # enters delay period
-        elif np.all(self.observation == array([[0, 0, 1]])):  # R touchscreen on
+                self.observation = [0, 0, 0]  # enters delay period
+        elif self.observation == [0, 0, 1]:  # R touchscreen on
             if action == 2:  # poke R to continue
-                self.observation = array([[0, 0, 0]])  # enters delay period
-        elif np.all(self.observation == array([[0, 0, 0]])):  # delay period
+                self.observation = [0, 0, 0]  # enters delay period
+        elif self.observation == [0, 0, 0]:  # delay period
             if self.delay_t < self.delay_length:
                 self.delay_t += 1
             else:
-                self.observation = array([[1, 0, 0]])  # enters initiation
-        elif np.all(self.observation == array([[0, 1, 1]])):  # choice phase
-            if (np.all(self.sample == array([[0, 1, 0]])) and action == 2) or (
-                    np.all(self.sample == array([[0, 0, 1]])) and action == 1):  # choosing nonmatch
+                self.observation = [1, 0, 0]  # enters initiation
+        elif self.observation == [0, 1, 1]:  # choice phase
+            if (self.sample == [0, 1, 0] and action == 2) or (
+                    self.sample == [0, 0, 1] and action == 1):  # choosing nonmatch
                 self.reward = 1
                 self.correction_trial = False  # reset correction_trial flag
                 self.done = True
-            elif (np.all(self.sample == array([[0, 1, 0]])) and action == 1) or (
-                    np.all(self.sample == array([[0, 0, 1]])) and action == 2):  # choosing mat h
+            elif (self.sample == [0, 1, 0] and action == 1) or (
+                    self.sample == [0, 0, 1] and action == 2):  # choosing match
                 self.reward = -1
                 self.correction_trial = True  # set correction_trial flag to true to have the same sample in next trial
                 self.done = True
@@ -103,14 +107,7 @@ class TunlEnv(object):
                 self.reward = 0
         return self.observation, self.reward, self.done, {}
 
-    def reset(self):
-        self.observation = array([[1, 0, 0]])
-        self.delay_t = 0  # time since delay
-        self.reward = 0
-        self.done = False
-        self.sample = "undefined"  # {array([0,1,0])=L, array([0,0,1])=R}
-        if self.correction_trial is False:
-            self.episode_sample = random.choices((array([[0, 1, 0]]), array([[0, 0, 1]])))[0]
+
 
 
 class Tunl_simple(object):
@@ -256,11 +253,10 @@ class TunlEnv_nomem(object):
     For each episode, the agent receives a sample (L/R), experiences a delay,
     then is given two choices (L/R) - choosing either leads to a reward.
 
-    action space (4):
+    action space (3):
     0 = initiation
     1 = touch left sample to enter delay
     2 = touch right sample to enter delay
-    3 = do nothing
 
     observation space: (5):
     array([[1,0,0]]) = light on, sound on
@@ -270,21 +266,25 @@ class TunlEnv_nomem(object):
     array([[0,0,0]]) = delay
     """
 
-    def __init__(self, delay):
-        self.observation = array([[1, 0, 0]])
+    def __init__(self, delay, seed=1):
+        self.observation = [1, 0, 0]
         self.delay_t = 0  # time since delay
         self.delay_length = delay
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.MultiBinary(3)
         self.reward = 0
         self.done = False
         self.sample = "undefined"
         self.episode_sample = None
-        self.seed()
+        self.rng, self.np_seed = seeding.np_random(seed)
 
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
+    def reset(self):
+        self.observation = [1, 0, 0]
+        self.delay_t = 0  # time since delay
+        self.reward = 0
+        self.done = False
+        self.sample = "undefined"  # {[0,1,0]=L, [0,0,1]=R}
+        self.episode_sample = random.choices(([0, 1, 0], [0, 0, 1]))[0]
 
     def step(self, action):
         """
@@ -293,35 +293,29 @@ class TunlEnv_nomem(object):
         """
         assert self.action_space.contains(action)
         # print("action is", action)
-        if np.all(self.observation == array([[1, 0, 0]])):  # initiation
+        if self.observation == [1, 0, 0]:  # initiation
             if action == 0:
                 if self.sample == "undefined":  # initiate sample phase
                     self.observation = self.episode_sample  # either array([[0,0,1,0]]) or array([[0,0,0,1]])
                     self.sample = self.observation
                 else:  # initiate choice phase
-                    self.observation = array([[0, 1, 1]])
-        elif np.all(self.observation == array([[0, 1, 0]])):  # L touchscreen on
+                    self.observation = [0, 1, 1]
+        elif self.observation == [0, 1, 0]:  # L touchscreen on
             if action == 1:  # poke L to continue
-                self.observation = array([[0, 0, 0]])  # enters delay period
-        elif np.all(self.observation == array([[0, 0, 1]])):  # R touchscreen on
+                self.observation = [0, 0, 0]  # enters delay period
+        elif self.observation == [0, 0, 1]:  # R touchscreen on
             if action == 2:  # poke R to continue
-                self.observation = array([[0, 0, 0]])  # enters delay period
-        elif np.all(self.observation == array([[0, 0, 0]])):  # delay period
+                self.observation = [0, 0, 0]  # enters delay period
+        elif self.observation == [0, 0, 0]:  # delay period
             if self.delay_t < self.delay_length:
                 self.delay_t += 1
             else:
-                self.observation = array([[1, 0, 0]])  # enters initiation
-        elif np.all(self.observation == array([[0, 1, 1]])):  # waits for choice
+                self.observation = [1, 0, 0]  # enters initiation
+        elif self.observation == [0, 1, 1]:  # waits for choice
             if action == 1 or action == 2:  # poke L or R
-                self.observation = array([[1, 0, 0]])
+                self.observation = [1, 0, 0]
                 self.reward = 1
                 self.done = True
         return self.observation, self.reward, self.done, {}
 
-    def reset(self):
-        self.observation = array([[1, 0, 0]])
-        self.delay_t = 0  # time since delay
-        self.reward = 0
-        self.done = False
-        self.sample = "undefined"  # {array([0,1,0])=L, array([0,0,1])=R}
-        self.episode_sample = random.choices((array([[0, 1, 0]]), array([[0, 0, 1]])))[0]
+

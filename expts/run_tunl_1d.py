@@ -56,9 +56,9 @@ seed = argsdict["seed"]
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_simple'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_simple'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d'
 save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
@@ -72,10 +72,11 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-env = Tunl_simple(len_delay, seed=seed) if env_type=='mem' else Tunl_simple_nomem(len_delay, seed=seed)
-# env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay)
-net = AC_Net(2, 2, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+# env = Tunl_simple(len_delay, seed=seed) if env_type=='mem' else Tunl_simple_nomem(len_delay, seed=seed)
+env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
+net = AC_Net(3, 3, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr)
+scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
@@ -88,27 +89,28 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_simple', load_model_path), map_location=torch.device('cpu')))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
-correct_perc = np.zeros(n_total_episodes, dtype=np.float16)
+nonmatch_perc = np.zeros(n_total_episodes, dtype=np.float16)
+last_reward_record = np.zeros(n_total_episodes, dtype=np.int8)
 if record_data:
-    delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # TODO: ld->len_delay. record data when env.indelay
+    delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
     env.reset()
-    if env.sample == [1,0]:  # L
+    if env.sample == [0,1,0]:  # L
         stim[i_episode] = 0
-    elif env.sample == [0,1]:  # R
+    elif env.sample == [0,0,1]:  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
     net.reinit_hid()
     while not done:
         pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))
-        if env.task_stage in ['delay'] and env.delay_t>0:
+        if env.observation == [0,0,0] and env.delay_t>0:
             if record_data:
                 if net.hidden_types[1] == 'linear':
                     resp.append(
@@ -117,33 +119,28 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
                     resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of LSTM cell
                 elif net.hidden_types[1] == 'gru':
                     resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of GRU cell
+        act, p, v = select_action(net, pol, val)
+        new_obs, reward, done = env.step(act)
+        net.rewards.append(reward)
 
-            new_obs, reward, done = env.step()
-
-        else:
-            act, p, v = select_action(net, pol, val)
-            new_obs, reward, done = env.step(act)
-            net.rewards.append(reward)
-
-        obs = torch.as_tensor(new_obs)
-
-    assert env.task_stage == 'choice'
-    choice[i_episode] = act  # 0=L, 1=R
+    choice[i_episode] = act-1  # 0=L, 1=R
+    last_reward_record[i_episode] = reward
     if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
-        correct_perc[i_episode] = 1
+        nonmatch_perc[i_episode] = 1
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-    p_loss, v_loss = finish_trial(net, 0.999, optimizer)
+    p_loss, v_loss = finish_trial(net, 0.999, optimizer, scheduler)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
-        print(f'Episode {i_episode}, {np.mean(correct_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_perc[:i_episode+1])*100:.3f}% correct')
+        print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% correct')
+        print(f'Episode {i_episode}, average reward {np.mean(last_reward_record[i_episode+1-save_ckpt_per_episodes:i_episode+1]):.3f} in the last {save_ckpt_per_episodes} episodes, total average reward {np.mean(last_reward_record[:i_episode+1]):.3f}')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
-binned_correct_perc = bin_rewards(correct_perc, window_size=window_size)
+binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
 
 
 fig, ax1 = plt.subplots()
 fig.suptitle(f'{env_title} TUNL')
-ax1.plot(np.arange(n_total_episodes), binned_correct_perc, label=net_title)
+ax1.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
 ax1.set_xlabel('Episode')
 ax1.set_ylabel('Fraction Nonmatch')
 ax1.set_ylim(0,1)
@@ -156,5 +153,5 @@ if save_performance_fig:
 if record_data:
     np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_resp=delay_resp)
 else:
-    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice)
+    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice, last_reward_record=last_reward_record)
 
