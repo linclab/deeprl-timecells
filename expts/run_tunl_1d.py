@@ -101,9 +101,9 @@ if record_data:
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
     env.reset()
-    if env.sample == [0,1,0]:  # L
+    if env.episode_sample == [0,1,0]:  # L
         stim[i_episode] = 0
-    elif env.sample == [0,0,1]:  # R
+    elif env.episode_sample == [0,0,1]:  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
@@ -138,6 +138,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
 
+breakpoint()
 
 fig, ax1 = plt.subplots()
 fig.suptitle(f'{env_title} TUNL')
