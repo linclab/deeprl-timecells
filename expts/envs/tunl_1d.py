@@ -151,7 +151,7 @@ class Tunl_simple(object):
 
     def step(self, action=None):
         if self.task_stage == 'init':
-            if action == 1:
+            if action == 0:
                 self.task_stage = 'sample'
                 self.observation = self.sample
                 self.reward = 1
@@ -221,7 +221,7 @@ class Tunl_simple_nomem(object):
 
     def step(self, action=None):
         if self.task_stage == 'init':
-            if action == 1:
+            if action == 0:
                 self.task_stage = 'sample'
                 self.observation = self.sample
                 self.reward = 1

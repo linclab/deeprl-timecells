@@ -101,7 +101,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     env.reset()
     if env.sample == [1,0]:  # L
         stim[i_episode] = 0
-    elif env.sample == [1,1]:  # R
+    elif env.sample == [0,1]:  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
@@ -127,6 +127,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
 
         obs = torch.as_tensor(new_obs)
 
+    assert env.task_stage == 'choice'
     choice[i_episode] = act  # 0=L, 1=R
     if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
         correct_perc[i_episode] = 1
