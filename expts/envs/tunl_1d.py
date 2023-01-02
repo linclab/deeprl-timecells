@@ -105,7 +105,7 @@ class TunlEnv(object):
                 self.done = True
             else:
                 self.reward = 0
-        return self.observation, self.reward, self.done, {}
+        return self.observation, self.reward, self.done
 
 
 
@@ -316,6 +316,6 @@ class TunlEnv_nomem(object):
                 self.observation = [1, 0, 0]
                 self.reward = 1
                 self.done = True
-        return self.observation, self.reward, self.done, {}
+        return self.observation, self.reward, self.done
 
 
