@@ -138,7 +138,6 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
 
-breakpoint()
 
 fig, ax1 = plt.subplots()
 fig.suptitle(f'{env_title} TUNL')
