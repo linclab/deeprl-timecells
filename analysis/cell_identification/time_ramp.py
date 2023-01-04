@@ -30,35 +30,6 @@ def lin_reg_ramping(resp):
     return p_result, slope_result, intercept_result, R_result
 
 
-def trial_consistency_across_durations(stim, stim1_resp, stim2_resp, type='absolute'):
-    stim_set = np.sort(np.unique(stim))
-    n_neurons = np.shape(stim1_resp)[-1]
-    stim_trial_avg_resp = []
-    stim_combinations_list = list(itertools.combinations(stim_set, r=2))
-    for stim_len in stim_set:
-        stim1_activities = stim1_resp[stim[:, 0] == stim_len, :stim_len, :]
-        stim2_activities = stim2_resp[stim[:, 0] == stim_len, :stim_len, :]
-        stim_trial_avg_resp.append(np.mean(np.stack(stim1_activities, stim2_activities, axis=1), axis=0))  # (T1, n_neurons)
-
-    R_result = np.zeros((n_neurons, len(stim_combinations_list)))
-    pval_result = np.zeros((n_neurons, len(stim_combinations_list)))
-
-    for i_neuron in range(n_neurons):
-        for i_stim_comb, stim_combination in enumerate(stim_combinations_list):
-            t1 = stim_combination[0]
-            i_t1 = list(stim_set).index(t1)
-            t2 = stim_combination[1]
-            i_t2 = list(stim_set).index(t2)
-            r_t1 = stim_trial_avg_resp[i_t1][:, i_neuron]
-            r_t2 = stim_trial_avg_resp[i_t2][:, i_neuron]
-            if type=='absolute':
-                R_result[i_neuron, i_stim_comb], pval_result[i_neuron, i_stim_comb] = stats.pearsonr(r_t1, r_t2[:t1])
-            elif type=='relative':
-                R_result[i_neuron, i_stim_comb], pval_result[i_neuron, i_stim_comb] = stats.pearsonr(np.repeat(r_t1, t2), np.repeat(r_t2, t1))
-
-    return R_result, pval_result
-
-
 def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000):
     """
     Toso et al., 2021
@@ -99,7 +70,7 @@ def trial_reliability_score(resp, split='odd-even', percentile=95, n_shuff=1000)
     :param split: 'random' or 'odd-even'
     :param percentile: default=95
     :param n_shuff: default=1000
-    :return:
+    :return: trial_reliability_score_result (n_neurons,) , trial_reliability_score_threshold_result (n_neurons,)
     """
     assert split=='random' or split=='odd-even', "split must be random or odd-even"
     n_total_episodes = np.shape(resp)[0]
@@ -159,6 +130,36 @@ def skaggs_temporal_information(resp, n_shuff=1000, percentile=95):
         I_threshold_result[i_neuron] = np.percentile(I_surrogate, percentile)
 
     return I_result, I_threshold_result
+
+
+# For identifying ramping cells and time cells in timing task
+def trial_consistency_across_durations(stim, stim1_resp, stim2_resp, type='absolute'):
+    stim_set = np.sort(np.unique(stim))
+    n_neurons = np.shape(stim1_resp)[-1]
+    stim_trial_avg_resp = []
+    stim_combinations_list = list(itertools.combinations(stim_set, r=2))
+    for stim_len in stim_set:
+        stim1_activities = stim1_resp[stim[:, 0] == stim_len, :stim_len, :]
+        stim2_activities = stim2_resp[stim[:, 0] == stim_len, :stim_len, :]
+        stim_trial_avg_resp.append(np.mean(np.stack(stim1_activities, stim2_activities, axis=1), axis=0))  # (T1, n_neurons)
+
+    R_result = np.zeros((n_neurons, len(stim_combinations_list)))
+    pval_result = np.zeros((n_neurons, len(stim_combinations_list)))
+
+    for i_neuron in range(n_neurons):
+        for i_stim_comb, stim_combination in enumerate(stim_combinations_list):
+            t1 = stim_combination[0]
+            i_t1 = list(stim_set).index(t1)
+            t2 = stim_combination[1]
+            i_t2 = list(stim_set).index(t2)
+            r_t1 = stim_trial_avg_resp[i_t1][:, i_neuron]
+            r_t2 = stim_trial_avg_resp[i_t2][:, i_neuron]
+            if type=='absolute':
+                R_result[i_neuron, i_stim_comb], pval_result[i_neuron, i_stim_comb] = stats.pearsonr(r_t1, r_t2[:t1])
+            elif type=='relative':
+                R_result[i_neuron, i_stim_comb], pval_result[i_neuron, i_stim_comb] = stats.pearsonr(np.repeat(r_t1, t2), np.repeat(r_t2, t1))
+
+    return R_result, pval_result
 
 
 def skaggs_temporal_information_varying_duration(resp, stim, n_shuff=1000, percentile=95):
@@ -222,10 +223,52 @@ def skaggs_temporal_information_varying_duration(resp, stim, n_shuff=1000, perce
     return I_result, I_threshold_result
 
 
+def sort_response_by_peak_latency(total_resp, cell_nums_ramp, cell_nums_seq, norm=True):
+    """
+    Average the responses across episodes, normalize the activity according to the
+    maximum and minimum of each cell (optional), and sort cells by when their maximum response happens.
+    Then, Separate cells into ramping cells (strictly increasing/decreasing) and sequence cells.
+    Note: sequence cells may contain NaN rows.
+    - Arguments: total_resp, norm=True
+    - Returns: cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp
+    """
+    np.seterr(divide='ignore', invalid='ignore')
+    n_neurons = np.shape(total_resp)[2]
+    segments = np.moveaxis(total_resp, 0, 1)
+    unsorted_matrix = np.zeros((n_neurons, len(segments)))  # len(segments) is also len_delay
+    sorted_matrix = np.zeros((n_neurons, len(segments)))
+    for i in range(len(segments)):  # at timestep i
+        averages = np.mean(segments[i],
+                           axis=0)  # 1 x n_neurons, each entry is the average response of this neuron at this time step across episodes
+        unsorted_matrix[:, i] = np.transpose(
+            averages)  # goes into the i-th column of unsorted_matrix, each row is one neuron
+        if norm is True:
+            normalized_matrix = (unsorted_matrix - np.min(unsorted_matrix, axis=1, keepdims=True)) / np.ptp(
+                unsorted_matrix, axis=1, keepdims=True)
+            # 0=minimum response of this neuron over time, 1=maximum response of this neuro over time
+            max_indeces = np.argmax(normalized_matrix, axis=1)  # which time step does the maximum firing occur
+            cell_nums = np.argsort(max_indeces)  # returns the order of cell number that should go into sorted_matrix
+            for i, i_cell in enumerate(list(cell_nums)):
+                sorted_matrix[i] = normalized_matrix[i_cell]
+        else:
+            max_indeces = np.argmax(unsorted_matrix, axis=1)  # which time step does the maximum firing occur
+            cell_nums = np.argsort(max_indeces)  # returns the order of cell number that should go into sorted_matrix
+            for i, i_cell in enumerate(list(cell_nums)):
+                sorted_matrix[i] = unsorted_matrix[i_cell]
+    # At this point, sorted_matrix should contain all cells
+    assert len(sorted_matrix) == n_neurons
 
+    sorted_matrix_seq = sorted_matrix[np.isin(cell_nums, cell_nums_seq)]
+    sorted_matrix_ramp = sorted_matrix[np.isin(cell_nums, cell_nums_ramp)]
+    sorted_matrix_nontime = sorted_matrix[~np.isin(cell_nums, np.intersect1d(cell_nums_ramp, cell_nums_ramp))]
 
+    # Re-arrange cell_nums_seq and cell_num_ramp and cell_nums_nontime according to peak latency
+    cell_nums_seq = cell_nums[np.isin(cell_nums, cell_nums_seq)]
+    cell_nums_ramp = cell_nums[np.isin(cell_nums, cell_nums_ramp)]
+    cell_nums_nontime = cell_nums[~np.isin(cell_nums, np.intersect1d(cell_nums_ramp, cell_nums_ramp))]
 
-
+    return cell_nums, cell_nums_seq, cell_nums_ramp, cell_nums_nontime,\
+           sorted_matrix, sorted_matrix_seq, sorted_matrix_ramp, sorted_matrix_nontime
 
 
 
