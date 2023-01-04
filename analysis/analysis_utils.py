@@ -40,7 +40,7 @@ def make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, label, sav
     plt.pie(neuron_counts, labels=neuron_labels, autopct=make_autopct(neuron_counts))
     plt.title(label)
     if save:
-        plt.savefig(os.path.join(save_dir, 'piechart.svg'))
+        plt.savefig(os.path.join(save_dir, label+'piechart.svg'))
     else:
         plt.show()
 
@@ -53,7 +53,7 @@ def make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, save_dir, label,
     plt.gca().set_axis_on()
     plt.title(label)
     if save:
-        plt.savefig(os.path.join(save_dir, 'venndiagram.svg'))
+        plt.savefig(os.path.join(save_dir, label+'_venndiagram.svg'))
     else:
         plt.show()
 
