@@ -7,13 +7,8 @@ from sklearn.model_selection import KFold
 from sklearn import svm
 import os
 from analysis_utils import make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, time_decode
-from cell_identification.time_ramp import separate_ramp_and_seq
+from cell_identification.time_ramp import *
 
-'''
-import torch
-from torch import nn
-from torch.autograd import Variable
-'''
 import numpy as np
 
 
@@ -96,7 +91,7 @@ def compare_correct_vs_incorrect(resp, stim_all, correct_trial, title, save_dir,
             plt.show()
 
     elif analysis == "single_unit":
-        single_cell_temporal_tuning(stim_all, corr_resp, incorr_resp, save_dir)
+        single_cell_temporal_tuning(stim_all, corr_resp, incorr_resp, save_dir, compare_correct=True)
         # single_cell_temporal_tuning(stim, corr_resp, incorr_resp, save_dir)
 
     elif analysis == "population":
@@ -277,24 +272,6 @@ def plot_time_cell_sorted_same_order(stim, stim1_resp, stim2_resp, save_dir, sav
         plot_sorted_in_same_order(stim1_activities, stim2_activities, 'Stim 1', 'Stim 2',
                                   big_title=str(stim_len) + "_steps", len_delay=stim_len, n_neurons=num_neurons,
                                   save_dir=save_dir, save=save)
-
-
-def plot_time_cell(stim, resp_hx, label, save_dir, save=False):
-    stim_set = np.sort(np.unique(stim))
-    n_neurons = np.shape(resp_hx)[-1]
-    for stim_len in stim_set:
-        resp = resp_hx[stim == stim_len, :stim_len, :]
-        cell_nums_all, sorted_matrix_all, cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_seq(
-            resp, norm=True)
-        n_ramp_neurons = len(cell_nums_ramp)
-        n_seq_neurons = len(cell_nums_seq)
-        make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir=save_dir, label=label, save=save)
-        plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=label + str(stim_len) + '_Sequence cells',
-                                  remove_nan=True, save_dir=save_dir, save=save)
-        plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=label + str(stim_len) + '_Ramping cells',
-                                  remove_nan=True, save_dir=save_dir, save=save)
-        plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=label + str(stim_len) + '_All cells',
-                                  remove_nan=True, save_dir=save_dir, save=save)
 
 
 def single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir, compare_correct=False):
