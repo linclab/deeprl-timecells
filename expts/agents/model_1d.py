@@ -116,12 +116,13 @@ class AC_Net(nn.Module):
         self.saved_actions = []
         self.rewards = []
 
-    def forward(self, x, temperature=1):
+    def forward(self, x, temperature=1, lesion_idx=None):
         '''
         forward(x):
         Runs a forward pass through the network to get a policy and value.
         Required arguments:
           - x (torch.Tensor): sensory input to the network, should be of size batch x input_d
+          - lesion_idx: if not None, set hx and cx of LSTM cells to 0 before passing input through LSTM layer
         '''
 
         # check the inputs
@@ -135,16 +136,30 @@ class AC_Net(nn.Module):
                 x = F.relu(self.cell_out[i])
                 lin_activity = x
             elif isinstance(layer, nn.LSTMCell):
-                x, cx = layer(x, (self.hx[i], self.cx[i]))
-                self.hx[i] = x.clone()
-                self.cx[i] = cx.clone()
+                if lesion_idx is None:
+                    x, cx = layer(x, (self.hx[i], self.cx[i]))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    cx_copy = self.cx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    cx_copy[:,lesion_idx] = 0
+                    x, cx = layer(x, (hx_copy, cx_copy))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
             elif isinstance(layer, nn.GRUCell):
-                x = layer(x, self.hx[i])
-                self.hx[i] = x.clone()
+                if lesion_idx is None:
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    x = layer(x, hx_copy)
+                    self.hx[i] = x.clone()
         # pass to the output layers
-        policy = F.softmax(self.output[0](x), dim=1)
+        policy = F.softmax(self.output[0](x) / temperature, dim=1)
         value = self.output[1](x)
-
         if isinstance(self.hidden[-1], nn.Linear):
             return policy, value, lin_activity
         else:

@@ -170,7 +170,7 @@ class AC_Net(nn.Module):
         self.temperature = 1
 
     # ================================
-    def forward(self, x, temperature=1):
+    def forward(self, x, temperature=1, lesion_idx=None):
         """
         forward(x):
         Runs a forward pass through the network to get a policy and value.
@@ -201,15 +201,36 @@ class AC_Net(nn.Module):
                 self.cell_out[i] = layer(x)
                 x = F.relu(self.cell_out[i])
             elif isinstance(layer, nn.LSTMCell):
-                x, cx = layer(x, (self.hx[i], self.cx[i]))
-                self.hx[i] = x.clone()
-                self.cx[i] = cx.clone()
+                if lesion_idx is None:
+                    x, cx = layer(x, (self.hx[i], self.cx[i]))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    cx_copy = self.cx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    cx_copy[:,lesion_idx] = 0
+                    x, cx = layer(x, (hx_copy, cx_copy))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
             elif isinstance(layer, nn.GRUCell):
-                x = layer(x, self.hx[i])
-                self.hx[i] = x.clone()
+                if lesion_idx is None:
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    x = layer(x, hx_copy)
+                    self.hx[i] = x.clone()
             elif isinstance(layer, nn.RNNCell):
-                x = layer(x, self.hx[i])
-                self.hx[i] = x.clone()
+                if lesion_idx is None:
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    x = layer(x, hx_copy)
+                    self.hx[i] = x.clone()
             elif isinstance(layer, nn.Conv2d):
                 x = F.relu(layer(x))
             elif isinstance(layer, nn.MaxPool2d):
