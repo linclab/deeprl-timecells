@@ -1,7 +1,7 @@
 from linclab_utils import plot_utils
 from mutual_info.utils import *
-from cell_identification.time_ramp import separate_ramp_and_seq
-from analysis_utils import bin_rewards, make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
+from cell_identification.time_ramp import *
+from analysis_utils import bin_rewards, make_venn_diagram, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
     single_cell_visualization, plot_decode_sample_from_single_time, time_decode_lin_reg
 import sklearn
 import sys
@@ -99,21 +99,68 @@ incorrect_resp = delay_resp[binary_nonmatch == 0]
 correct_loc = delay_loc[binary_nonmatch == 1]  # delay locations on correct trials
 incorrect_loc = delay_loc[binary_nonmatch == 0]
 
-cell_nums_all, sorted_matrix_all, cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_seq(
-    delay_resp, norm=True)
-nontime_cell_idx = [x for x in range(n_neurons) if (x not in cell_nums_seq and x not in cell_nums_ramp)]
+
+separate_trial_types = False
+# Identifying ramping cells
+if separate_trial_types:
+    p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp)
+    ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, slope_result_l>=0.05)
+    cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
+    p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp)
+    ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, slope_result_r>=0.05)
+    cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
+    ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
+    cell_nums_ramp = np.where(ramp_cell_bool)[0]
+else:
+    p_result, slope_result, intercept_result, R_result = lin_reg_ramping(delay_resp)
+    ramp_cell_bool = np.logical_and(p_result<=0.05, slope_result<=0.05)
+    cell_nums_ramp = np.where(ramp_cell_bool)[0]
+
+# Identifying sequence cells
+if separate_trial_types:
+    RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=95, n_shuff=1000)
+    seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
+    cell_nums_seq_l = np.where(seq_cell_bool_l)
+    RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=95, n_shuff=1000)
+    seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
+    cell_nums_seq_r = np.where(seq_cell_bool_r)
+    seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
+    cell_nums_seq = np.where(seq_cell_bool)[0]
+else:
+    RB_result, z_RB_threshold_result = ridge_to_background(delay_resp, ramp_cell_bool, percentile=95, n_shuff=1000)
+    seq_cell_bool = RB_result > z_RB_threshold_result
+    cell_nums_seq = np.where(seq_cell_bool)[0]
+
+trial_reliability_score_result, trial_reliability_score_threshold_result = \
+    trial_reliability_score(delay_resp, split='random', percentile=95, n_shuff=1000)
+not_reliable_cell_bool = trial_reliability_score_result < trial_reliability_score_threshold_result
+
+I_result, I_threshold_result = skaggs_temporal_information(delay_resp, n_shuff=1000, percentile=95)
+high_temporal_info_cell_bool = I_result > I_threshold_result
+
+cell_nums_nontime = np.remove(np.arange(n_neurons), np.intersect1d(cell_nums_seq, cell_nums_ramp))
+
+# Here, the cell_nums have not been re-arranged according to peak latency yet
 delay_resp_ramp = delay_resp[:, :, cell_nums_ramp]
 delay_resp_seq = delay_resp[:, :, cell_nums_seq]
-delay_resp_nontime = delay_resp[:,:,nontime_cell_idx]
+delay_resp_nontime = delay_resp[:, :, cell_nums_nontime]
 left_stim_resp_ramp = delay_resp_ramp[np.all(stim == [1, 1], axis=1)]
 right_stim_resp_ramp = delay_resp_ramp[np.any(stim != [1, 1], axis=1)]
 left_stim_resp_seq = delay_resp_seq[np.all(stim == [1, 1], axis=1)]
 right_stim_resp_seq = delay_resp_seq[np.any(stim != [1, 1], axis=1)]
+left_stim_resp_nontime = delay_resp_nontime[np.all(stim == [1, 1], axis=1)]
+right_stim_resp_nontime = delay_resp_nontime[np.any(stim != [1, 1], axis=1)]
 n_ramp_neurons = len(cell_nums_ramp)
 n_seq_neurons = len(cell_nums_seq)
-#
-print('Make a pie chart of neuron counts...')
-make_piechart(n_ramp_neurons, n_seq_neurons, n_neurons, save_dir, env_title, save=False)
+n_nontime_neurons = len(cell_nums_nontime)
+
+# Re-arrange cell_nums according to peak latency
+cell_nums_all, cell_nums_seq, cell_nums_ramp, cell_nums_nontime, \
+sorted_matrix_all, sorted_matrix_seq, sorted_matrix_ramp, sorted_matrix_nontime = \
+    sort_response_by_peak_latency(delay_resp, cell_nums_ramp, cell_nums_seq, norm=True)
+
+# print('Make a venn diagram of neuron counts...')
+make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, save_dir=save_dir, save=False)
 
 print('Sort avg resp analysis...')
 plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=env_title+' Sequence cells', remove_nan=True, save_dir=save_dir, save=False)
@@ -169,7 +216,7 @@ decode_sample_from_trajectory(delay_loc, stim, save_dir=save_dir, save=False)
 
 print("Mutual info for ramping cells and sequence cells")
 
-# ======= Starting Line 110 of analysis_place.py ==========
+
 ratemap_seq, spatial_occupancy_seq = construct_ratemap(delay_resp_seq, delay_loc)
 mutual_info_seq = calculate_mutual_information(ratemap_seq, spatial_occupancy_seq)
 shuffled_mutual_info_seq = calculate_shuffled_mutual_information(delay_resp_seq, delay_loc, n_total_episodes)
