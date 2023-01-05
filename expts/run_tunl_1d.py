@@ -75,7 +75,7 @@ random.seed(seed)
 # env = Tunl_simple(len_delay, seed=seed) if env_type=='mem' else Tunl_simple_nomem(len_delay, seed=seed)
 env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
 net = AC_Net(3, 3, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
-optimizer = torch.optim.Adam(net.parameters(), lr)
+optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
@@ -152,7 +152,7 @@ if save_performance_fig:
 
 # save data
 if record_data:
-    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_resp=delay_resp)
+    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, last_reward_record=last_reward_record, delay_resp=delay_resp)
 else:
     np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice, last_reward_record=last_reward_record)
 
