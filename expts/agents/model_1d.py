@@ -206,7 +206,7 @@ def discount_rwds(r, gamma):  # takes [1,1,1,1] and makes it [3.439,2.71,1.9,1]
     return disc_rwds
 
 
-def finish_trial(model, discount_factor, optimizer, scheduler, **kwargs):
+def finish_trial(model, discount_factor, optimizer, scheduler=None, **kwargs):
     '''
     Finishes a given training trial and backpropagates.
     '''
