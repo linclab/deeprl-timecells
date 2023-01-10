@@ -74,7 +74,7 @@ random.seed(seed)
 
 # env = Tunl_simple(len_delay, seed=seed) if env_type=='mem' else Tunl_simple_nomem(len_delay, seed=seed)
 env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
-net = AC_Net(3, 3, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
@@ -98,19 +98,22 @@ last_reward_record = np.zeros(n_total_episodes, dtype=np.int8)
 if record_data:
     delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
+episode_reward_record = []
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
+    episode_reward = 0
     done = False
     env.reset()
-    if env.episode_sample == [0,1,0]:  # L
+    episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
+    if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
         stim[i_episode] = 0
-    elif env.episode_sample == [0,0,1]:  # R
+    elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
     net.reinit_hid()
     while not done:
-        pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))
-        if env.observation == [0,0,0] and env.delay_t>0:
+        pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float())
+        if np.all(env.observation == array([[0, 0, 1, 0]])) and env.delay_t>0:
             if record_data:
                 if net.hidden_types[1] == 'linear':
                     resp.append(
@@ -120,20 +123,23 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
                 elif net.hidden_types[1] == 'gru':
                     resp.append(net.hx[1].clone().detach().numpy().squeeze())  # hidden state of GRU cell
         act, p, v = select_action(net, pol, val)
-        new_obs, reward, done = env.step(act)
+        new_obs, reward, done = env.step(act, episode_sample)
         net.rewards.append(reward)
+        episode_reward += reward
 
     choice[i_episode] = act-1  # 0=L, 1=R
     last_reward_record[i_episode] = reward
+    episode_reward_record.append(episode_reward)
     if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
         nonmatch_perc[i_episode] = 1
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-    p_loss, v_loss = finish_trial(net, 0.999, optimizer, scheduler)
+    p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
         if env_type == 'mem':
-            print(f'Episode {i_episode}, average reward {np.mean(last_reward_record[i_episode+1-save_ckpt_per_episodes:i_episode+1]):.3f} in the last {save_ckpt_per_episodes} episodes, total average reward {np.mean(last_reward_record[:i_episode+1]):.3f}')
+            print(f'Episode {i_episode}, total average reward {episode_reward_record/(i_episode+1):.3f}')
+            # print(f'Episode {i_episode}, average reward {np.mean(last_reward_record[i_episode+1-save_ckpt_per_episodes:i_episode+1]):.3f} in the last {save_ckpt_per_episodes} episodes, total average reward {np.mean(last_reward_record[:i_episode+1]):.3f}')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)

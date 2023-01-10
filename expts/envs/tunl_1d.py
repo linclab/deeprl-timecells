@@ -29,83 +29,99 @@ class TunlEnv(object):
         5. Choice phase: the agent must choose the side of the touchscreen that was NOT lit in the sample phase
         (i.e. if the sample was L, the agent must select action R from action space). If agent correctly select the
         nonmatching action, it will receive a reward of 1. If the agent incorrectly select the matching action, it will
-        receive a punishment (i.e. reward = -1), and be presented the same sample in the next trial (i.e. correction trial).
-        If the agent does not do anything meaningful, it will receive neither reward nor punishment (i.e, reward = 0).
+        receive a punishment (i.e. reward = -1). If the agent does not do anything meaningful, it will receive neither
+        reward nor punishment (i.e, reward = 0). The L/R choices will stay on the touchscreen until the agent chooses
+        the correct action.
 
 
-        The observation space consists of 5 possible arrays, each with 3 elements: initiation, L touchscreen, and
-        R touchscreen. Each element is either 0 (off) or 1 (on).
-        [1,0,0] = initiation on; this signals the animal to initiate sample / choice phase
-        [0,1,0] = L touchscreen on
-        [0,0,1] = R touchscreen on
-        [0,0,0] = delay period, no signal
-        [0,1,1] = both L and R touchscreen on; this signals the animal to make a choice
+        The observation space consists of 5 possible arrays, each with four elements: light, sound, L touchscreen, and
+        R touchscreen. Each element is either 0 (off) or 1 on.
+        [1,1,0,0] = light and sound on; this signals the animal to initiate sample / choice phase
+        [0,0,1,0] = L touchscreen on
+        [0,0,0,1] = R touchscreen on
+        [0,0,0,0] = delay period, no signal
+        [0,0,1,1] = both L and R touchscreen on; this signals the animal to make a choice
 
-        The action space consists of 3 possible actions:
+        The action space consists of 4 possible actions:
         0 = initiate
         1 = choose L on the touchscreen
         2 = choose R on the touchscreen
+        3 = do nothing meaningful
 
         """
-        self.observation = [1, 0, 0]
-        self.sample = "undefined"
-        self.episode_sample = None
-        self.delay_t = 0  # time since delay
+        self.observation = array([[1, 1, 0, 0]])
+        self.sample = "undefined"  # {array([[0,0,1,0]]=L, array([[0,0,0,1]])=R}
+        self.delay_t = 0  # time since delay; each delay_t is 0.1s
         self.delay_length = delay
-        self.action_space = spaces.Discrete(3)
-        self.observation_space = spaces.MultiBinary(3)
+        self.action_space = spaces.Discrete(4)
+        self.observation_space = spaces.MultiBinary(4)
         self.reward = 0
         self.done = False
-        self.rng, self.np_seed = seeding.np_random(seed)
-        self.correction_trial = False
-        
-    def reset(self):
-        self.observation = [1, 0, 0]
-        self.delay_t = 0  # time since delay
-        self.reward = 0
-        self.done = False
-        self.sample = "undefined"  # {[0,1,0]=L, [0,0,1]=R}
-        if self.correction_trial is False:
-            self.episode_sample = random.choices(([0, 1, 0], [0, 0, 1]))[0]
-            
-    def step(self, action):
+        self.seed()
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
+    def step(self, action, episode_sample):
         """
         :param action:
         :return: observation, reward, done, info
         """
         assert self.action_space.contains(action)
-        if self.observation == [1, 0, 0]:  # initiation
+        # print("action is", action)
+        if np.all(self.observation == array([[1, 1, 0, 0]])):  # initiation
             if action == 0:
                 if self.sample == "undefined":  # initiate sample phase
-                    self.observation = self.episode_sample  # either array([[0,1,0]]) or array([[0,0,1]])
+                    self.observation = episode_sample  # either array([[0,0,1,0]]) or array([[0,0,0,1]])
                     self.sample = self.observation
+                    # print("SAMPLE IS", self.sample)
+                    self.done = False
                 else:  # initiate choice phase
-                    self.observation = [0, 1, 1]
-        elif self.observation == [0, 1, 0]:  # L touchscreen on
+                    self.observation = array([[0, 0, 1, 1]])
+                    self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 1, 0]])):  # L touchscreen on
             if action == 1:  # poke L to continue
-                self.observation = [0, 0, 0]  # enters delay period
-        elif self.observation == [0, 0, 1]:  # R touchscreen on
+                self.observation = array([[0, 0, 0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 0, 1]])):  # R touchscreen on
             if action == 2:  # poke R to continue
-                self.observation = [0, 0, 0]  # enters delay period
-        elif self.observation == [0, 0, 0]:  # delay period
+                self.observation = array([[0, 0, 0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 0, 0]])):  # delay period
             if self.delay_t < self.delay_length:
                 self.delay_t += 1
+                self.done = False
             else:
-                self.observation = [1, 0, 0]  # enters initiation
-        elif self.observation == [0, 1, 1]:  # choice phase
-            if (self.sample == [0, 1, 0] and action == 2) or (
-                    self.sample == [0, 0, 1] and action == 1):  # choosing nonmatch
+                self.observation = array([[1, 1, 0, 0]])  # enters initiation
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 1, 1]])):  # choice phase
+            if (np.all(self.sample == array([[0, 0, 1, 0]])) and action == 2) or (
+                    np.all(self.sample == array([[0, 0, 0, 1]])) and action == 1):
                 self.reward = 1
-                self.correction_trial = False  # reset correction_trial flag
                 self.done = True
-            elif (self.sample == [0, 1, 0] and action == 1) or (
-                    self.sample == [0, 0, 1] and action == 2):  # choosing match
+            elif (np.all(self.sample == array([[0, 0, 1, 0]])) and action == 1) or (
+                    np.all(self.sample == array([[0, 0, 0, 1]])) and action == 2):
                 self.reward = -1
-                self.correction_trial = True  # set correction_trial flag to true to have the same sample in next trial
-                self.done = True
+                self.done = False
             else:
                 self.reward = 0
+                self.done = False
         return self.observation, self.reward, self.done
+
+    def reset(self):
+        self.observation = array([[1, 1, 0, 0]])
+        self.sample = "undefined"  # {array([0,0,1,0])=L, array([0,0,0,1])=R}
+        self.delay_t = 0  # time since delay
+        self.reward = 0
+
+
 
 
 
