@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 from numpy import array
-from envs.tunl_1d import TunlEnv, TunlEnv_nomem, Tunl_simple, Tunl_simple_nomem
+from envs.tunl_1d import TunlEnv, TunlEnv_nomem
 from agents.model_1d import *
 import os
 from datetime import datetime
@@ -72,8 +72,7 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-# env = Tunl_simple(len_delay, seed=seed) if env_type=='mem' else Tunl_simple_nomem(len_delay, seed=seed)
-env = TunlEnv(len_delay, seed=argsdict['seed']) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
+env = TunlEnv(len_delay, seed=seed) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
 net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
@@ -92,8 +91,9 @@ else:
     net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
-first_reward = np.zeros(n_total_episodes, dtype=np.int8)  # 1=correct, -1=incorrect, 0=no decision made # reward from the first choice since delay period ends
+first_reward = np.zeros(n_total_episodes, dtype=np.int8)  # 1 = correct, -1 = incorrect # first non-zero reward since delay ends
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
+first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 if record_data:
     delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
@@ -108,9 +108,10 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     if record_data:
         resp = []
     net.reinit_hid()
+    act_record = []
     while not done:
         pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float())
-        if np.all(env.observation == array([[0, 0, 1, 0]])) and env.delay_t>0:
+        if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
             if record_data:
                 if net.hidden_types[1] == 'linear':
                     resp.append(
@@ -122,8 +123,10 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         act, p, v = select_action(net, pol, val)
         new_obs, reward, done = env.step(act, episode_sample)
         net.rewards.append(reward)
-    first_reward[i_episode] = net.rewards[next((i for i, x in enumerate(net.rewards) if x), 0)]  # 1 if correct, -1 if incorrect, 0 if no choice was made in this episode
-    nonmatch_perc[i_episode] = 1 if first_reward[i_episode] == 1 else 0
+        act_record.append(act)
+    first_reward[i_episode] = net.rewards[next((i for i, x in enumerate(net.rewards) if x), 0)]  # The first non-zero reward. 1 if correct, -1 if incorrect
+    first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
+    nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)

@@ -121,8 +121,8 @@ class TunlEnv_nomem(object):
 
     action space (4):
     0 = initiation
-    1 = touch left sample to enter delay
-    2 = touch right sample to enter delay
+    1 = touch left sample
+    2 = touch right sample
     3 = do nothing
 
     observation space: (5):
