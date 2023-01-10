@@ -91,7 +91,6 @@ else:
     net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
-first_reward = np.zeros(n_total_episodes, dtype=np.int8)  # 1 = correct, -1 = incorrect # first non-zero reward since delay ends
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
 first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 if record_data:
@@ -124,7 +123,6 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         new_obs, reward, done = env.step(act, episode_sample)
         net.rewards.append(reward)
         act_record.append(act)
-    first_reward[i_episode] = net.rewards[next((i for i, x in enumerate(net.rewards) if x), 0)]  # The first non-zero reward. 1 if correct, -1 if incorrect
     first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
     nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
     if record_data:
@@ -150,7 +148,7 @@ if save_performance_fig:
 
 # save data
 if record_data:
-    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_reward=first_reward, delay_resp=delay_resp)
+    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, delay_resp=delay_resp)
 else:
-    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_reward=first_reward)
+    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action)
 
