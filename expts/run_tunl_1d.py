@@ -56,9 +56,9 @@ seed = argsdict["seed"]
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og'
 save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}')
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
@@ -89,7 +89,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d', load_model_path), map_location=torch.device('cpu')))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -127,7 +127,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         net.rewards.append(reward)
         episode_reward += reward
 
-    choice[i_episode] = act-1  # 0=L, 1=R
+    choice[i_episode] = act-1  # 0=L, 1=R # TODO: original TUNL, last act will always be nonmatch. Chuck nonmatch_perc and last_reward_record.
     last_reward_record[i_episode] = reward
     episode_reward_record.append(episode_reward)
     if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
@@ -136,9 +136,9 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
-        print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+        #print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
         if env_type == 'mem':
-            print(f'Episode {i_episode}, total average reward {episode_reward_record/(i_episode+1):.3f}')
+            print(f'Episode {i_episode}, total average reward {sum(episode_reward_record)/len(episode_reward_record):.3f}')
             # print(f'Episode {i_episode}, average reward {np.mean(last_reward_record[i_episode+1-save_ckpt_per_episodes:i_episode+1]):.3f} in the last {save_ckpt_per_episodes} episodes, total average reward {np.mean(last_reward_record[:i_episode+1]):.3f}')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
