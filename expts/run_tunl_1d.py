@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation
 parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
 parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
 parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
-parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d")
+parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d_og")
 parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
@@ -92,15 +92,12 @@ else:
     net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path), map_location=torch.device('cpu')))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
-choice = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
-nonmatch_perc = np.zeros(n_total_episodes, dtype=np.float16)
-last_reward_record = np.zeros(n_total_episodes, dtype=np.int8)
+first_reward = np.zeros(n_total_episodes, dtype=np.int8)  # 1=correct, -1=incorrect, 0=no decision made # reward from the first choice since delay period ends
+nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
 if record_data:
     delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
-episode_reward_record = []
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
-    episode_reward = 0
     done = False
     env.reset()
     episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
@@ -125,21 +122,13 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         act, p, v = select_action(net, pol, val)
         new_obs, reward, done = env.step(act, episode_sample)
         net.rewards.append(reward)
-        episode_reward += reward
-
-    choice[i_episode] = act-1  # 0=L, 1=R # TODO: original TUNL, last act will always be nonmatch. Chuck nonmatch_perc and last_reward_record.
-    last_reward_record[i_episode] = reward
-    episode_reward_record.append(episode_reward)
-    if stim[i_episode] + choice[i_episode] == 1:  # nonmatch
-        nonmatch_perc[i_episode] = 1
+    first_reward[i_episode] = net.rewards[next((i for i, x in enumerate(net.rewards) if x), 0)]  # 1 if correct, -1 if incorrect, 0 if no choice was made in this episode
+    nonmatch_perc[i_episode] = 1 if first_reward[i_episode] == 1 else 0
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
-        #print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
-        if env_type == 'mem':
-            print(f'Episode {i_episode}, total average reward {sum(episode_reward_record)/len(episode_reward_record):.3f}')
-            # print(f'Episode {i_episode}, average reward {np.mean(last_reward_record[i_episode+1-save_ckpt_per_episodes:i_episode+1]):.3f} in the last {save_ckpt_per_episodes} episodes, total average reward {np.mean(last_reward_record[:i_episode+1]):.3f}')
+        print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
         if save_ckpts:
             torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
@@ -158,7 +147,7 @@ if save_performance_fig:
 
 # save data
 if record_data:
-    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, last_reward_record=last_reward_record, delay_resp=delay_resp)
+    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_reward=first_reward, delay_resp=delay_resp)
 else:
-    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice, last_reward_record=last_reward_record)
+    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_reward=first_reward)
 

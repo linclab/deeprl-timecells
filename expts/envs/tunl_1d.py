@@ -35,7 +35,7 @@ class TunlEnv(object):
 
 
         The observation space consists of 5 possible arrays, each with four elements: light, sound, L touchscreen, and
-        R touchscreen. Each element is either 0 (off) or 1 on.
+        R touchscreen. Each element is either 0 (off) or 1 (on).
         [1,1,0,0] = light and sound on; this signals the animal to initiate sample / choice phase
         [0,0,1,0] = L touchscreen on
         [0,0,0,1] = R touchscreen on
@@ -51,31 +51,23 @@ class TunlEnv(object):
         """
         self.observation = array([[1, 1, 0, 0]])
         self.sample = "undefined"  # {array([[0,0,1,0]]=L, array([[0,0,0,1]])=R}
-        self.delay_t = 0  # time since delay; each delay_t is 0.1s
+        self.delay_t = 0  # time since delay;
         self.delay_length = delay
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.MultiBinary(4)
         self.reward = 0
         self.done = False
-        self.seed()
-
-    def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
+        self.rng, self.np_seed = seeding.np_random(seed)
 
     def step(self, action, episode_sample):
-        """
-        :param action:
-        :return: observation, reward, done, info
-        """
+
         assert self.action_space.contains(action)
-        # print("action is", action)
+
         if np.all(self.observation == array([[1, 1, 0, 0]])):  # initiation
             if action == 0:
                 if self.sample == "undefined":  # initiate sample phase
                     self.observation = episode_sample  # either array([[0,0,1,0]]) or array([[0,0,0,1]])
                     self.sample = self.observation
-                    # print("SAMPLE IS", self.sample)
                     self.done = False
                 else:  # initiate choice phase
                     self.observation = array([[0, 0, 1, 1]])
@@ -120,218 +112,84 @@ class TunlEnv(object):
         self.sample = "undefined"  # {array([0,0,1,0])=L, array([0,0,0,1])=R}
         self.delay_t = 0  # time since delay
         self.reward = 0
-
-
-
-
-
-
-class Tunl_simple(object):
-    """
-    States:
-    [1,1]: init
-    [0,0]: delay
-    [1,0]: left sample
-    [0,1]: right sample
-
-    Actions:
-    0: poke left & initiation
-    1: poke right
-    """
-    def __init__(self, len_delay=40, rwd=10, inc_rwd=-10, seed=1):
-        self.len_delay = len_delay
-        self.rwd = rwd
-        self.inc_rwd = inc_rwd
-        self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.MultiBinary(2)
-        self.rng, self.np_seed = seeding.np_random(seed)
-        self.reward = 0  # reward at this time step, not the cumulative reward of this episode
-        self.task_stage = 'init'
         self.done = False
-        self.delay_t = 0  # time since delay
-        self.observation = [1,1]
-        self.sample = None
-        self.correction_trial = False
-
-    def reset(self):
-        self.reward = 0
-        self.task_stage = 'init'
-        self.done = False
-        self.observation = [1,1]
-        self.delay_t = 0  # time since delay
-        if not self.correction_trial:  # receives new sample. Otherwise repeat old sample.
-            self.sample = random.choices(([1,0],[0,1]))[0]  # [1,0] or [0,1]
-
-    def step(self, action=None):
-        if self.task_stage == 'init':
-            if action == 0:
-                self.task_stage = 'sample'
-                self.observation = self.sample
-                self.reward = 1
-            else:
-                self.reward = -1
-
-        elif self.task_stage == "sample":
-            if (self.observation == [1,0] and action == 0) or (self.observation == [0,1] and action == 1):  # touch sample to enter delay
-                self.task_stage = 'delay'
-                self.observation = [0,0]
-                self.reward = 1
-            else:
-                self.reward = -1
-
-        elif self.task_stage == 'delay':
-            if self.delay_t < self.len_delay:
-                self.delay_t += 1
-            else:
-                self.task_stage = 'choice'
-                self.observation = [1,1]
-
-        elif self.task_stage == 'choice':
-            if (self.sample == [1,0] and action == 1) or (self.sample == [0,1] and action == 0):  # choose nonmatch
-                self.reward = self.rwd
-                self.correction_trial = False
-            else:
-                self.reward = self.inc_rwd
-                self.correction_trial = True
-            self.done = True
-
-        return self.observation, self.reward, self.done
-
-
-class Tunl_simple_nomem(object):
-    """
-    States:
-    [1,1]: init
-    [0,0]: delay
-    [1,0]: left sample
-    [0,1]: right sample
-
-    Actions:
-    0: poke left & initiation
-    1: poke right
-    """
-    def __init__(self, len_delay=40, rwd=10, inc_rwd=-10, seed=1):
-        self.len_delay = len_delay
-        self.rwd = rwd
-        self.inc_rwd = inc_rwd
-        self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.MultiBinary(2)
-        self.rng, self.np_seed = seeding.np_random(seed)
-        self.reward = 0  # reward at this time step, not the cumulative reward of this episode
-        self.task_stage = 'init'
-        self.done = False
-        self.delay_t = 0  # time since delay
-        self.observation = [1,1]
-        self.sample = None
-
-    def reset(self):
-        self.reward = 0
-        self.task_stage = 'init'
-        self.done = False
-        self.observation = [1,1]
-        self.delay_t = 0  # time since delay
-        self.sample = random.choices(([1,0],[0,1]))[0]  # [1,0] or [0,1]
-
-    def step(self, action=None):
-        if self.task_stage == 'init':
-            if action == 0:
-                self.task_stage = 'sample'
-                self.observation = self.sample
-                self.reward = 1
-            else:
-                self.reward = -1
-
-        elif self.task_stage == "sample":
-            if (self.observation == [1,0] and action == 0) or (self.observation == [0,1] and action == 1):  # touch sample to enter delay
-                self.task_stage = 'delay'
-                self.observation = [0,0]
-                self.reward = 1
-            else:
-                self.reward = -1
-
-        elif self.task_stage == 'delay':
-            if self.delay_t < self.len_delay:
-                self.delay_t += 1
-            else:
-                self.task_stage = 'choice'
-                self.observation = [1,1]
-
-        elif self.task_stage == 'choice':
-            if action == 0 or action == 1:  # make a choice
-                self.reward = self.rwd
-                self.done = True
-
-        return self.observation, self.reward, self.done
 
 
 class TunlEnv_nomem(object):
-    """
-    For each episode, the agent receives a sample (L/R), experiences a delay,
-    then is given two choices (L/R) - choosing either leads to a reward.
+    '''
+    In choice phase, agent may poke L or R to receive a reward and end trial.
 
-    action space (3):
+    action space (4):
     0 = initiation
     1 = touch left sample to enter delay
     2 = touch right sample to enter delay
+    3 = do nothing
 
     observation space: (5):
-    array([[1,0,0]]) = light on, sound on
-    array([[0,1,0]]) = left sample
-    array([[0,0,1]]) = right sample
-    array([[0,1,1]]) = waiting for choice
-    array([[0,0,0]]) = delay
-    """
+    array([[1,1,0,0]]) = light on, sound on
+    array([[0,0,1,0]]) = left sample
+    array([[0,0,0,1]]) = right sample
+    array([[0,0,1,1]]) = waiting for choice
+    array([[0,0,0,0]]) = delay
 
+    '''
     def __init__(self, delay, seed=1):
-        self.observation = [1, 0, 0]
-        self.delay_t = 0  # time since delay
+        self.observation = array([[1, 1, 0, 0]])
+        self.sample = "undefined"  # {array([[0,0,1,0]]=L, array([[0,0,0,1]])=R}
+        self.delay_t = 0  # time since delay;
         self.delay_length = delay
-        self.action_space = spaces.Discrete(3)
-        self.observation_space = spaces.MultiBinary(3)
+        self.action_space = spaces.Discrete(4)
+        self.observation_space = spaces.MultiBinary(4)
         self.reward = 0
         self.done = False
-        self.sample = "undefined"
-        self.episode_sample = None
         self.rng, self.np_seed = seeding.np_random(seed)
 
+    def step(self, action, episode_sample):
+
+        assert self.action_space.contains(action)
+
+        if np.all(self.observation == array([[1, 1, 0, 0]])):  # initiation
+            if action == 0:
+                if self.sample == "undefined":  # initiate sample phase
+                    self.observation = episode_sample  # either array([[0,0,1,0]]) or array([[0,0,0,1]])
+                    self.sample = self.observation
+                    self.done = False
+                else:  # initiate choice phase
+                    self.observation = array([[0, 0, 1, 1]])
+                    self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 1, 0]])):  # L touchscreen on
+            if action == 1:  # poke L to continue
+                self.observation = array([[0, 0, 0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 0, 1]])):  # R touchscreen on
+            if action == 2:  # poke R to continue
+                self.observation = array([[0, 0, 0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 0, 0]])):  # delay period
+            if self.delay_t < self.delay_length:
+                self.delay_t += 1
+                self.done = False
+            else:
+                self.observation = array([[1, 1, 0, 0]])  # enters initiation
+                self.done = False
+        elif np.all(self.observation == array([[0, 0, 1, 1]])):  # choice phase
+            if action == 1 or action == 2:  # poke L or R
+                self.reward = 1
+                self.done = True
+            else:
+                self.reward = 0
+                self.done = False
+        return self.observation, self.reward, self.done
+
     def reset(self):
-        self.observation = [1, 0, 0]
+        self.observation = array([[1, 1, 0, 0]])
+        self.sample = "undefined"  # {array([0,0,1,0])=L, array([0,0,0,1])=R}
         self.delay_t = 0  # time since delay
         self.reward = 0
         self.done = False
-        self.sample = "undefined"  # {[0,1,0]=L, [0,0,1]=R}
-        self.episode_sample = random.choices(([0, 1, 0], [0, 0, 1]))[0]
-
-    def step(self, action):
-        """
-        :param action:
-        :return: observation, reward, done, info
-        """
-        assert self.action_space.contains(action)
-        # print("action is", action)
-        if self.observation == [1, 0, 0]:  # initiation
-            if action == 0:
-                if self.sample == "undefined":  # initiate sample phase
-                    self.observation = self.episode_sample  # either array([[0,0,1,0]]) or array([[0,0,0,1]])
-                    self.sample = self.observation
-                else:  # initiate choice phase
-                    self.observation = [0, 1, 1]
-        elif self.observation == [0, 1, 0]:  # L touchscreen on
-            if action == 1:  # poke L to continue
-                self.observation = [0, 0, 0]  # enters delay period
-        elif self.observation == [0, 0, 1]:  # R touchscreen on
-            if action == 2:  # poke R to continue
-                self.observation = [0, 0, 0]  # enters delay period
-        elif self.observation == [0, 0, 0]:  # delay period
-            if self.delay_t < self.delay_length:
-                self.delay_t += 1
-            else:
-                self.observation = [1, 0, 0]  # enters initiation
-        elif self.observation == [0, 1, 1]:  # waits for choice
-            if action == 1 or action == 2:  # poke L or R
-                self.observation = [1, 0, 0]
-                self.reward = 1
-                self.done = True
-        return self.observation, self.reward, self.done
-
-
