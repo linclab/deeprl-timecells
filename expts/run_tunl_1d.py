@@ -144,11 +144,11 @@ ax1.set_ylim(0,1)
 ax1.legend()
 #plt.show()
 if save_performance_fig:
-    fig.savefig(save_dir + f'/total_{n_total_episodes}episodes_performance.svg')
+    fig.savefig(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance.svg')
 
 # save data
 if record_data:
     np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, delay_resp=delay_resp)
 else:
-    np.savez_compressed(save_dir + f'/total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action)
+    np.savez_compressed(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action)
 
