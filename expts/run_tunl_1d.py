@@ -152,3 +152,7 @@ if record_data:
 else:
     np.savez_compressed(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action)
 
+del stim, nonmatch_perc, first_action, net, env, optimizer
+if record_data:
+    del delay_resp
+
