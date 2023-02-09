@@ -327,7 +327,7 @@ def select_action(model, policy_, value_):
 
 
 # calculate policy and value loss for updating network weights
-def finish_trial(model, discount_factor, optimizer, **kwargs):
+def finish_trial(model, discount_factor, optimizer, beta=0., hid_activity=None, **kwargs):
     """
     Finishes a given training trial and backpropagates.
     """
@@ -350,8 +350,12 @@ def finish_trial(model, discount_factor, optimizer, **kwargs):
 
     p_loss = (torch.cat(policy_losses).sum())
     v_loss = (torch.cat(value_losses).sum())
+    if beta > 0:
+        t_loss = calculate_temporal_coherence_penalty(beta, hid_activity)
+    else:
+        t_loss = 0
 
-    total_loss = p_loss + v_loss
+    total_loss = p_loss + v_loss + t_loss
 
     total_loss.backward(retain_graph=True)  # calculate gradient
     optimizer.step()
@@ -362,3 +366,9 @@ def finish_trial(model, discount_factor, optimizer, **kwargs):
     return p_loss, v_loss
 
 
+def calculate_temporal_coherence_penalty(beta, hid_activity):
+    resp_diff = hid_activity[1,:] - hid_activity[:-1,:]
+    total_diff = np.sum(np.power(resp_diff, 2))
+    n_steps = hid_activity.shape[0]
+    loss = beta / n_steps * total_diff
+    return loss

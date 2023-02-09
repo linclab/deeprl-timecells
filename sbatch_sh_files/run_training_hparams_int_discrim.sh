@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --array=0-30%30
 #SBATCH --job-name=timing_hparam
-#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/timing/slurm-%A.%a.out
-#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/timing/slurm-%A.%a.err
+#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/timing2d/slurm-%A.%a.out
+#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/timing2d/slurm-%A.%a.err
 #SBATCH --partition=long
-#SBATCH --gres=gpu:2g.20gb:1  # 2g:20gb for tunl1d, rtx8000 for tunl2d
+#SBATCH --gres=gpu:rtx8000:1  # 2g:20gb for 1d, rtx8000 for 2d
 #SBATCH --cpus-per-gpu=6
-#SBATCH --mem=20G
+#SBATCH --mem=48G
 #SBATCH --mail-type=END,FAL
 #SBATCH --mail-user=lindongy@mila.quebec
 
@@ -34,5 +34,9 @@ hidden_type=${hidden_type_arr[$htidx]}
 lr=${lr_arr[$lridx]}
 n_neurons=${n_neurons_arr[$nidx]}
 
-# Run interval discrimination experiment
-python expts/run_int_discrim.py --n_total_episodes 150000 --save_ckpt_per_episodes 30000 --load_model_path 'None' --save_ckpts True --n_neurons $n_neurons --lr $lr --seed 1 --hidden_type $hidden_type
+# Run 1D interval discrimination experiment
+python expts/run_int_discrim.py --n_total_episodes 150000 --save_ckpt_per_episodes 30000 --load_model_path 'None' --save_ckpts True --n_neurons $n_neurons --lr $lr --seed 1 --hidden_type $hidden_type --save_performance_fig True
+
+
+# Run 2D interval discrimination experiment
+python expts/run_int_discrim_2d.py --n_total_episodes 300000 --save_ckpt_per_episodes 30000 --load_model_path 'None' --save_ckpts True --n_neurons $n_neurons --lr $lr --seed 1 --hidden_type $hidden_type --save_performance_fig True
