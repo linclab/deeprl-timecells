@@ -1,12 +1,13 @@
 import random
 import os
-from expts.agents.model_2d import *
-from expts.envs.int_discrim_2d import *
+from agents.model_2d import *
+from envs.int_discrim_2d import *
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
 import  argparse
+from tqdm import tqdm
 # from analysis.linclab_utils import plot_utils
 #
 # plot_utils.linclab_plt_defaults()
@@ -157,7 +158,7 @@ epi_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 correct_perc = np.zeros(n_total_episodes, dtype=np.float16)
 
 
-for i_episode in range(n_total_episodes):
+for i_episode in tqdm(range(n_total_episodes)):
     done = False
     env.reset()
     ideal_nav_rwds[i_episode] = ideal_nav_rwd(env, step_rwd, poke_rwd, rwd)
@@ -167,7 +168,7 @@ for i_episode in range(n_total_episodes):
 
     while not done:
         pol, val = net.forward(
-            torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float()
+            torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
         )  # forward
         if record_data and hidden_type=='lstm':
             if env.phase == "stim_1":
