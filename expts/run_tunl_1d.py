@@ -90,6 +90,9 @@ else:
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
     net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path), map_location=torch.device('cpu')))
 
+if record_data:
+    net.eval()
+
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
 first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -109,7 +112,8 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     net.reinit_hid()
     act_record = []
     while not done:
-        pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float())
+        with torch.set_grad_enabled(not record_data):  # set torch.no_grad when recording data
+            pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float())
         if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
             if record_data:
                 if net.hidden_types[1] == 'linear':
@@ -127,7 +131,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-    p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+    p_loss, v_loss = finish_trial(net, 0.99, optimizer, record_data)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
         if save_ckpts:
