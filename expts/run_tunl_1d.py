@@ -73,7 +73,7 @@ np.random.seed(seed)
 random.seed(seed)
 
 env = TunlEnv(len_delay, seed=seed) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
-net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons]).to(device)
+net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
