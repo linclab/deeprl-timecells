@@ -206,7 +206,7 @@ def discount_rwds(r, gamma):  # takes [1,1,1,1] and makes it [3.439,2.71,1.9,1]
     return disc_rwds
 
 
-def finish_trial(model, discount_factor, optimizer, record_data, scheduler=None, **kwargs):
+def finish_trial(model, discount_factor, optimizer, scheduler=None, **kwargs):
     '''
     Finishes a given training trial and backpropagates.
     '''
@@ -229,12 +229,12 @@ def finish_trial(model, discount_factor, optimizer, record_data, scheduler=None,
     optimizer.zero_grad() # clear gradient
     p_loss = (torch.cat(policy_losses).sum())
     v_loss = (torch.cat(value_losses).sum())
-    if not record_data:
-        total_loss = p_loss + v_loss
-        total_loss.backward(retain_graph=True) # calculate gradient
-        optimizer.step()  # move down gradient
-        if scheduler is not None:
-            scheduler.step()
+
+    total_loss = p_loss + v_loss
+    total_loss.backward(retain_graph=True) # calculate gradient
+    optimizer.step()  # move down gradient
+    if scheduler is not None:
+        scheduler.step()
 
     del model.rewards[:]
     del model.saved_actions[:]
