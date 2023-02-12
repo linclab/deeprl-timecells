@@ -56,8 +56,8 @@ if not os.path.exists(save_dir):
 print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
-# use_cuda = torch.cuda.is_available()
-# device = torch.device("cuda:0" if use_cuda else "cpu")  # Not using cuda for 1D IntDiscrm
+use_cuda = torch.cuda.is_available()
+device = torch.device("cuda:0" if use_cuda else "cpu")
 torch.manual_seed(seed)
 np.random.seed(seed)
 
@@ -80,7 +80,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing', load_model_path), map_location=torch.device('cpu')))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing', load_model_path)))
 
 
 # Define helper functions
@@ -115,7 +115,7 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode,0] = env.first_stim
     stim[i_episode,1] = env.second_stim
     while not done:
-        pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))  # forward
+        pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0).to(device))  # forward
         if env.task_stage in ['init', 'choice_init']:
             act, p, v = select_action(net, pol, val)
             new_obs, reward, done = env.step(act)
