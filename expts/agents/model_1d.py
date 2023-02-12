@@ -6,6 +6,14 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from collections import namedtuple
 
+use_cuda = True
+if torch.cuda.is_available() and use_cuda:
+    device = torch.device('cuda')
+else:
+    device = torch.device('cpu')
+def to_device(list_of_arrays):
+    return [torch.Tensor(array).to(device) for array in list_of_arrays]
+
 
 class AC_Net(nn.Module):
     """
@@ -45,6 +53,9 @@ class AC_Net(nn.Module):
         # check that the correct number of hidden dimensions are specified
         assert len(hidden_types) == len(hidden_dimensions)
 
+        # use gpu
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
+
         # check whether we're using hidden layers
         if not hidden_types:
             self.layers = [input_dimensions, action_dimensions]
@@ -70,18 +81,18 @@ class AC_Net(nn.Module):
                     output_d = hidden_dimensions[i]
                     if htype == 'linear':
                         self.hidden.append(nn.Linear(input_d, output_d))
-                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d))) ##
+                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
                         self.hx.append(None) ##
                         self.cx.append(None) ##
                     elif htype == 'lstm':
                         self.hidden.append(nn.LSTMCell(input_d, output_d))
                         self.cell_out.append(None) ##
-                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
-                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)))
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     elif htype == 'gru':
                         self.hidden.append(nn.GRUCell(input_d, output_d))
                         self.cell_out.append(None) ##
-                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
                 # second hidden layer onwards
                 else:
@@ -91,18 +102,18 @@ class AC_Net(nn.Module):
                     # construct the layer
                     if htype == 'linear':
                         self.hidden.append(nn.Linear(input_d, output_d))
-                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d))) ##
+                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
                         self.hx.append(None)
                         self.cx.append(None)
                     elif htype == 'lstm':
                         self.hidden.append(nn.LSTMCell(input_d, output_d))
                         self.cell_out.append(None) ##
-                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
-                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)))
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     elif htype == 'gru':
                         self.hidden.append(nn.GRUCell(input_d, output_d))
                         self.cell_out.append(None) ##
-                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)))
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
         # create the actor and critic layers
         self.layers = [input_dimensions] + hidden_dimensions + [action_dimensions]
@@ -115,6 +126,7 @@ class AC_Net(nn.Module):
         # to store a record of actions and rewards
         self.saved_actions = []
         self.rewards = []
+        self.to(self.device)
 
     def forward(self, x, temperature=1, lesion_idx=None):
         '''
@@ -173,15 +185,15 @@ class AC_Net(nn.Module):
 
         for i, layer in enumerate(self.hidden):
             if isinstance(layer, nn.Linear):
-                self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features))) ##
+                self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device)) ##
                 self.hx.append(None)##
                 self.cx.append(None)##
             elif isinstance(layer, nn.LSTMCell):
-                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)))
-                self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)))
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cell_out.append(None) ##
             elif isinstance(layer, nn.GRUCell):
-                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)))
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cx.append(None)
                 self.cell_out.append(None)##
 
@@ -219,12 +231,12 @@ def finish_trial(model, discount_factor, optimizer, scheduler=None, **kwargs):
     policy_losses = []
     value_losses = []
 
-    returns_ = torch.Tensor(returns_)
+    returns_ = torch.Tensor(returns_).to(model.device)
 
     for (log_prob, value), r in zip(saved_actions, returns_):
         rpe = r - value.item()
         policy_losses.append(-log_prob * rpe)
-        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]))).unsqueeze(-1))
+        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(model.device))).unsqueeze(-1))
         #   return policy_losses, value_losses
     optimizer.zero_grad() # clear gradient
     p_loss = (torch.cat(policy_losses).sum())
