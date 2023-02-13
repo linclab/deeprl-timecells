@@ -64,7 +64,12 @@ if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
 else:
     main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og'
-save_dir = os.path.join(main_dir, f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}_wd{weight_decay}')
+save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}'
+if weight_decay != 0:
+    save_dir_str += f'_wd{weight_decay}'
+if p_dropout != 0:
+    save_dir_str += f'_p{p_dropout}_{dropout_type}'
+save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 print(f'Saved to {save_dir}')
