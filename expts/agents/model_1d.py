@@ -20,7 +20,7 @@ class AC_Net(nn.Module):
     An actor-critic neural network class. Takes sensory inputs and generates a policy and a value estimate.
     """
 
-    def __init__(self, input_dimensions, action_dimensions, batch_size, hidden_types, hidden_dimensions):
+    def __init__(self, input_dimensions, action_dimensions, batch_size, hidden_types, hidden_dimensions, p_dropout=0, dropout_type=None):
 
         """
         AC_Net(input_dimensions, action_dimensions, hidden_types=[], hidden_dimensions=[])
@@ -126,6 +126,9 @@ class AC_Net(nn.Module):
         # to store a record of actions and rewards
         self.saved_actions = []
         self.rewards = []
+        self.p_dropout = p_dropout
+        self.dropout = nn.Dropout(p=self.p_dropout)
+        self.dropout_type = dropout_type
         self.to(self.device)
 
     def forward(self, x, temperature=1, lesion_idx=None):
@@ -144,12 +147,18 @@ class AC_Net(nn.Module):
         for i, layer in enumerate(self.hidden):
             # run input through the layer depending on type
             if isinstance(layer, nn.Linear): ##
+                if self.dropout_type == 1:
+                    x = self.dropout(x)  # will affect linear only
                 self.cell_out[i] = layer(x)
                 x = F.relu(self.cell_out[i])
                 lin_activity = x
             elif isinstance(layer, nn.LSTMCell):
                 if lesion_idx is None:
+                    if self.dropout_type == 2:
+                        x = self.dropout(x) # dropout on input to LSTM. will affect LSTM
                     x, cx = layer(x, (self.hx[i], self.cx[i]))
+                    if self.dropout_type == 3:
+                        x = self.dropout(x)  # will affect both LSTM and linear
                     self.hx[i] = x.clone()
                     self.cx[i] = cx.clone()
                 else:
@@ -170,6 +179,8 @@ class AC_Net(nn.Module):
                     x = layer(x, hx_copy)
                     self.hx[i] = x.clone()
         # pass to the output layers
+        if self.dropout_type == 4:
+            x = self.dropout(x)
         policy = F.softmax(self.output[0](x) / temperature, dim=1)
         value = self.output[1](x)
         if isinstance(self.hidden[-1], nn.Linear):
