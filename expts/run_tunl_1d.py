@@ -32,11 +32,13 @@ parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to s
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
 parser.add_argument("--lr", type=float, default=0.0001, help="learning rate")
-parser.add_argument("--weight_decay", type=float, default=0.001, help="weight_decay")
+parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay")
 parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproducibility")
 parser.add_argument("--env_type", type=str, default='mem', help="type of environment: mem or nomem")
 parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
+parser.add_argument("--p_dropout", type=float, default=0.0, help="dropout probability")
+parser.add_argument("--dropout_type", type=int, default=None, help="location of dropout (could be 1,2,3,or 4)")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -55,6 +57,8 @@ env_type = argsdict['env_type']
 hidden_type = argsdict['hidden_type']
 seed = argsdict["seed"]
 weight_decay = argsdict['weight_decay']
+p_dropout = argsdict['p_dropout']
+dropout_type = argsdict['dropout_type']
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
@@ -74,7 +78,7 @@ np.random.seed(seed)
 random.seed(seed)
 
 env = TunlEnv(len_delay, seed=seed) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
-net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout, dropout_type)
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
