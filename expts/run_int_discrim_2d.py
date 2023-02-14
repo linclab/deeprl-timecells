@@ -56,6 +56,9 @@ parser.add_argument("--incorrect_reward", type=int, default=-100, help="Magnitud
 parser.add_argument("--step_reward", type=float, default=-0.1, help="Magnitude of reward for each action agent takes, to ensure shortest path")
 parser.add_argument("--poke_reward", type=int, default=5, help="Magnitude of reward when agent pokes signal to proceed")
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
+parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay")
+parser.add_argument("--p_dropout", type=float, default=0.0, help="dropout probability")
+parser.add_argument("--dropout_type", type=int, default=None, help="location of dropout (could be 1,2,3,or 4)")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -77,14 +80,21 @@ rwd = argsdict['nonmatch_reward']
 inc_rwd = argsdict['incorrect_reward']
 step_rwd = argsdict['step_reward']
 poke_rwd = argsdict['poke_reward']
-
+weight_decay = argsdict['weight_decay']
+p_dropout = argsdict['p_dropout']
+dropout_type = argsdict['dropout_type']
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing2d'
 else:
     main_dir = '/network/scratch/l/lindongy/timecell/training/timing2d'
-save_dir = os.path.join(main_dir, f'{hidden_type}_{n_neurons}_{lr}')
+save_dir_str = f'{hidden_type}_{n_neurons}_{lr}'
+if weight_decay != 0:
+    save_dir_str += f'_wd{weight_decay}'
+if p_dropout != 0:
+    save_dir_str += f'_p{p_dropout}_{dropout_type}'
+save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 print(f'Saved to {save_dir}')
@@ -124,12 +134,14 @@ net = AC_Net(
         (layer_4_out_h, layer_4_out_w, conv_2_features),  # pool
         n_neurons,
         n_neurons],  # hidden_dims
+    p_dropout=p_dropout,
+    dropout_type=dropout_type,
     batch_size=1,
     rfsize=rfsize,
     padding=padding,
     stride=stride)
 
-optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 env_title = "Interval Discrimination 2D"
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 

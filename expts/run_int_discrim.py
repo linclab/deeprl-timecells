@@ -28,6 +28,9 @@ parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproduc
 # parser.add_argument("--env_type", type=str, default='mem', help="type of environment: mem or nomem")
 parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
+parser.add_argument("--weight_decay", type=float, default=0.0, help="weight_decay")
+parser.add_argument("--p_dropout", type=float, default=0.0, help="dropout probability")
+parser.add_argument("--dropout_type", type=int, default=None, help="location of dropout (could be 1,2,3,or 4)")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -45,13 +48,21 @@ lr = argsdict['lr']
 hidden_type = argsdict['hidden_type']
 seed = argsdict['seed']
 save_performance_fig = True if argsdict['save_performance_fig'] == True or argsdict['save_performance_fig'] == 'True' else False
+weight_decay = argsdict['weight_decay']
+p_dropout = argsdict['p_dropout']
+dropout_type = argsdict['dropout_type']
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing'
 else:
     main_dir = '/network/scratch/l/lindongy/timecell/training/timing'
-save_dir = os.path.join(main_dir, f'{hidden_type}_{n_neurons}_{lr}')
+save_dir_str = f'{hidden_type}_{n_neurons}_{lr}'
+if weight_decay != 0:
+    save_dir_str += f'_wd{weight_decay}'
+if p_dropout != 0:
+    save_dir_str += f'_p{p_dropout}_{dropout_type}'
+save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 print(f'Saved to {save_dir}')
@@ -68,10 +79,12 @@ net = AC_Net(
     action_dimensions=2,  # action dim
     hidden_types=[hidden_type, 'linear'],  # hidden types
     hidden_dimensions=[n_neurons, n_neurons], # hidden dims
-    batch_size=1)
+    batch_size=1,
+    p_dropout=p_dropout,
+    dropout_type=dropout_type)
 env_title = "Interval Discrimination"
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
-optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 
 # Load existing model
 if load_model_path=='None':
