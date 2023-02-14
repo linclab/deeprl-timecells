@@ -23,7 +23,7 @@ class AC_Net(nn.Module):
     '''
 
     # ================================
-    def __init__(self, input_dimensions, action_dimensions, hidden_types, hidden_dimensions,
+    def __init__(self, input_dimensions, action_dimensions, hidden_types, hidden_dimensions, p_dropout=0, dropout_type=None,
                  batch_size=4, rfsize=4, padding=1, stride=1):
         '''
         Create an actor-critic network class.
@@ -165,6 +165,9 @@ class AC_Net(nn.Module):
         # to store a record of actions and rewards
         self.saved_actions = []
         self.rewards = []
+        self.p_dropout = p_dropout
+        self.dropout = nn.Dropout(p=self.p_dropout)
+        self.dropout_type = dropout_type
 
         self.to(self.device)
         self.temperature = 1
@@ -198,11 +201,17 @@ class AC_Net(nn.Module):
                     x = x.view(x.shape[0], -1)
             # run input through the layer depending on type
             if isinstance(layer, nn.Linear):
+                if self.dropout_type == 1:
+                    x = self.dropout(x)  # will affect linear only
                 self.cell_out[i] = layer(x)
                 x = F.relu(self.cell_out[i])
             elif isinstance(layer, nn.LSTMCell):
                 if lesion_idx is None:
+                    if self.dropout_type == 2:
+                        x = self.dropout(x) # dropout on input to LSTM. will affect LSTM
                     x, cx = layer(x, (self.hx[i], self.cx[i]))
+                    if self.dropout_type == 3:
+                        x = self.dropout(x)  # will affect both LSTM and linear
                     self.hx[i] = x.clone()
                     self.cx[i] = cx.clone()
                 else:
@@ -236,6 +245,8 @@ class AC_Net(nn.Module):
             elif isinstance(layer, nn.MaxPool2d):
                 x = layer(x)
         # pass to the output layers
+        if self.dropout_type == 4:
+            x = self.dropout(x)
         policy = F.softmax(self.output[0](x) / temperature, dim=1)
         value = self.output[1](x)
 
