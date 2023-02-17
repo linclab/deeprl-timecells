@@ -2,11 +2,15 @@ import numpy as np
 from scipy import stats
 import itertools
 from analysis.mutual_info.utils import shuffle_activity
+import matplotlib.pyplot as plt
+import os
+from matplotlib.backends.backend_pdf import PdfPages
+from tqdm import tqdm
 import sklearn
 import scikit_posthocs as sp
 
 
-def lin_reg_ramping(resp):
+def lin_reg_ramping(resp, plot=False, save_dir=None, title=None):
     """
     Shikano et al., 2021; Toso et al., 2021
     Fit linear regression to trial-averaged tuning curve of each neuron to identify ramping cells.
@@ -14,23 +18,44 @@ def lin_reg_ramping(resp):
     :return: r, p, slope (beta) of each neuron
     """
     n_total_episodes = np.shape(resp)[0]
+    random_trial_id = np.random.choice(n_total_episodes, 10)
     len_delay = np.shape(resp)[1]
     n_neurons = np.shape(resp)[2]
     # r_result = np.zeros(n_neurons)
     p_result = np.zeros(n_neurons)
     slope_result = np.zeros(n_neurons)
     intercept_result = np.zeros(n_neurons)
-    R_result = np.zeros(n_neurons)
-    for i_neuron in range(n_neurons):
+    pearson_R_result = np.zeros(n_neurons)
+    if plot:
+        plot_cols = 10
+        plot_rows = int(np.ceil(n_neurons / plot_cols))
+        tuning_curve_fig = plt.figure('tuning_curves', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
+
+    for i_neuron in tqdm(range(n_neurons)):
         tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)
         t = np.arange(len_delay)
-        slope_result[i_neuron], intercept_result[i_neuron], r, p_result[i_neuron], std_err = stats.linregress(t,tuning_curve)
-        R_result[i_neuron], pval = stats.pearsonr(t, tuning_curve)
+        slope_result[i_neuron], intercept_result[i_neuron], pearson_R_result[i_neuron], p_result[i_neuron], std_err = stats.linregress(t,tuning_curve)
 
-    return p_result, slope_result, intercept_result, R_result
+        if plot:
+            random_trial_resp_to_plot = resp[random_trial_id, :, i_neuron]
+            tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
+            tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)
+            for i_trial in range(len(random_trial_resp_to_plot)):
+                tuning_curve_plot.plot(random_trial_resp_to_plot[i_trial], alpha=0.1, color='blue')
+            tuning_curve_plot.set_title(f'p={p_result[i_neuron]:.5f}\nr={pearson_R_result[i_neuron]:.5f}')
+            # tuning_curve_plot.legend()
+    if plot:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curves_for_ramping_identification.pdf')) as pdf:
+            try:
+                pdf.savefig(tuning_curve_fig)
+                plt.close(tuning_curve_fig)
+                print(f'{title}_tuning_curves.pdf saved to {save_dir}')
+            except:
+                pass
+    return p_result, slope_result, intercept_result, pearson_R_result
 
 
-def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000):
+def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=False, save_dir=None, title=None):
     """
     Toso et al., 2021
     Note: resp should be normalized for each neuron, 0 = this neuron's mininum resp, 1 = this neuron's maximum resp
@@ -45,20 +70,56 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000):
     n_neurons = np.shape(resp)[2]
     RB_result = np.zeros(n_neurons)
     z_RB_threshold_result = np.zeros(n_neurons)
+    if plot:
+        plot_cols = 10
+        plot_rows = int(np.ceil(n_neurons / plot_cols))
+        tuning_curve_fig = plt.figure('ramp_subtracted', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
 
-    for i_neuron in range(n_neurons):
-        trial_avg_resp = np.mean(resp[:, :, i_neuron], axis=0)  # (len_delay, )
-        if ramping_bool[i_neuron]:  # if i_neuron is a ramping neuron
-            trial_avg_resp = np.mean(resp[:, :, i_neuron], axis=0)
+    for i_neuron in tqdm(range(n_neurons)):
+        tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)  # (len_delay, )
+        if ramping_bool[i_neuron]:  # if i_neuron is a ramping neuron, then subtract the linear regression
             t = np.arange(len_delay)
-            slope, intercept, r, p, std_err = stats.linregress(t,trial_avg_resp)
-            trial_avg_resp -= slope * t + intercept
-        RB_result[i_neuron] = np.max(trial_avg_resp) / np.mean(trial_avg_resp)
-        shuffled_RB = np.zeros(n_shuff)
-        for i_shuff in range(n_shuff):
-            np.random.shuffle(trial_avg_resp)
-            shuffled_RB[i_shuff] = np.max(trial_avg_resp) / np.mean(trial_avg_resp)
-        z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
+            slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
+            lin_reg = slope * t + intercept
+            lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
+
+        if ramping_bool[i_neuron]:
+            RB_result[i_neuron] = np.max(lin_subtracted_tuning_curve) / np.mean(lin_subtracted_tuning_curve)
+            shuffled_RB = np.zeros(n_shuff)
+            lin_subtracted_resp = resp[:, :, i_neuron] - np.tile(lin_reg, (n_total_episodes, 1))
+            for i_shuff in range(n_shuff):
+                shuffled_resp = np.random.permutation(lin_subtracted_resp.flatten()).reshape((n_total_episodes, len_delay))  #TODO: HUGE
+                new_tuning_curve = np.mean(shuffled_resp, axis=0)
+                shuffled_RB[i_shuff] = np.max(new_tuning_curve) / np.mean(new_tuning_curve)
+            z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
+        else:
+            RB_result[i_neuron] = np.max(tuning_curve) / np.mean(tuning_curve)
+            shuffled_RB = np.zeros(n_shuff)
+            for i_shuff in range(n_shuff):
+                # shuffled_resp = np.random.permutation(resp[:, :, i_neuron].flatten()).reshape((n_total_episodes, len_delay))
+                # new_tuning_curve = np.mean(shuffled_resp, axis=0)
+                shuffled_resp = shuffle_activity(resp)
+                new_tuning_curve = np.mean(shuffled_resp[:, :, i_neuron], axis=0)
+                shuffled_RB[i_shuff] = np.max(new_tuning_curve) / np.mean(new_tuning_curve)
+            z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
+
+        if plot:
+            tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
+            if ramping_bool[i_neuron]:
+                tuning_curve_plot.plot(tuning_curve, color='grey', alpha=1)
+                tuning_curve_plot.plot(lin_reg, color='grey', alpha=0.25)
+                tuning_curve_plot.plot(lin_subtracted_tuning_curve, color='blue', alpha=1)
+            else:
+                tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)
+            tuning_curve_plot.set_title(f'RB={RB_result[i_neuron]:.5f}\nz_RB={z_RB_threshold_result[i_neuron]:.5f}')
+    if plot:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curve_for_seq_identification_new.pdf')) as pdf:
+            try:
+                pdf.savefig(tuning_curve_fig)
+                plt.close(tuning_curve_fig)
+                print(f'{title}_tuning_curve_for_seq_identification.pdf saved to {save_dir}')
+            except:
+                pass
 
     return RB_result, z_RB_threshold_result
 
@@ -78,7 +139,7 @@ def trial_reliability_score(resp, split='odd-even', percentile=95, n_shuff=1000)
     n_neurons = np.shape(resp)[2]
     trial_reliability_score_result = np.zeros(n_neurons)  # pearson corr coeff between the trial averaged response in the two trial splits
     trial_reliability_score_threshold_result = np.zeros(n_neurons)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         if split == 'random':
             split_1_idx = np.random.choice(n_total_episodes, n_total_episodes//2, replace=False)
             ind = np.zeros(n_total_episodes, dtype=bool)
@@ -87,8 +148,8 @@ def trial_reliability_score(resp, split='odd-even', percentile=95, n_shuff=1000)
             split_2_idx = np.arange(n_total_episodes)[rest]
 
         elif split == 'odd-even':
-            split_1_idx = np.arange(start=0, stop=n_total_episodes, step=2)
-            split_2_idx = np.arange(start=1, stop=n_total_episodes+1, step=2)
+            split_1_idx = np.arange(start=0, stop=n_total_episodes-1, step=2)
+            split_2_idx = np.arange(start=1, stop=n_total_episodes, step=2)
 
         resp_1 = resp[split_1_idx, :, i_neuron]  # (n_total_episodes/2, len_delay)
         resp_2 = resp[split_2_idx, :, i_neuron]
@@ -96,9 +157,12 @@ def trial_reliability_score(resp, split='odd-even', percentile=95, n_shuff=1000)
 
         shuffled_score = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
-            shuffled_resp = shuffle_activity(resp)
+            shuffled_resp = shuffle_activity(resp) # gives higher shuffled reliability score
             resp_1 = shuffled_resp[split_1_idx, :, i_neuron]
             resp_2 = shuffled_resp[split_2_idx, :, i_neuron]
+            # shuffled_resp = np.random.permutation(resp[:, :, i_neuron].flatten()).reshape((n_total_episodes, len_delay))
+            # resp_1 = shuffled_resp[split_1_idx, :]
+            # resp_2 = shuffled_resp[split_2_idx, :]
             shuffled_score[i_shuff], pval = stats.pearsonr(np.mean(resp_1, axis=0), np.mean(resp_2, axis=0))
 
         trial_reliability_score_threshold_result[i_neuron] = np.percentile(shuffled_score, percentile)
@@ -116,16 +180,16 @@ def skaggs_temporal_information(resp, n_shuff=1000, percentile=95):
     n_neurons = np.shape(resp)[2]
     I_result = np.zeros(n_neurons)
     I_threshold_result = np.zeros(n_neurons)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         p_t = 1 / len_delay
-        trial_avg_resp = np.mean(resp[:, :, i_neuron], axis=0)  # (len_delay, )
-        I_result[i_neuron] = np.sum(trial_avg_resp * (p_t * np.log2(trial_avg_resp / np.mean(trial_avg_resp))))
+        tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)  # (len_delay, )
+        I_result[i_neuron] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
 
         I_surrogate = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
             shuffled_resp = shuffle_activity(resp)
-            trial_avg_resp = np.mean(shuffled_resp[:, :, i_neuron], axis=0)  # (len_delay, )
-            I_surrogate[i_shuff] = np.sum(trial_avg_resp * (p_t * np.log2(trial_avg_resp / np.mean(trial_avg_resp))))
+            tuning_curve = np.mean(shuffled_resp[:, :, i_neuron], axis=0)  # (len_delay, )
+            I_surrogate[i_shuff] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
 
         I_threshold_result[i_neuron] = np.percentile(I_surrogate, percentile)
 
