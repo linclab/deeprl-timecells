@@ -10,11 +10,11 @@ plot_utils.linclab_plt_defaults()
 plot_utils.set_font(font='Helvetica')
 
 main_dir = '/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/data/timing/trained'
-data_dir = 'lstm_512_5e-06'
+data_dir = 'lstm_128_1e-05'
 save_dir = os.path.join(main_dir.replace('data', 'figure'), data_dir)
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-data = np.load(os.path.join(main_dir, data_dir, data_dir+'_seed_1_epi59999.pt_data.npz'), allow_pickle=True)  # data.npz file
+data = np.load(os.path.join(main_dir, data_dir, data_dir+'_seed_1_epi149999.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')
 hidden_type = hparams[0]
@@ -39,7 +39,7 @@ if behaviour_only:
     plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
     plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
     # plot_training_performance() # TODO: fix this function
-    sys.exit()
+    # sys.exit()
 else:
     action_hist = data["action_hist"]
     correct_trials = data["correct_trial"]
@@ -50,7 +50,7 @@ else:
     n_total_episodes = np.shape(stim)[0]
     plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
     plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
-    sys.exit()
+    # sys.exit()
 
 # Select units with large enough variation in its activation
 # big_var_neurons = []
@@ -61,13 +61,13 @@ else:
 # delay_resp = delay_resp_hx[:, :, [x for x in range(512) if x in big_var_neurons]]
 # stim2_resp = stim2_resp[:, :, [x for x in range(512) if x in big_var_neurons]]
 
-normalize = False
+normalize = True
 if normalize:
     reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
     reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
     stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
 
-    reshape_resp = np.reshape(stim2_resp, (n_total_episodes*ld, n_neurons))
+    reshape_resp = np.reshape(stim2_resp, (n_total_episodes*40, n_neurons))
     reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
     stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
 
@@ -77,6 +77,13 @@ if normalize:
 
 resp_hx = np.concatenate((stim1_resp, delay_resp, stim2_resp), axis=1)
 last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
+
+resp = stim1_resp  # Or stim2_resp or delay_resp
+stimulus = stim[:, 0]  # or stim[:, 1]
+label = 'stimulus_1'
+# Identifying ramping cells
+p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title='stim1')
+breakpoint() #TODO: this will give NAN because not every trial's resp has the same length
 
 # Plot cell activities in all combinations of stimulus length
 
@@ -105,7 +112,8 @@ resp = stim1_resp  # Or stim2_resp or delay_resp
 stimulus = stim[:, 0]  # or stim[:, 1]
 label = 'stimulus_1'
 # Identifying ramping cells
-p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp)
+p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title='stim1')
+breakpoint()
 ramp_cell_bool = np.logical_and(p_result<=0.05, slope_result<=0.05)
 cell_nums_ramp = np.where(ramp_cell_bool)[0]
 
