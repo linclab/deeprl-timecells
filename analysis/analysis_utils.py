@@ -3,11 +3,13 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 from scipy import stats
 from sklearn.decomposition import PCA
 from sklearn import svm
+from sklearn.manifold import TSNE
 import torch
 import numpy as np
-from analysis.linclab_utils import plot_utils
+from linclab_utils import plot_utils
 import os
 from matplotlib_venn import venn2
+import umap
 
 
 def bin_rewards(epi_rewards, window_size):
@@ -56,6 +58,7 @@ def make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, save_dir, label,
         plt.savefig(os.path.join(save_dir, label+'_venndiagram.svg'))
     else:
         plt.show()
+
 
 def plot_sorted_averaged_resp(cell_nums, sorted_matrix, title, remove_nan=True, save_dir=None, save=False):
     """
@@ -152,7 +155,6 @@ def plot_sorted_in_same_order(resp_a, resp_b, a_title, b_title, big_title, len_d
         plt.savefig(os.path.join(save_dir, f'sorted_in_same_order_{big_title}.svg'))
     else:
         plt.show()
-
 
 
 def decode_sample_from_single_time(total_resp, total_stim, n_fold=5):
@@ -300,17 +302,17 @@ def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir
         ax1.set_xticks(np.arange(len_delay, step=10))
         ax1.set_yticks([0, len(norm_xl)])
         ax1.set_yticklabels(['1', '100'])
-        ax1.set_ylabel(f'Correct trials')
+        ax1.set_ylabel(f'Left trials')
 
         im2 = ax2.imshow(norm_xr, cmap='jet')
         ax2.set_aspect('auto')
         ax2.set_xticks(np.arange(len_delay, step=10))
         ax2.set_yticks([0, len(norm_xr)])
         ax2.set_yticklabels(['1', '100'])
-        ax2.set_ylabel(f'Incorrect trials')
+        ax2.set_ylabel(f'Right trials')
 
-        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Correct', color=plot_utils.LINCLAB_COLS['yellow'])
-        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Incorrect', color=plot_utils.LINCLAB_COLS['brown'])
+        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Left', color=plot_utils.LINCLAB_COLS['yellow'])
+        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Right', color=plot_utils.LINCLAB_COLS['brown'])
         ax3.set_xlabel('Time since delay period onset')
         ax3.legend(loc='upper right', fontsize='medium')
         ax3.set_ylabel('Avg activation')
@@ -404,6 +406,31 @@ def plot_half_split_resp(total_resp, save_dir, split='random', save=False):
     resp_2 = total_resp[split_2_idx]
 
     plot_sorted_in_same_order(resp_1, resp_2, title_1, title_2, "", len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=save)
+
+
+def tuning_curve_dim_reduction(resp, mode, save_dir, title):
+    # TODO: label clusters
+    # tuning_curves = np.mean(resp, axis=0).T  # n_neurons x len_delay
+    n_total_episodes = np.shape(resp)[0]
+    len_delay = np.shape(resp)[1]
+    n_neurons = np.shape(resp)[2]
+    tuning_curves = np.reshape(resp, (n_neurons, n_total_episodes*len_delay))
+    if mode == 'umap':
+        embedding = umap.UMAP(n_neighbors=40).fit_transform(tuning_curves)
+    elif mode == 'tsne':
+        tsne = TSNE(n_components=2, random_state=0)  # recommended n_components: 2
+        embedding = tsne.fit_transform(tuning_curves)
+    elif mode == 'pca':
+        pca = PCA(n_components=10)  # recommended n_components: 10. Though raising it to 20 seems to not make a difference?
+        embedding = pca.fit_transform(tuning_curves)
+
+    plt.figure()
+    plt.scatter(x=embedding[:, 0],
+                y=embedding[:, 1], alpha=1)
+    plt.title(f"{title}_{mode}")
+    plt.show()
+    # plt.savefig(os.path.join(save_dir,f'{title}_tuning_curve_{mode}.svg'))
+
 
 
 # ================= TO CHUCK =================================
