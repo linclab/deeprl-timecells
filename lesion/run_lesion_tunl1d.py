@@ -11,6 +11,7 @@ from analysis.linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
 from numpy import array
+import re
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -76,8 +77,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="lesion study in Head-fixed TUNL 1d task simulation")
     parser.add_argument("--n_total_episodes",type=int,default=1000,help="Total episodes to run lesion expt")
     parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d_og")
-    parser.add_argument("--seed", type=int, help="seed to analyse")
-    parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
     parser.add_argument("--backprop", type=bool, default=False, help="Whether backprop loss during lesion expt")
     args = parser.parse_args()
     argsdict = args.__dict__
@@ -85,12 +84,14 @@ if __name__ == '__main__':
 
     n_total_episodes = argsdict['n_total_episodes']
     load_model_path = argsdict['load_model_path']
-    seed = argsdict['seed']
-    epi = argsdict['episode']
     backprop = True if argsdict['backprop'] == True or argsdict['backprop'] == 'True' else False
 
     # Load_model_path: mem_40_lstm_256_0.0001/seed_1_epi999999.pt, relative to training/tunl1d_og
     config_dir = load_model_path.split('/')[0]
+    pt_name = load_model_path.split('/')[1]
+    pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
+    seed = int(pt[1])
+    epi = int(pt[2])
     main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/tunl1d_og'
     data_analysis_dir = os.path.join(main_data_analysis_dir, config_dir)
     ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_ramp_ident_results_separate.npz'), allow_pickle=True)
