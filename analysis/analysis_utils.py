@@ -280,8 +280,8 @@ def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_
 def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir):
     len_delay = np.shape(total_resp)[1]
     n_neurons = np.shape(total_resp)[2]
-    print("Number of correct trials: ", np.sum(binary_stim==1))
-    print("Number of incorrect trials: ", np.sum(binary_stim==0))
+    print("Number of left trials: ", np.sum(binary_stim==1))
+    print("Number of right trials: ", np.sum(binary_stim==0))
 
     assert len(total_resp) == len(binary_stim)
     assert all(elem in list(np.arange(n_neurons)) for elem in cell_nums)
