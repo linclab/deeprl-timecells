@@ -167,12 +167,12 @@ for i_episode in tqdm(range(n_total_episodes)):
             correct_trial[i_episode] = env.correct_trial
     p_loss, v_loss = finish_trial(net, 1, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
-        if load_model_path is not None:
+        if load_model_path != 'None':
             print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(correct_trial[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_trial[:i_episode+1])*100:.3f}% correct')
         else:
             print(f'Episode {i_episode}, {np.mean(correct_trial[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_trial[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
-            if load_model_path is not None:
+            if load_model_path != 'None':
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}.pt')
             else:
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')

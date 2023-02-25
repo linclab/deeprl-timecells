@@ -1,18 +1,17 @@
 import random
 import os
 from re import I
-from agents.model_1d import *
-from envs.tunl_1d import TunlEnv
+from expts.agents.model_1d import *
+from expts.envs.tunl_1d import TunlEnv
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from lesion_expt_utils import generate_lesion_index
-#from analysis.linclab_utils import plot_utils
+from analysis.linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
 from numpy import array
 import re
-import gc
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -72,8 +71,8 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
 
 if __name__ == '__main__':
 
-    #plot_utils.linclab_plt_defaults()
-    #plot_utils.set_font(font='Helvetica')
+    plot_utils.linclab_plt_defaults()
+    plot_utils.set_font(font='Helvetica')
 
     parser = argparse.ArgumentParser(description="lesion study in Head-fixed TUNL 1d task simulation")
     parser.add_argument("--n_total_episodes",type=int,default=1000,help="Total episodes to run lesion expt")
@@ -135,23 +134,19 @@ if __name__ == '__main__':
     random.seed(seed)
 
     env = TunlEnv(len_delay, seed=seed)
-    #net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
-    #optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
-    n_lesion = np.arange(start=1, stop=40, step=5)
-    #n_lesion = [7,8]
+    n_lesion = np.arange(start=0, stop=n_neurons, step=10)
     postlesion_perf_array = np.zeros((3, len(n_lesion)))
 
     for i_row, lesion_type in enumerate(['random', 'ramp', 'seq']):
         for i_column, num_lesion in enumerate(n_lesion):
-            gc.collect()
-            torch.cuda.empty_cache()
-            net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+
             net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
             net.eval()
-            optimizer = torch.optim.Adam(net.parameters(), lr=lr)  # Optimizer doesn't really matter unless you do backprop which you shouldn't
             lesion_index = generate_lesion_index(lesion_type, num_lesion, n_neurons=n_neurons, cell_nums_ramp=cell_nums_ramp, cell_nums_seq=cell_nums_seq)
-            #breakpoint()
+
             postlesion_perf_array[i_row, i_column] = lesion_experiment(env=env, net=net, optimizer=optimizer,
                                                                        n_total_episodes=n_total_episodes,
                                                                        lesion_idx=lesion_index,
@@ -159,5 +154,5 @@ if __name__ == '__main__':
                                                                        save_dir=save_dir,
                                                                        backprop=backprop)
             print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_row, i_column]*100:.3f}% nonmatch")
-            del net, optimizer
+
     np.savez_compressed(os.path.join(save_dir, 'lesion_performance_arr.npz'), postlesion_perf=postlesion_perf_array)
