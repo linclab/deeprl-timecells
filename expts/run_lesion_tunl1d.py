@@ -2,13 +2,13 @@ import gc
 import random
 import os
 from re import I
-from expts.agents.model_1d import *
-from expts.envs.tunl_1d import TunlEnv
+from agents.model_1d import *
+from envs.tunl_1d import TunlEnv
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from lesion_expt_utils import generate_random_index
-from analysis.linclab_utils import plot_utils
+#from analysis.linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
 from numpy import array
@@ -72,8 +72,8 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
 
 if __name__ == '__main__':
 
-    plot_utils.linclab_plt_defaults()
-    plot_utils.set_font(font='Helvetica')
+    #plot_utils.linclab_plt_defaults()
+    #plot_utils.set_font(font='Helvetica')
 
     parser = argparse.ArgumentParser(description="lesion study in Head-fixed TUNL 1d task simulation")
     parser.add_argument("--n_total_episodes",type=int,default=1000,help="Total episodes to run lesion expt")
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     else:
         n_lesion = np.arange(start=lesion_idx_start, stop=n_neurons, step=lesion_idx_step)
 
-    postlesion_perf_array = np.zeros((3, len(n_lesion)), num_shuffle)
+    postlesion_perf_array = np.zeros((3, len(n_lesion), num_shuffle))
 
     random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_seq)
 
@@ -168,8 +168,8 @@ if __name__ == '__main__':
             optimizer = torch.optim.Adam(net.parameters(), lr=lr)
             net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
             net.eval()
-            for i_shuffle in num_shuffle:
-                lesion_index = random_index_dict[lesion_type][i_shuffle][:n_lesion]
+            for i_shuffle in tqdm(range(num_shuffle)):
+                lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion]
     
                 postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle] = lesion_experiment(env=env, net=net, optimizer=optimizer,
                                                                            n_total_episodes=n_total_episodes,
