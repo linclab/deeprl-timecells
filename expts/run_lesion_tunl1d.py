@@ -1,3 +1,4 @@
+import gc
 import random
 import os
 from re import I
@@ -6,7 +7,7 @@ from expts.envs.tunl_1d import TunlEnv
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from lesion_expt_utils import generate_lesion_index
+from lesion_expt_utils import generate_random_index
 from analysis.linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
@@ -78,6 +79,11 @@ if __name__ == '__main__':
     parser.add_argument("--n_total_episodes",type=int,default=1000,help="Total episodes to run lesion expt")
     parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d_og")
     parser.add_argument("--backprop", type=bool, default=False, help="Whether backprop loss during lesion expt")
+    parser.add_argument("--num_shuffle", type=int, default=100, help="Number of times to shuffle the neuron indices, one shuffle = one lesion expt")
+    parser.add_argument("--verbose", type=bool, default=False, help="if True, print nonmatch performance of each lesion expt")
+    parser.add_argument("--lesion_idx_start", type=int, default=5, help="start of lesion index")
+    parser.add_argument("--lesion_idx_end", type=int, default=None, help="end of lesion index. if None (default), end at n_neurons")
+    parser.add_argument("--lesion_idx_step", type=int, default=5, help="step of lesion index")
     args = parser.parse_args()
     argsdict = args.__dict__
     print(argsdict)
@@ -85,6 +91,11 @@ if __name__ == '__main__':
     n_total_episodes = argsdict['n_total_episodes']
     load_model_path = argsdict['load_model_path']
     backprop = True if argsdict['backprop'] == True or argsdict['backprop'] == 'True' else False
+    verbose = True if argsdict['verbose'] == True or argsdict['verbose'] == 'True' else False
+    num_shuffle = argsdict['num_shuffle']
+    lesion_idx_start = argsdict['lesion_idx_start']
+    lesion_idx_step = argsdict['lesion_idx_step']
+    lesion_idx_end = argsdict['lesion_idx_end']
 
     # Load_model_path: mem_40_lstm_256_0.0001/seed_1_epi999999.pt, relative to training/tunl1d_og
     config_dir = load_model_path.split('/')[0]
@@ -107,6 +118,9 @@ if __name__ == '__main__':
     hidden_type = hparams[2]
     n_neurons = int(hparams[3])
     lr = float(hparams[4])
+    wd = None
+    p = None
+    dropout_type = None
     if len(hparams) > 5:  # weight_decay or dropout
         if 'wd' in hparams[5]:
             wd = float(hparams[5][2:])
@@ -133,26 +147,59 @@ if __name__ == '__main__':
     np.random.seed(seed)
     random.seed(seed)
 
-    env = TunlEnv(len_delay, seed=seed)
-    net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    if lesion_idx_end is not None:  # specified lesion_idx_end
+        n_lesion = np.arange(start=lesion_idx_start, stop=lesion_idx_end, step=lesion_idx_step)
+    else:
+        n_lesion = np.arange(start=lesion_idx_start, stop=n_neurons, step=lesion_idx_step)
 
-    n_lesion = np.arange(start=0, stop=n_neurons, step=10)
-    postlesion_perf_array = np.zeros((3, len(n_lesion)))
+    postlesion_perf_array = np.zeros((3, len(n_lesion)), num_shuffle)
 
-    for i_row, lesion_type in enumerate(['random', 'ramp', 'seq']):
-        for i_column, num_lesion in enumerate(n_lesion):
+    random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_seq)
 
+    for i_lesion_type, lesion_type in enumerate(['random', 'ramp', 'seq']):
+        for i_num_lesion, num_lesion in enumerate(n_lesion):
+            gc.collect()
+            torch.cuda.empty_cache()
+            env = TunlEnv(len_delay, seed=seed)
+            if p is not None:
+                net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout=p, dropout_type=dropout_type)
+            else:
+                net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+            optimizer = torch.optim.Adam(net.parameters(), lr=lr)
             net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
             net.eval()
-            lesion_index = generate_lesion_index(lesion_type, num_lesion, n_neurons=n_neurons, cell_nums_ramp=cell_nums_ramp, cell_nums_seq=cell_nums_seq)
+            for i_shuffle in num_shuffle:
+                lesion_index = random_index_dict[lesion_type][i_shuffle][:n_lesion]
+    
+                postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle] = lesion_experiment(env=env, net=net, optimizer=optimizer,
+                                                                           n_total_episodes=n_total_episodes,
+                                                                           lesion_idx=lesion_index,
+                                                                           title=f"{lesion_type}_{num_lesion}",
+                                                                           save_dir=save_dir,
+                                                                           backprop=backprop)
+                if verbose:
+                    print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle]*100:.3f}% nonmatch")
+            del env, net, optimizer
 
-            postlesion_perf_array[i_row, i_column] = lesion_experiment(env=env, net=net, optimizer=optimizer,
-                                                                       n_total_episodes=n_total_episodes,
-                                                                       lesion_idx=lesion_index,
-                                                                       title=f"{lesion_type}_{num_lesion}",
-                                                                       save_dir=save_dir,
-                                                                       backprop=backprop)
-            print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_row, i_column]*100:.3f}% nonmatch")
+    fig, ax1 = plt.subplots()
+    # fig.suptitle(f'{env_title} TUNL')
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), label='Random lesion')
+    ax1.fill_between(n_lesion,
+                     np.mean(postlesion_perf_array[0, :, :], axis=-1)-np.std(postlesion_perf_array[0, :, :], axis=-1),
+                     np.mean(postlesion_perf_array[0, :, :], axis=-1)+np.std(postlesion_perf_array[0, :, :], axis=-1))
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[1, :, :], axis=-1), label='Ramping cell lesion')
+    ax1.fill_between(n_lesion,
+                     np.mean(postlesion_perf_array[1, :, :], axis=-1)-np.std(postlesion_perf_array[1, :, :], axis=-1),
+                     np.mean(postlesion_perf_array[1, :, :], axis=-1)+np.std(postlesion_perf_array[1, :, :], axis=-1))
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[2, :, :], axis=-1), label='Time cell lesion')
+    ax1.fill_between(n_lesion,
+                     np.mean(postlesion_perf_array[2, :, :], axis=-1)-np.std(postlesion_perf_array[2, :, :], axis=-1),
+                     np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1))
+    ax1.set_xlabel('Number of neurons lesioned')
+    ax1.set_ylabel('Fraction Nonmatch')
+    ax1.set_ylim(0,1)
+    ax1.legend()
+    #plt.show()
+    fig.savefig(os.path.join(save_dir, 'lesion_results.png'))
 
-    np.savez_compressed(os.path.join(save_dir, 'lesion_performance_arr.npz'), postlesion_perf=postlesion_perf_array)
+    np.savez_compressed(os.path.join(save_dir, 'lesion_results.npz'), random_index_dict=random_index_dict, n_lesion=n_lesion, postlesion_perf=postlesion_perf_array)

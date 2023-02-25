@@ -2,24 +2,28 @@ import numpy as np
 import torch
 
 
-def generate_lesion_index(type_lesion, num_lesion, n_neurons, cell_nums_ramp, cell_nums_seq):  # TODO: add type_lesion: 'stim-selective' or 'readout'
-    '''
-    Arguments:
-    - type_lesion: 'random' or 'ramp' or 'seq'. Str.
-    - num_lesion: number of cells lesioned. Int.
-    Returns:
-    - lesion_index
-    '''
-    if type_lesion == 'random':
-        lesion_index = np.random.choice(n_neurons, num_lesion, replace=False)
-    elif type_lesion == 'ramp':
-        if num_lesion <= len(cell_nums_ramp):
-            lesion_index = np.random.choice(cell_nums_ramp, num_lesion, replace=False)
-        else:
-            lesion_index = np.concatenate((cell_nums_ramp, np.random.choice(cell_nums_seq, num_lesion-len(cell_nums_ramp), replace=False)))
-    elif type_lesion == 'seq':
-        if num_lesion <= len(cell_nums_seq):
-            lesion_index = np.random.choice(cell_nums_seq, num_lesion, replace=False)
-        else:
-            lesion_index = np.concatenate((cell_nums_seq, np.random.choice(cell_nums_ramp, num_lesion-len(cell_nums_seq), replace=False)))
-    return lesion_index
+def generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_seq):
+    random_index_dict = {
+        'random': np.zeros((num_shuffle, n_neurons)),
+        'ramp': np.zeros((num_shuffle, n_neurons)),
+        'seq': np.zeros((num_shuffle, n_neurons))
+    }
+
+    for i_shuffle in range(num_shuffle):
+        random_index = np.arange(n_neurons)
+        np.random.shuffle(random_index)
+        random_index_dict['random'][i_shuffle] = random_index
+
+        cell_nums_ramp_shuffled = np.random.permutation(cell_nums_ramp)
+        non_ramp_nums = np.setdiff1d(np.arange(n_neurons), cell_nums_ramp)
+        np.random.shuffle(non_ramp_nums)
+        ramp_index = np.concatenate((cell_nums_ramp_shuffled, non_ramp_nums))
+        random_index_dict['ramp'][i_shuffle] = ramp_index
+
+        cell_nums_seq_shuffled = np.random.permutation(cell_nums_seq)
+        non_seq_nums = np.setdiff1d(np.arange(n_neurons), cell_nums_seq)
+        np.random.shuffle(non_seq_nums)
+        seq_index = np.concatenate((cell_nums_seq_shuffled, non_seq_nums))
+        random_index_dict['seq'][i_shuffle] = seq_index
+
+    return random_index_dict
