@@ -29,7 +29,7 @@ def bin_rewards(epi_rewards, window_size):
     return avg_rewards
 
 
-def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_dir, title, backprop=False):
+def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_dir, title, save_net_and_data=False, backprop=False):
     stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
     nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
     first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
@@ -64,8 +64,11 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
         if backprop:
             p_loss, v_loss = finish_trial(net, 0.99, optimizer)
-    torch.save(net.state_dict(), save_dir + f'/postlesion_{title}.pt')
-    np.savez_compressed(save_dir + f'/lesion_{title}_data.npz', stim=stim, first_action=first_action, delay_resp=delay_resp)
+    if save_net_and_data:
+        net_and_data_dir = os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_net_and_data')
+        os.mkdir(net_and_data_dir)
+        torch.save(net.state_dict(), os.path.join(net_and_data_dir, f'/postlesion_{title}.pt'))
+        np.savez_compressed(os.path.join(net_and_data_dir, f'/lesion_{title}_data.npz'), stim=stim, first_action=first_action, delay_resp=delay_resp)
 
     return np.mean(nonmatch_perc)
 
@@ -79,6 +82,7 @@ if __name__ == '__main__':
     parser.add_argument("--n_total_episodes",type=int,default=1000,help="Total episodes to run lesion expt")
     parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d_og")
     parser.add_argument("--backprop", type=bool, default=False, help="Whether backprop loss during lesion expt")
+    parser.add_argument("--save_net_and_data", type=bool, default=False, help="Save hx during lesion expt and save net after lesion expt")
     parser.add_argument("--num_shuffle", type=int, default=100, help="Number of times to shuffle the neuron indices, one shuffle = one lesion expt")
     parser.add_argument("--verbose", type=bool, default=False, help="if True, print nonmatch performance of each lesion expt")
     parser.add_argument("--lesion_idx_start", type=int, default=5, help="start of lesion index")
@@ -92,6 +96,7 @@ if __name__ == '__main__':
     load_model_path = argsdict['load_model_path']
     backprop = True if argsdict['backprop'] == True or argsdict['backprop'] == 'True' else False
     verbose = True if argsdict['verbose'] == True or argsdict['verbose'] == 'True' else False
+    save_net_and_data = True if argsdict['save_net_and_data'] == True or argsdict['save_net_and_data'] == 'True' else False
     num_shuffle = argsdict['num_shuffle']
     lesion_idx_start = argsdict['lesion_idx_start']
     lesion_idx_step = argsdict['lesion_idx_step']
@@ -175,31 +180,31 @@ if __name__ == '__main__':
                                                                            n_total_episodes=n_total_episodes,
                                                                            lesion_idx=lesion_index,
                                                                            title=f"{lesion_type}_{num_lesion}",
-                                                                           save_dir=save_dir,
+                                                                           save_dir=save_dir, save_net_and_data=save_net_and_data,
                                                                            backprop=backprop)
                 if verbose:
                     print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle]*100:.3f}% nonmatch")
             del env, net, optimizer
 
     fig, ax1 = plt.subplots()
-    # fig.suptitle(f'{env_title} TUNL')
-    ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), label='Random lesion')
+    fig.suptitle(f'{env_title}_{ckpt_name}')
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), color='gray', label='Random lesion')
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[0, :, :], axis=-1)-np.std(postlesion_perf_array[0, :, :], axis=-1),
-                     np.mean(postlesion_perf_array[0, :, :], axis=-1)+np.std(postlesion_perf_array[0, :, :], axis=-1))
-    ax1.plot(n_lesion, np.mean(postlesion_perf_array[1, :, :], axis=-1), label='Ramping cell lesion')
+                     np.mean(postlesion_perf_array[0, :, :], axis=-1)+np.std(postlesion_perf_array[0, :, :], axis=-1), color='lightgray', alpha=0.2)
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[1, :, :], axis=-1), color='royalblue', label='Ramping cell lesion')
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[1, :, :], axis=-1)-np.std(postlesion_perf_array[1, :, :], axis=-1),
-                     np.mean(postlesion_perf_array[1, :, :], axis=-1)+np.std(postlesion_perf_array[1, :, :], axis=-1))
-    ax1.plot(n_lesion, np.mean(postlesion_perf_array[2, :, :], axis=-1), label='Time cell lesion')
+                     np.mean(postlesion_perf_array[1, :, :], axis=-1)+np.std(postlesion_perf_array[1, :, :], axis=-1), color='lightsteelblue', alpha=0.2)
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[2, :, :], axis=-1), color='magenta', label='Time cell lesion')
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)-np.std(postlesion_perf_array[2, :, :], axis=-1),
-                     np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1))
+                     np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
     ax1.set_xlabel('Number of neurons lesioned')
     ax1.set_ylabel('Fraction Nonmatch')
     ax1.set_ylim(0,1)
     ax1.legend()
     #plt.show()
-    fig.savefig(os.path.join(save_dir, 'lesion_results.png'))
+    fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_lesion_results.png'))
 
-    np.savez_compressed(os.path.join(save_dir, 'lesion_results.npz'), random_index_dict=random_index_dict, n_lesion=n_lesion, postlesion_perf=postlesion_perf_array)
+    np.savez_compressed(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_lesion_results.npz'), random_index_dict=random_index_dict, n_lesion=n_lesion, postlesion_perf=postlesion_perf_array)
