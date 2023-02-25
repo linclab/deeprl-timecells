@@ -54,7 +54,7 @@ parser.add_argument("--plot_performance", type=bool, default=True,  help="if beh
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
 parser.add_argument("--separate_trial_types", type=bool, default=True,  help="identify ramp and sequence cells separately for left-stim and right-stim trials and then combine")
 parser.add_argument("--n_shuffle", type=int, default=100, help="number of shuffles to acquire null distribution")
-parser.add_argument("--percentile", type=int, default=99, help="P threshold to determind significance")
+parser.add_argument("--percentile", type=float, default=99.9, help="P threshold to determind significance")
 parser.add_argument("--load_time_ramp_results", type=bool, default=True, help="if true, make sure to have results from time_ramp_ident in save_dir")
 args = parser.parse_args()
 argsdict = args.__dict__
@@ -83,7 +83,7 @@ if len(hparams) > 5:  # weight_decay or dropout
     if 'p' in hparams[5]:
         p = float(hparams[5][1:])
         dropout_type = hparams[6]
-env_title = 'Mnemonic_TUNL' if env_type == 'mem' else 'Non-mnemonic_TUNL'
+env_title = 'Mnemonic_TUNL_1D' if env_type == 'mem' else 'Non-mnemonic_TUNL_1D'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
 behaviour_only = True if argsdict['behaviour_only'] == True or argsdict['behaviour_only'] == 'True' else False  # plot performance data

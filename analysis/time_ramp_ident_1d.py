@@ -1,3 +1,7 @@
+"""
+Separate time cell and ramping cell identification script to run on cluster.
+"""
+
 from cell_identification.time_ramp import *
 from analysis_utils import *
 #from expts.envs.tunl_1d import *
@@ -17,7 +21,7 @@ parser.add_argument("--plot_performance", type=bool, default=True,  help="if beh
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
 parser.add_argument("--separate_trial_types", type=bool, default=True,  help="identify ramp and sequence cells separately for left-stim and right-stim trials and then combine")
 parser.add_argument("--n_shuffle", type=int, default=1000, help="number of shuffles to acquire null distribution")
-parser.add_argument("--percentile", type=int, default=95, help="P threshold to determind significance")
+parser.add_argument("--percentile", type=float, default=95.0, help="P threshold to determind significance")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)

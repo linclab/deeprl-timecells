@@ -1,12 +1,9 @@
-import random
 import os
-from re import I
 from expts.agents.model_1d import *
 from expts.envs.int_discrim import IntervalDiscrimination
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-from lesion_expt_utils import generate_lesion_index
+from expts.lesion_expt_utils import generate_lesion_index
 from analysis.linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
