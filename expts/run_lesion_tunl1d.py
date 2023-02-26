@@ -163,17 +163,18 @@ if __name__ == '__main__':
 
     for i_lesion_type, lesion_type in enumerate(['random', 'ramp', 'seq']):
         for i_num_lesion, num_lesion in enumerate(n_lesion):
-            gc.collect()
-            torch.cuda.empty_cache()
-            env = TunlEnv(len_delay, seed=seed)
-            if p is not None:
-                net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout=p, dropout_type=dropout_type)
-            else:
-                net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
-            optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-            net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
-            net.eval()
             for i_shuffle in tqdm(range(num_shuffle)):
+                gc.collect()
+                torch.cuda.empty_cache()
+                env = TunlEnv(len_delay, seed=seed)
+                if p is not None:
+                    net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout=p, dropout_type=dropout_type)
+                else:
+                    net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+                optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+                net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
+                net.eval()
+
                 lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion]
     
                 postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle] = lesion_experiment(env=env, net=net, optimizer=optimizer,
@@ -184,7 +185,7 @@ if __name__ == '__main__':
                                                                            backprop=backprop)
                 if verbose:
                     print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle]*100:.3f}% nonmatch")
-            del env, net, optimizer
+                del env, net, optimizer
 
     fig, ax1 = plt.subplots()
     fig.suptitle(f'{env_title}_{ckpt_name}')
