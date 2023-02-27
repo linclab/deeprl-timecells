@@ -169,6 +169,7 @@ class AC_Net(nn.Module):
                     x, cx = layer(x, (hx_copy, cx_copy))
                     self.hx[i] = x.clone()
                     self.cx[i] = cx.clone()
+                    del hx_copy, cx_copy
             elif isinstance(layer, nn.GRUCell):
                 if lesion_idx is None:
                     x = layer(x, self.hx[i])
