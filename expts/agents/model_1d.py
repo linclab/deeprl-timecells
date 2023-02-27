@@ -179,6 +179,7 @@ class AC_Net(nn.Module):
                     hx_copy[:,lesion_idx] = 0
                     x = layer(x, hx_copy)
                     self.hx[i] = x.clone()
+                    del hx_copy
         # pass to the output layers
         if self.dropout_type == 4:
             x = self.dropout(x)

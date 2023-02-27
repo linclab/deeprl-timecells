@@ -178,7 +178,7 @@ def compare_mutual_info(path):
 
 
 
-def construct_ratemap(delay_resp, delay_loc, norm=True):
+def construct_ratemap(delay_resp, delay_loc, norm=True):  # TODO: vs. construct_ratemap_occupancy?
     """
     Stack all steps across all episodes, normalize the activity according to the
     maximum and minimum of each cell (optional), and construct the rate map of each cell.

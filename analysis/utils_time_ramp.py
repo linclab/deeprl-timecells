@@ -197,6 +197,52 @@ def skaggs_temporal_information(resp, n_shuff=1000, percentile=95):
 
 
 # For identifying ramping cells and time cells in timing task
+
+def lin_reg_ramping_varying_duration(resp, stim, plot=False, save_dir=None, title=None):
+    """
+    Shikano et al., 2021; Toso et al., 2021
+    Fit linear regression to trial-averaged tuning curve of each neuron to identify ramping cells.
+    :param resp: n_total_episodes x len_delay x n_neurons
+    :return: r, p, slope (beta) of each neuron
+    """
+    n_total_episodes = np.shape(resp)[0]
+    random_trial_id = np.random.choice(n_total_episodes, 10)
+    len_delay = np.shape(resp)[1]
+    n_neurons = np.shape(resp)[2]
+    # r_result = np.zeros(n_neurons)
+    p_result = np.zeros(n_neurons)
+    slope_result = np.zeros(n_neurons)
+    intercept_result = np.zeros(n_neurons)
+    pearson_R_result = np.zeros(n_neurons)
+    if plot:
+        plot_cols = 10
+        plot_rows = int(np.ceil(n_neurons / plot_cols))
+        tuning_curve_fig = plt.figure('tuning_curves', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
+
+    for i_neuron in tqdm(range(n_neurons)):
+        tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)
+        t = np.arange(len_delay)
+        slope_result[i_neuron], intercept_result[i_neuron], pearson_R_result[i_neuron], p_result[i_neuron], std_err = stats.linregress(t,tuning_curve)
+
+        if plot:
+            random_trial_resp_to_plot = resp[random_trial_id, :, i_neuron]
+            tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
+            tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)
+            for i_trial in range(len(random_trial_resp_to_plot)):
+                tuning_curve_plot.plot(random_trial_resp_to_plot[i_trial], alpha=0.1, color='blue')
+            tuning_curve_plot.set_title(f'p={p_result[i_neuron]:.5f}\nr={pearson_R_result[i_neuron]:.5f}')
+            # tuning_curve_plot.legend()
+    if plot:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curves_for_ramping_identification.pdf')) as pdf:
+            try:
+                pdf.savefig(tuning_curve_fig)
+                plt.close(tuning_curve_fig)
+                print(f'{title}_tuning_curves.pdf saved to {save_dir}')
+            except:
+                pass
+    return p_result, slope_result, intercept_result, pearson_R_result
+
+
 def trial_consistency_across_durations(stim, stim1_resp, stim2_resp, type='absolute'):
     stim_set = np.sort(np.unique(stim))
     n_neurons = np.shape(stim1_resp)[-1]
@@ -210,7 +256,7 @@ def trial_consistency_across_durations(stim, stim1_resp, stim2_resp, type='absol
     R_result = np.zeros((n_neurons, len(stim_combinations_list)))
     pval_result = np.zeros((n_neurons, len(stim_combinations_list)))
 
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         for i_stim_comb, stim_combination in enumerate(stim_combinations_list):
             t1 = stim_combination[0]
             i_t1 = list(stim_set).index(t1)
@@ -263,7 +309,7 @@ def skaggs_temporal_information_varying_duration(resp, stim, n_shuff=1000, perce
 
         # shuffle recep_field and re-calculate I
         I_shuffle = np.zeros(n_shuff)
-        for i_shuff in range(n_shuff):
+        for i_shuff in tqdm(range(n_shuff)):
             # Create shuffled recep_field
             shuff_recep_field = np.zeros((n_total_episodes, int(np.max(stim_set))))  # (n_total_episodes, 40)
             shuff_recep_field[:, :] = np.nan

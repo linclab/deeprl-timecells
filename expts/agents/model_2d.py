@@ -222,6 +222,7 @@ class AC_Net(nn.Module):
                     x, cx = layer(x, (hx_copy, cx_copy))
                     self.hx[i] = x.clone()
                     self.cx[i] = cx.clone()
+                    del hx_copy, cx_copy
             elif isinstance(layer, nn.GRUCell):
                 if lesion_idx is None:
                     x = layer(x, self.hx[i])
@@ -231,6 +232,7 @@ class AC_Net(nn.Module):
                     hx_copy[:,lesion_idx] = 0
                     x = layer(x, hx_copy)
                     self.hx[i] = x.clone()
+                    del hx_copy
             elif isinstance(layer, nn.RNNCell):
                 if lesion_idx is None:
                     x = layer(x, self.hx[i])
@@ -240,6 +242,7 @@ class AC_Net(nn.Module):
                     hx_copy[:,lesion_idx] = 0
                     x = layer(x, hx_copy)
                     self.hx[i] = x.clone()
+                    del hx_copy
             elif isinstance(layer, nn.Conv2d):
                 x = F.relu(layer(x))
             elif isinstance(layer, nn.MaxPool2d):

@@ -1,27 +1,58 @@
-from linclab_utils import plot_utils
-from mutual_info.utils import *
 from cell_identification.time_ramp import *
-from analysis_utils import bin_rewards, make_venn_diagram, plot_sorted_averaged_resp, plot_sorted_in_same_order, plot_dim_vs_delay_t, \
-    single_cell_visualization, plot_decode_sample_from_single_time, time_decode_lin_reg
-import sklearn
+from analysis_utils import *
+#from expts.envs.tunl_1d import *
+from analysis import linclab_plot_utils
 import sys
 import argparse
 
-plot_utils.linclab_plt_defaults()
-plot_utils.set_font(font='Helvetica')
+linclab_plot_utils.linclab_plt_defaults()
+linclab_plot_utils.set_font(font='Helvetica')
 
-parser = argparse.ArgumentParser(description="Non-location-fixed 2D TUNL task simulation")
-parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl2d',help="main data directory")
-parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_1e-05',help="directory in which .npz is saved")
-parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/tunl2d', help="main directory in which agent-specific directory will be created")
+
+def single_cell_plot(total_resp, binary_stim, i_neuron, start_trial):
+    assert start_trial+100 <= sum(binary_stim == 0) and start_trial+100 <= sum(binary_stim == 1), "start_trial exceeds number of left or right trials"
+    xl = total_resp[binary_stim == 0, :, i_neuron][start_trial:start_trial+100]
+    xr = total_resp[binary_stim == 1, :, i_neuron][start_trial:start_trial+100]
+    norm_xl = stats.zscore(xl, axis=1)
+    norm_xr = stats.zscore(xr, axis=1)
+
+    fig, (ax1, ax2, ax3) = plt.subplots(ncols=1, nrows=3, figsize=(5, 8), sharex='all',
+                                        gridspec_kw={'height_ratios': [2, 2, 1.5]})
+    fig.suptitle(f'Unit #{i_neuron}')
+
+    im = ax1.imshow(norm_xl, cmap='jet')
+    ax1.set_aspect('auto')
+    ax1.set_xticks(np.arange(len_delay, step=10))
+    ax1.set_yticks([0, len(norm_xl)])
+    ax1.set_yticklabels(['1', '100'])
+    ax1.set_ylabel(f'Left trials')
+
+    im2 = ax2.imshow(norm_xr, cmap='jet')
+    ax2.set_aspect('auto')
+    ax2.set_xticks(np.arange(len_delay, step=10))
+    ax2.set_yticks([0, len(norm_xr)])
+    ax2.set_yticklabels(['1', '100'])
+    ax2.set_ylabel(f'Right trials')
+
+    ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Left', color=linclab_plot_utils.LINCLAB_COLS['yellow'])
+    ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Right', color=linclab_plot_utils.LINCLAB_COLS['brown'])
+    ax3.set_xlabel('Time since delay period onset')
+    ax3.legend(loc='upper right', fontsize='medium')
+    ax3.set_ylabel('Avg activation')
+    plt.show()
+
+parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og',help="main data directory")
+parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_0.0001_p0.25_2',help="directory in which .npz is saved")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/tunl1d_og', help="main directory in which agent-specific directory will be created")
 parser.add_argument("--seed", type=int, help="seed to analyse")
 parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
 parser.add_argument("--behaviour_only", type=bool, default=False, help="whether the data only includes performance data")
 parser.add_argument("--plot_performance", type=bool, default=True,  help="if behaviour only, whether to plot the performance plot")
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
 parser.add_argument("--separate_trial_types", type=bool, default=True,  help="identify ramp and sequence cells separately for left-stim and right-stim trials and then combine")
-parser.add_argument("--n_shuffle", type=int, default=1000, help="number of shuffles to acquire null distribution")
-parser.add_argument("--percentile", type=float, default=95.0, help="P threshold to determind significance")
+parser.add_argument("--n_shuffle", type=int, default=100, help="number of shuffles to acquire null distribution")
+parser.add_argument("--percentile", type=float, default=99.9, help="P threshold to determind significance")
 parser.add_argument("--load_time_ramp_results", type=bool, default=True, help="if true, make sure to have results from time_ramp_ident in save_dir")
 args = parser.parse_args()
 argsdict = args.__dict__
@@ -50,29 +81,19 @@ if len(hparams) > 5:  # weight_decay or dropout
     if 'p' in hparams[5]:
         p = float(hparams[5][1:])
         dropout_type = hparams[6]
-env_title = 'Mnemonic_TUNL_2D' if env_type == 'mem' else 'Non-mnemonic_TUNL_2D'
+env_title = 'Mnemonic_TUNL_1D' if env_type == 'mem' else 'Non-mnemonic_TUNL_1D'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
 behaviour_only = True if argsdict['behaviour_only'] == True or argsdict['behaviour_only'] == 'True' else False  # plot performance data
 plot_performance = True if argsdict['plot_performance'] == True or argsdict['plot_performance'] == 'True' else False
 if behaviour_only:
-    stim = data['stim']  # n_total_episodes x 2
-    choice = data['choice']  # n_total_episodes x 2
-    epi_nav_reward = data['epi_nav_reward']  # n_total_episodes
-    ideal_nav_reward = data['ideal_nav_rwds']  # n_total_episodes
+    stim = data['stim']  # n_total_episodes
+    first_action = data['first_action']  # n_total_episodes
     n_total_episodes = np.shape(stim)[0]
-    nonmatch = np.any(stim != choice, axis=0)
-    avg_nav_rewards = bin_rewards(epi_nav_reward, n_total_episodes//10)
+    nonmatch = stim != first_action
     binned_nonmatch_perc = bin_rewards(nonmatch, n_total_episodes//10)
     if plot_performance:
-        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex='all', figsize=(6, 6))
-        fig.suptitle(f'{env_title} TUNL 2D')
-        ax1.plot(np.arange(n_total_episodes), avg_nav_rewards, label=net_title)
-        ax1.plot(np.arange(n_total_episodes), ideal_nav_reward, label="Ideal navigation reward")
-        ax1.set_xlabel('Episode')
-        ax1.set_ylabel('Navigation reward')
-        ax1.legend()
-
+        fig, ax2 = plt.subplots(nrows=1, ncols=1, figsize=(6, 3))
         ax2.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
         ax2.set_xlabel('Episode')
         ax2.set_ylabel('Fraction Nonmatch')
@@ -81,15 +102,11 @@ if behaviour_only:
         fig.savefig(save_dir + f'/performance.svg')
     sys.exit()
 
-stim = data['stim']  # n_total_episodes x 2
-choice = data['choice']  # n_total_episodes x 2
-delay_loc = data['delay_loc']  # n_total_episodes x len_delay x 2
-delay_resp_hx = data['delay_resp_hx']  # n_total_episodes x len_delay x n_neurons
-delay_resp_cx = data['delay_resp_cx']  # n_total_episodes x len_delay x n_neurons
-epi_nav_reward = data['epi_nav_reward']  # n_total_episodes
-ideal_nav_reward = data['ideal_nav_rwds']  # n_total_episodes
+
+stim = data['stim']  # n_total_episodes
+first_action = data['first_action']  # n_total_episodes
+delay_resp = data['delay_resp']  # n_total_episodes x len_delay x n_neurons
 n_total_episodes = np.shape(stim)[0]
-delay_resp = delay_resp_hx
 
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
@@ -107,24 +124,17 @@ if normalize:
 # delay_loc = delay_loc[:, 2:, :]
 
 # separate left and right trials
-left_stim_resp = delay_resp[np.all(stim == [1, 1], axis=1)]
-right_stim_resp = delay_resp[np.any(stim != [1, 1], axis=1)]
-left_stim_loc = delay_loc[np.all(stim == [1, 1], axis=1)]  # delay locations on stim==left trials
-right_stim_loc = delay_loc[np.any(stim != [1, 1], axis=1)]
+left_stim_resp = delay_resp[stim == 0]
+right_stim_resp = delay_resp[stim == 1]
 
-left_choice_resp = delay_resp[np.all(choice == [1, 1], axis=1)]
-right_choice_resp = delay_resp[np.any(choice != [1, 1], axis=1)]
-left_choice_loc = delay_loc[np.all(choice == [1, 1], axis=1)]  # delay locations on first_choice=left trials
-right_choice_loc = delay_loc[np.any(choice != [1, 1], axis=1)]
+left_choice_resp = delay_resp[first_action == 0]
+right_choice_resp = delay_resp[first_action == 1]
 
-binary_stim = np.ones(np.shape(stim)[0])
-binary_stim[np.all(stim == [1, 1], axis=1)] = 0  # 0 is L, 1 is right
+binary_nonmatch = np.ones(n_total_episodes)
+binary_nonmatch[stim == first_action] = 0  # 0 is match, 1 is nonmatch
 
-binary_nonmatch = np.any(stim != choice, axis=1)
 correct_resp = delay_resp[binary_nonmatch == 1]
 incorrect_resp = delay_resp[binary_nonmatch == 0]
-correct_loc = delay_loc[binary_nonmatch == 1]  # delay locations on correct trials
-incorrect_loc = delay_loc[binary_nonmatch == 0]
 
 # cell_nums_all, sorted_matrix_all, cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_seq(
 #     delay_resp, norm=True)
@@ -255,16 +265,18 @@ else: # Run time cell and ramping cell identification script
 
 
 cell_nums_nontime = np.delete(np.arange(n_neurons), np.intersect1d(cell_nums_seq, cell_nums_ramp))
+
+
 # Here, the cell_nums have not been re-arranged according to peak latency yet
 delay_resp_ramp = delay_resp[:, :, cell_nums_ramp]
 delay_resp_seq = delay_resp[:, :, cell_nums_seq]
 delay_resp_nontime = delay_resp[:, :, cell_nums_nontime]
-left_stim_resp_ramp = delay_resp_ramp[np.all(stim == [1, 1], axis=1)]
-right_stim_resp_ramp = delay_resp_ramp[np.any(stim != [1, 1], axis=1)]
-left_stim_resp_seq = delay_resp_seq[np.all(stim == [1, 1], axis=1)]
-right_stim_resp_seq = delay_resp_seq[np.any(stim != [1, 1], axis=1)]
-left_stim_resp_nontime = delay_resp_nontime[np.all(stim == [1, 1], axis=1)]
-right_stim_resp_nontime = delay_resp_nontime[np.any(stim != [1, 1], axis=1)]
+left_stim_resp_ramp = delay_resp_ramp[stim == 0]
+right_stim_resp_ramp = delay_resp_ramp[stim == 1]
+left_stim_resp_seq = delay_resp_seq[stim == 0]
+right_stim_resp_seq = delay_resp_seq[stim == 1]
+left_stim_resp_nontime = delay_resp_nontime[stim == 0]
+right_stim_resp_nontime = delay_resp_nontime[stim == 1]
 n_ramp_neurons = len(cell_nums_ramp)
 n_seq_neurons = len(cell_nums_seq)
 n_nontime_neurons = len(cell_nums_nontime)
@@ -275,23 +287,24 @@ sorted_matrix_all, sorted_matrix_seq, sorted_matrix_ramp, sorted_matrix_nontime 
     sort_response_by_peak_latency(delay_resp, cell_nums_ramp, cell_nums_seq, norm=True)
 
 # print('Make a venn diagram of neuron counts...')
-make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, save_dir=save_dir, label=f'{seed}_{epi}', save=True)
+make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, label=f'{seed}_{epi}', save_dir=save_dir, save=True)
 
 print('Sort avg resp analysis...')
 plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=env_title+' Sequence cells', remove_nan=True, save_dir=save_dir, save=True)
 plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=env_title+' Ramping cells', remove_nan=True, save_dir=save_dir, save=True)
+plot_sorted_averaged_resp(cell_nums_nontime, sorted_matrix_nontime, title=env_title+' Non-temporal cells', remove_nan=True, save_dir=save_dir, save=True)
 plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=env_title+' All cells', remove_nan=True, save_dir=save_dir, save=True)
 
 print('sort in same order analysis...')
 plot_sorted_in_same_order(left_stim_resp_ramp, right_stim_resp_ramp, 'Left', 'Right', big_title=env_title+' Ramping cells', len_delay=len_delay, n_neurons=n_ramp_neurons, save_dir=save_dir, save=True)
 plot_sorted_in_same_order(left_stim_resp_seq, right_stim_resp_seq, 'Left', 'Right', big_title=env_title+' Sequence cells', len_delay=len_delay, n_neurons=n_seq_neurons, save_dir=save_dir, save=True)
 plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_title=env_title+' All cells', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=True)
-plot_sorted_in_same_order(correct_resp, incorrect_resp, 'Correct', 'Incorrect', big_title=env_title+' All cells ic', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=True)
+#plot_sorted_in_same_order(correct_resp, incorrect_resp, 'Correct', 'Incorrect', big_title=env_title+' All cells ic', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=False)
 
 print('decode stim analysis...')
-plot_decode_sample_from_single_time(delay_resp, binary_stim, env_title+' All Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=True)
-plot_decode_sample_from_single_time(delay_resp_ramp, binary_stim, env_title+' Ramping Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=True)
-plot_decode_sample_from_single_time(delay_resp_seq, binary_stim, env_title+' Sequence Cells', n_fold=7, max_iter=100, save_dir=save_dir, save=True)
+plot_decode_sample_from_single_time(delay_resp, stim, env_title+' All Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=True)
+plot_decode_sample_from_single_time(delay_resp_ramp, stim, env_title+' Ramping Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=True)
+plot_decode_sample_from_single_time(delay_resp_seq, stim, env_title+' Sequence Cells', n_fold=7, max_iter=100, save_dir=save_dir, save=True)
 
 print('decode time analysis...')
 time_decode_lin_reg(delay_resp, len_delay, n_neurons, 1000, title=env_title+' All cells', save_dir=save_dir, save=True)
@@ -299,59 +312,7 @@ time_decode_lin_reg(delay_resp_ramp, len_delay, n_ramp_neurons, 1000, title=env_
 time_decode_lin_reg(delay_resp_seq, len_delay, n_seq_neurons, 1000, title=env_title+' Sequence cells', save_dir=save_dir, save=True)
 
 print('Single-cell visualization... SAVE AUTOMATICALLY')
-single_cell_visualization(delay_resp, binary_stim, cell_nums_ramp, type='ramp', save_dir=save_dir)
-single_cell_visualization(delay_resp, binary_stim, cell_nums_seq, type='seq', save_dir=save_dir)
-
-
-# ==========================================
-
-# Mutual information analysis
-# ==========================================
-
-# mutual information analysis
-
-ratemap, spatial_occupancy = construct_ratemap(delay_resp, delay_loc)
-mutual_info = calculate_mutual_information(ratemap, spatial_occupancy)
-shuffled_mutual_info = calculate_shuffled_mutual_information(delay_resp, delay_loc, n_total_episodes)
-
-plot_mutual_info_distribution(mutual_info, title='all_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info, save_dir=save_dir, save=False)
-
-joint_encoding_info(delay_resp, delay_loc, analysis='selectivity', recalculate=True)
-plot_joint_encoding_information(save_dir=save_dir, title='all_cells')
-
-ratemap_left_sti, spatial_occupancy_left_sti = construct_ratemap(left_stim_resp, left_stim_loc)
-ratemap_right_sti, spatial_occupancy_right_sti = construct_ratemap(right_stim_resp, right_stim_loc)
-mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_occupancy_left_sti)
-mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
-
-print("Plot splitter cells... SAVE AUTOMATICALLY")
-plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=save_dir)
-
-decode_sample_from_trajectory(delay_loc, stim, save_dir=save_dir, save=True)
-
-print("Mutual info for ramping cells and sequence cells")
-
-
-ratemap_seq, spatial_occupancy_seq = construct_ratemap(delay_resp_seq, delay_loc)
-mutual_info_seq = calculate_mutual_information(ratemap_seq, spatial_occupancy_seq)
-shuffled_mutual_info_seq = calculate_shuffled_mutual_information(delay_resp_seq, delay_loc, n_total_episodes)
-plot_mutual_info_distribution(mutual_info_seq, title='seq_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_seq, save_dir=save_dir, save=True)
-print("seq: ", np.nanmean(mutual_info_seq))
-print("shuffled seq: ", np.nanmean(shuffled_mutual_info_seq))
-
-ratemap_ramp, spatial_occupancy_ramp = construct_ratemap(delay_resp_ramp, delay_loc)
-mutual_info_ramp = calculate_mutual_information(ratemap_ramp, spatial_occupancy_ramp)
-shuffled_mutual_info_ramp = calculate_shuffled_mutual_information(delay_resp_ramp, delay_loc, n_total_episodes)
-plot_mutual_info_distribution(mutual_info_ramp, title='ramp_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp, save_dir=save_dir, save=True)
-print("ramp: ", np.nanmean(mutual_info_ramp))
-print("shuffled ramp: ", np.nanmean(shuffled_mutual_info_ramp))
-
-ratemap_nontime, spatial_occupancy_nontime = construct_ratemap(delay_resp_nontime, delay_loc)
-mutual_info_nontime = calculate_mutual_information(ratemap_nontime, spatial_occupancy_nontime)
-shuffled_mutual_info_nontime = calculate_shuffled_mutual_information(delay_resp_nontime, delay_loc, n_total_episodes)
-plot_mutual_info_distribution(mutual_info_ramp, title='non_time_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_ramp, save_dir=save_dir, save=True)
-print("Non-time: ", np.nanmean(mutual_info_nontime))
-print("shuffled non-time: ", np.nanmean(shuffled_mutual_info_nontime))
-
+single_cell_visualization(delay_resp, stim, cell_nums_ramp, type='ramp', save_dir=save_dir)
+single_cell_visualization(delay_resp, stim, cell_nums_seq, type='seq', save_dir=save_dir)
 
 print('Analysis finished')

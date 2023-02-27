@@ -1,19 +1,17 @@
 """
 Separate time cell and ramping cell identification script to run on cluster.
 """
-
 from cell_identification.time_ramp import *
 from analysis_utils import *
 #from expts.envs.tunl_1d import *
-from linclab_utils import plot_utils
 import sys
 import argparse
 
 
-parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
-parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og',help="main data directory")
-parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_0.0001_p0.25_2',help="directory in which .npz is saved")
-parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/tunl1d_og', help="main directory in which agent-specific directory will be created")
+parser = argparse.ArgumentParser(description="Non-location-fixed 2D TUNL task simulation")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl2d',help="main data directory")
+parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_1e-05',help="directory in which .npz is saved")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/tunl2d', help="main directory in which agent-specific directory will be created")
 parser.add_argument("--seed", type=int, help="seed to analyse")
 parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
 parser.add_argument("--behaviour_only", type=bool, default=False, help="whether the data only includes performance data")
@@ -54,13 +52,23 @@ net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 behaviour_only = True if argsdict['behaviour_only'] == True or argsdict['behaviour_only'] == 'True' else False  # plot performance data
 plot_performance = True if argsdict['plot_performance'] == True or argsdict['plot_performance'] == 'True' else False
 if behaviour_only:
-    stim = data['stim']  # n_total_episodes
-    first_action = data['first_action']  # n_total_episodes
+    stim = data['stim']  # n_total_episodes x 2
+    choice = data['choice']  # n_total_episodes x 2
+    epi_nav_reward = data['epi_nav_reward']  # n_total_episodes
+    ideal_nav_reward = data['ideal_nav_rwds']  # n_total_episodes
     n_total_episodes = np.shape(stim)[0]
-    nonmatch = stim != first_action
+    nonmatch = np.any(stim != choice, axis=0)
+    avg_nav_rewards = bin_rewards(epi_nav_reward, n_total_episodes//10)
     binned_nonmatch_perc = bin_rewards(nonmatch, n_total_episodes//10)
     if plot_performance:
-        fig, ax2 = plt.subplots(nrows=1, ncols=1, figsize=(6, 3))
+        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex='all', figsize=(6, 6))
+        fig.suptitle(f'{env_title} TUNL 2D')
+        ax1.plot(np.arange(n_total_episodes), avg_nav_rewards, label=net_title)
+        ax1.plot(np.arange(n_total_episodes), ideal_nav_reward, label="Ideal navigation reward")
+        ax1.set_xlabel('Episode')
+        ax1.set_ylabel('Navigation reward')
+        ax1.legend()
+
         ax2.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
         ax2.set_xlabel('Episode')
         ax2.set_ylabel('Fraction Nonmatch')
@@ -69,11 +77,15 @@ if behaviour_only:
         fig.savefig(save_dir + f'/performance.svg')
     sys.exit()
 
-
-stim = data['stim']  # n_total_episodes
-first_action = data['first_action']  # n_total_episodes
-delay_resp = data['delay_resp']  # n_total_episodes x len_delay x n_neurons
+stim = data['stim']  # n_total_episodes x 2
+choice = data['choice']  # n_total_episodes x 2
+delay_loc = data['delay_loc']  # n_total_episodes x len_delay x 2
+delay_resp_hx = data['delay_resp_hx']  # n_total_episodes x len_delay x n_neurons
+delay_resp_cx = data['delay_resp_cx']  # n_total_episodes x len_delay x n_neurons
+epi_nav_reward = data['epi_nav_reward']  # n_total_episodes
+ideal_nav_reward = data['ideal_nav_rwds']  # n_total_episodes
 n_total_episodes = np.shape(stim)[0]
+delay_resp = delay_resp_hx
 
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
@@ -91,17 +103,24 @@ if normalize:
 # delay_loc = delay_loc[:, 2:, :]
 
 # separate left and right trials
-left_stim_resp = delay_resp[stim == 0]
-right_stim_resp = delay_resp[stim == 1]
+left_stim_resp = delay_resp[np.all(stim == [1, 1], axis=1)]
+right_stim_resp = delay_resp[np.any(stim != [1, 1], axis=1)]
+left_stim_loc = delay_loc[np.all(stim == [1, 1], axis=1)]  # delay locations on stim==left trials
+right_stim_loc = delay_loc[np.any(stim != [1, 1], axis=1)]
 
-left_choice_resp = delay_resp[first_action == 0]
-right_choice_resp = delay_resp[first_action == 1]
+left_choice_resp = delay_resp[np.all(choice == [1, 1], axis=1)]
+right_choice_resp = delay_resp[np.any(choice != [1, 1], axis=1)]
+left_choice_loc = delay_loc[np.all(choice == [1, 1], axis=1)]  # delay locations on first_choice=left trials
+right_choice_loc = delay_loc[np.any(choice != [1, 1], axis=1)]
 
-binary_nonmatch = np.ones(n_total_episodes)
-binary_nonmatch[stim == first_action] = 0  # 0 is match, 1 is nonmatch
+binary_stim = np.ones(np.shape(stim)[0])
+binary_stim[np.all(stim == [1, 1], axis=1)] = 0  # 0 is L, 1 is right
 
+binary_nonmatch = np.any(stim != choice, axis=1)
 correct_resp = delay_resp[binary_nonmatch == 1]
 incorrect_resp = delay_resp[binary_nonmatch == 0]
+correct_loc = delay_loc[binary_nonmatch == 1]  # delay locations on correct trials
+incorrect_loc = delay_loc[binary_nonmatch == 0]
 
 # cell_nums_all, sorted_matrix_all, cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_seq(
 #     delay_resp, norm=True)
@@ -143,7 +162,7 @@ else:
 if separate_trial_types:
     RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
     seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
-    cell_nums_seq_l = np.where(seq_cell_bool_l)[0]  # takes 30 minutes for 256 neurons for 1000 shuffs
+    cell_nums_seq_l = np.where(seq_cell_bool_l)[0]
     RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
     seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
     cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
@@ -180,7 +199,7 @@ if separate_trial_types:
                         trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
     print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
 else:
-    trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_score(delay_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)  # Takes 30 minutes for 256 neurons for 1000 shuffs
+    trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_score(delay_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
     trial_reliable_cell_bool = trial_reliability_score_result >= trial_reliability_score_threshold_result
     trial_reliable_cell_num = np.where(trial_reliable_cell_bool)
     np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_trial_reliability_results_combined.npz'),
@@ -189,7 +208,7 @@ else:
     print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
 
 if separate_trial_types:
-    I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)  # takes 8 hours to do 1000 shuffles for 256 neurons
+    I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)
     high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
     high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
     I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
