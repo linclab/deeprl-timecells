@@ -258,6 +258,7 @@ if __name__ == '__main__':
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)-np.std(postlesion_perf_array[2, :, :], axis=-1),
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
+    ax1.hlines(y=0.5, linestyles='dashed', colors='gray')
     ax1.set_xlabel('Number of neurons lesioned')
     ax1.set_ylabel('Fraction Nonmatch')
     ax1.set_ylim(0,1)
