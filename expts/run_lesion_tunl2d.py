@@ -1,7 +1,7 @@
 import random
 import os
-from expts.agents.model_2d import *
-from expts.envs.tunl_2d import Tunl
+from agents.model_2d import *
+from envs.tunl_2d import Tunl
 import numpy as np
 import torch
 from lesion_expt_utils import generate_random_index
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
     seed = int(pt[1])
     epi = int(pt[2])
-    main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/tunl2d'
+    main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/tunl2d_100_99.9'
     data_analysis_dir = os.path.join(main_data_analysis_dir, config_dir)
     ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_ramp_ident_results_separate.npz'), allow_pickle=True)
     seq_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_seq_ident_results_separate.npz'), allow_pickle=True)
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     main_dir = '/network/scratch/l/lindongy/timecell/lesion/tunl2d'
     save_dir = os.path.join(main_dir, f'{config_dir}_seed{seed}_epi{epi}')
     if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir)
     print(f'Saving to {save_dir}')
 
     # Setting up cuda and seeds
@@ -194,7 +194,7 @@ if __name__ == '__main__':
                 gc.collect()
                 torch.cuda.empty_cache()
                 env = Tunl(len_delay, len_edge=7, rwd=100, inc_rwd=-20, step_rwd=-0.1, poke_rwd=5, rng_seed=seed)
-                if p is not None:
+                if p is None:
                     net = AC_Net(
                         input_dimensions=(6, 9, 3),  # input dim
                         action_dimensions=6,  # action dim
