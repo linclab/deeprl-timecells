@@ -1,8 +1,8 @@
 """
 Separate time cell and ramping cell identification script to run on cluster.
 """
-from cell_identification.time_ramp import *
-from analysis_utils import *
+from utils_time_ramp import *
+from utils_analysis import *
 #from expts.envs.tunl_1d import *
 import sys
 import argparse
@@ -168,7 +168,7 @@ if separate_trial_types:
     cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
     seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
     cell_nums_seq = np.where(seq_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_seq_ident_results_separate.npz'),
+    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_seq_ident_results_separate_shuff{n_shuffle}_.npz'),
                         RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
                         RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
                         seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
