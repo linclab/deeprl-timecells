@@ -2,8 +2,8 @@
 Separate time cell and ramping cell identification script to run on cluster.
 """
 
-from cell_identification.time_ramp import *
-from analysis_utils import *
+from utils_time_ramp import *
+from utils_analysis import *
 #from expts.envs.tunl_1d import *
 import sys
 import argparse
