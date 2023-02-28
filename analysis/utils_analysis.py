@@ -432,6 +432,15 @@ def tuning_curve_dim_reduction(resp, mode, save_dir, title):
     # plt.savefig(os.path.join(save_dir,f'{title}_tuning_curve_{mode}.svg'))
 
 
+def shuffle_activity(delay_resp):
+    #shuffle LSTM activity within each episode
+    shuffled_delay_resp = np.empty(np.shape(delay_resp))
+    n_episodes = np.shape(delay_resp)[0]
+    len_delay = np.shape(delay_resp)[1]
+    for i_eps in range(n_episodes):
+        shift = np.random.randint(np.floor(len_delay*0.3), np.ceil(len_delay*0.7))
+        shuffled_delay_resp[i_eps,:,:] = np.roll(np.squeeze(delay_resp[i_eps,:,:]), shift=shift, axis=0)
+    return shuffled_delay_resp
 
 # ================= TO CHUCK =================================
 
