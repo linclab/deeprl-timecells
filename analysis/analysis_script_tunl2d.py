@@ -1,13 +1,13 @@
-from analysis import linclab_plot_utils
-from analysis.mutual_info_utils import *
-from cell_identification.time_ramp import *
-from analysis_utils import bin_rewards, make_venn_diagram, plot_sorted_averaged_resp, plot_sorted_in_same_order, \
+import utils_linclab_plot
+from utils_mutual_info import *
+from utils_time_ramp import *
+from utils_analysis import bin_rewards, make_venn_diagram, plot_sorted_averaged_resp, plot_sorted_in_same_order, \
     single_cell_visualization, plot_decode_sample_from_single_time, time_decode_lin_reg
 import sys
 import argparse
 
-linclab_plot_utils.linclab_plt_defaults()
-linclab_plot_utils.set_font(font='Helvetica')
+utils_linclab_plot.linclab_plt_defaults()
+utils_linclab_plot.set_font(font='Helvetica')
 
 parser = argparse.ArgumentParser(description="Non-location-fixed 2D TUNL task simulation")
 parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl2d',help="main data directory")

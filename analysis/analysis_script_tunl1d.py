@@ -1,12 +1,12 @@
-from cell_identification.time_ramp import *
-from analysis_utils import *
+from utils_time_ramp import *
+from utils_analysis import *
 #from expts.envs.tunl_1d import *
-from analysis import linclab_plot_utils
+import utils_linclab_plot
 import sys
 import argparse
 
-linclab_plot_utils.linclab_plt_defaults()
-linclab_plot_utils.set_font(font='Helvetica')
+utils_linclab_plot.linclab_plt_defaults()
+utils_linclab_plot.set_font(font='Helvetica')
 
 
 def single_cell_plot(total_resp, binary_stim, i_neuron, start_trial):
@@ -34,8 +34,8 @@ def single_cell_plot(total_resp, binary_stim, i_neuron, start_trial):
     ax2.set_yticklabels(['1', '100'])
     ax2.set_ylabel(f'Right trials')
 
-    ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Left', color=linclab_plot_utils.LINCLAB_COLS['yellow'])
-    ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Right', color=linclab_plot_utils.LINCLAB_COLS['brown'])
+    ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Left', color=utils_linclab_plot.LINCLAB_COLS['yellow'])
+    ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Right', color=utils_linclab_plot.LINCLAB_COLS['brown'])
     ax3.set_xlabel('Time since delay period onset')
     ax3.legend(loc='upper right', fontsize='medium')
     ax3.set_ylabel('Avg activation')
