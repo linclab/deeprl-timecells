@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import stats
 import itertools
-from mutual_info.utils import shuffle_activity
+from utils_mutual_info import shuffle_activity
 import matplotlib.pyplot as plt
 import os
 from matplotlib.backends.backend_pdf import PdfPages

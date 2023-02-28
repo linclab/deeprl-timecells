@@ -6,7 +6,7 @@ from sklearn import svm
 from sklearn.manifold import TSNE
 import torch
 import numpy as np
-from analysis import linclab_plot_utils
+import utils_linclab_plot
 import os
 from matplotlib_venn import venn2
 import umap
