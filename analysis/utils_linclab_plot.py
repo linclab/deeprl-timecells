@@ -1,5 +1,5 @@
 """
-linclab_plot_utils.py
+utils_linclab_plot.py
 
 Authors: Colleen Gillon
 

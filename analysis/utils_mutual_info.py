@@ -12,6 +12,7 @@ from numpy import nan
 from scipy import stats
 from sklearn import svm
 from sklearn.model_selection import cross_val_score
+from utils_analysis import shuffle_activity
 np.seterr(invalid='ignore')
 
 import itertools
@@ -525,15 +526,6 @@ def mutual_info(ratemap, occupancy):
     return I
 
 
-def shuffle_activity(delay_resp):
-    #shuffle LSTM activity within each episode
-    shuffled_delay_resp = np.empty(np.shape(delay_resp))
-    n_episodes = np.shape(delay_resp)[0]
-    len_delay = np.shape(delay_resp)[1]
-    for i_eps in range(n_episodes):
-        shift = np.random.randint(np.floor(len_delay*0.3), np.ceil(len_delay*0.7))
-        shuffled_delay_resp[i_eps,:,:] = np.roll(np.squeeze(delay_resp[i_eps,:,:]), shift=shift, axis=0)
-    return shuffled_delay_resp
 
 
 def informativeness(delay_resp, delay_loc, randomize=None, shuffle=None):
