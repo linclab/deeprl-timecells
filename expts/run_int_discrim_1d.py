@@ -7,13 +7,14 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
-#from linclab_utils import plot_utils
 import argparse
 from tqdm import tqdm
 import re
+import sys
+sys.path.insert(0, '..')
+from analysis import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
-#plot_utils.linclab_plt_defaults()
-# plot_utils.set_font(font='Helvetica')
 
 parser = argparse.ArgumentParser(description="Head-fixed Interval Discrimination task simulation")
 parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")

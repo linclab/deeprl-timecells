@@ -8,7 +8,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
 import sklearn
 import scikit_posthocs as sp
-
+import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
 def lin_reg_ramping(resp, plot=False, save_dir=None, title=None):
     """

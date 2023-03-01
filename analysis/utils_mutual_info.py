@@ -14,11 +14,12 @@ from sklearn import svm
 from sklearn.model_selection import cross_val_score
 from utils_analysis import shuffle_activity
 np.seterr(invalid='ignore')
-
 import itertools
 from matplotlib.cbook import _reshape_2D
 import matplotlib.pyplot as plt
 import numpy as np
+import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
 # Function adapted from matplotlib.cbook
 def my_boxplot_stats(X, whis=1.5, bootstrap=None, labels=None,

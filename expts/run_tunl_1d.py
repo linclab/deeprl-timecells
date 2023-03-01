@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 import argparse
 from tqdm import tqdm
 import re
+import sys
+sys.path.insert(0, '..')
+from analysis import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
 def bin_rewards(epi_rewards, window_size):
     """

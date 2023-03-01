@@ -6,8 +6,7 @@ from utils_analysis import bin_rewards, make_venn_diagram, plot_sorted_averaged_
 import sys
 import argparse
 
-utils_linclab_plot.linclab_plt_defaults()
-utils_linclab_plot.set_font(font='Helvetica')
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
 parser = argparse.ArgumentParser(description="Non-location-fixed 2D TUNL task simulation")
 parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl2d',help="main data directory")

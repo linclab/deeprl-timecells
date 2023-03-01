@@ -10,7 +10,7 @@ import utils_linclab_plot
 import os
 from matplotlib_venn import venn2
 import umap
-
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
 def bin_rewards(epi_rewards, window_size):
     """

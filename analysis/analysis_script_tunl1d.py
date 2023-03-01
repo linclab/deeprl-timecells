@@ -4,9 +4,7 @@ from utils_analysis import *
 import utils_linclab_plot
 import sys
 import argparse
-
-utils_linclab_plot.linclab_plt_defaults()
-utils_linclab_plot.set_font(font='Helvetica')
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
 
 def single_cell_plot(total_resp, binary_stim, i_neuron, start_trial):
