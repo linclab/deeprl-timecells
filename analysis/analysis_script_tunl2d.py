@@ -137,15 +137,15 @@ separate_trial_types = True if argsdict['separate_trial_types'] == True or argsd
 
 if load_time_ramp_results:
     if separate_trial_types:
-        ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_ramp_ident_results_separate.npz'), allow_pickle=True)
-        seq_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_seq_ident_results_separate.npz'), allow_pickle=True)
-        trial_reliability_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_trial_reliability_results_separate.npz'), allow_pickle=True)
-        temporal_info_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_temporal_info_results_separate.npz'), allow_pickle=True)
+        ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results_separate.npz'), allow_pickle=True)
+        seq_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results_separate.npz'), allow_pickle=True)
+        trial_reliability_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results_separate.npz'), allow_pickle=True)
+        temporal_info_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results_separate.npz'), allow_pickle=True)
     else:
-        ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_ramp_ident_results_combined.npz'), allow_pickle=True)
-        seq_ident_results = np.load(os.path.join(save_dir, f'{seed}_{epi}_seq_ident_results_combined.npz'), allow_pickle=True)
-        trial_reliability_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_trial_reliability_results_combined.npz'), allow_pickle=True)
-        temporal_info_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_temporal_info_results_combined.npz'), allow_pickle=True)
+        ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results_combined.npz'), allow_pickle=True)
+        seq_ident_results = np.load(os.path.join(save_dir, f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results_combined.npz'), allow_pickle=True)
+        trial_reliability_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results_combined.npz'), allow_pickle=True)
+        temporal_info_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results_combined.npz'), allow_pickle=True)
     cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
     cell_nums_seq = seq_ident_results['cell_nums_seq']
 
@@ -160,7 +160,7 @@ else: # Run time cell and ramping cell identification script
         cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
         ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
         cell_nums_ramp = np.where(ramp_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_ramp_ident_results_separate.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results_separate.npz'),
                             p_result_l=p_result_l, slope_result_l=slope_result_l, intercept_result_l=intercept_result_l, R_result_l=R_result_l,
                             p_result_r=p_result_r,slope_result_r=slope_result_r, intercept_result_r=intercept_result_r, R_result_r=R_result_r,
                             ramp_cell_bool_l=ramp_cell_bool_l,cell_nums_ramp_l=cell_nums_ramp_l,
@@ -171,7 +171,7 @@ else: # Run time cell and ramping cell identification script
         p_result, slope_result, intercept_result, R_result = lin_reg_ramping(delay_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_all_trials')
         ramp_cell_bool = np.logical_and(p_result<=0.05, np.abs(R_result)>=0.9)
         cell_nums_ramp = np.where(ramp_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_ramp_ident_results_combined.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results_combined.npz'),
                             p_result=p_result, slope_result=slope_result, intercept_result=intercept_result, R_result=R_result,
                             ramp_cell_bool=ramp_cell_bool, cell_nums_ramp=cell_nums_ramp)
         print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
@@ -187,7 +187,7 @@ else: # Run time cell and ramping cell identification script
         cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
         seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
         cell_nums_seq = np.where(seq_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_seq_ident_results_separate.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results_separate.npz'),
                             RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
                             RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
                             seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
@@ -196,7 +196,7 @@ else: # Run time cell and ramping cell identification script
         RB_result, z_RB_threshold_result = ridge_to_background(delay_resp, ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_all_trials')
         seq_cell_bool = RB_result > z_RB_threshold_result  # False if z_RB_threshold_result is nan
         cell_nums_seq = np.where(seq_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir, f'{seed}_{epi}_seq_ident_results_combined.npz'),
+        np.savez_compressed(os.path.join(save_dir, f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results_combined.npz'),
                             RB_result=RB_result, z_RB_threshold_result=z_RB_threshold_result,seq_cell_bool=seq_cell_bool,cell_nums_seq=cell_nums_seq)
         print(f"{len(cell_nums_seq)}/{n_neurons} sequence cells")
     # breakpoint()
@@ -210,7 +210,7 @@ else: # Run time cell and ramping cell identification script
         trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
         trial_reliable_cell_bool = np.logical_or(trial_reliable_cell_bool_l, trial_reliable_cell_bool_r)
         trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_trial_reliability_results_separate.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results_separate.npz'),
                             trial_reliability_score_result_l=trial_reliability_score_result_l, trial_reliability_score_threshold_result_l=trial_reliability_score_threshold_result_l,
                             trial_reliable_cell_bool_l=trial_reliable_cell_bool_l, trial_reliable_cell_num_l=trial_reliable_cell_num_l,
                             trial_reliability_score_result_r=trial_reliability_score_result_r, trial_reliability_score_threshold_result_r=trial_reliability_score_threshold_result_r,
@@ -221,7 +221,7 @@ else: # Run time cell and ramping cell identification script
         trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_score(delay_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)  # Takes 30 minutes for 256 neurons for 1000 shuffs
         trial_reliable_cell_bool = trial_reliability_score_result >= trial_reliability_score_threshold_result
         trial_reliable_cell_num = np.where(trial_reliable_cell_bool)
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_trial_reliability_results_combined.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results_combined.npz'),
                             trial_reliability_score_result=trial_reliability_score_result, trial_reliability_score_threshold_result=trial_reliability_score_threshold_result,
                             trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
         print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
@@ -235,7 +235,7 @@ else: # Run time cell and ramping cell identification script
         high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
         high_temporal_info_cell_bool = np.logical_or(high_temporal_info_cell_bool_l, high_temporal_info_cell_bool_r)
         high_temporal_info_cell_nums = np.where(high_temporal_info_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_temporal_info_results_separate.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results_separate.npz'),
                             I_result_l=I_result_l, I_threshold_result_l=I_threshold_result_l,
                             high_temporal_info_cell_bool_l=high_temporal_info_cell_bool_l,high_temporal_info_cell_nums_l=high_temporal_info_cell_nums_l,
                             I_result_r=I_result_r, I_threshold_result_r=I_threshold_result_r,
@@ -246,7 +246,7 @@ else: # Run time cell and ramping cell identification script
         I_result, I_threshold_result = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
         high_temporal_info_cell_bool = I_result >= I_threshold_result
         high_temporal_info_cell_num = np.where(high_temporal_info_cell_bool)[0]
-        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_temporal_info_results_combined.npz'),
+        np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results_combined.npz'),
                             I_result=I_result, I_threshold_result=I_threshold_result,
                             high_temporal_info_cell_bool=high_temporal_info_cell_bool,high_temporal_info_cell_num=high_temporal_info_cell_num)
         print(f"{len(high_temporal_info_cell_num)}/{n_neurons} high temporal-information cells")
