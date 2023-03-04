@@ -11,9 +11,9 @@ import argparse
 from tqdm import tqdm
 import re
 import sys
-sys.path.insert(0, '..')
+sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
-utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
 def bin_rewards(epi_rewards, window_size):
     """

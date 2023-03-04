@@ -13,9 +13,8 @@ from tqdm import tqdm
 from numpy import array
 import re
 import sys
-sys.path.insert(0, '..')
+sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
-
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -83,7 +82,7 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
 
 if __name__ == '__main__':
 
-    utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
+    utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
     parser = argparse.ArgumentParser(description="lesion study in Head-fixed TUNL 1d task simulation")
     parser.add_argument("--n_total_episodes",type=int,default=1000,help="Total episodes to run lesion expt")
