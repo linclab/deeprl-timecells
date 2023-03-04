@@ -27,13 +27,14 @@ def lin_reg_ramping(resp, plot=False, save_dir=None, title=None):
     slope_result = np.zeros(n_neurons)
     intercept_result = np.zeros(n_neurons)
     pearson_R_result = np.zeros(n_neurons)
+    tuning_curves = calculate_tuning_curves(resp)
     if plot:
         plot_cols = 10
         plot_rows = int(np.ceil(n_neurons / plot_cols))
         tuning_curve_fig = plt.figure('tuning_curves', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
 
     for i_neuron in tqdm(range(n_neurons)):
-        tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)
+        tuning_curve = tuning_curves[i_neuron]
         t = np.arange(len_delay)
         slope_result[i_neuron], intercept_result[i_neuron], pearson_R_result[i_neuron], p_result[i_neuron], std_err = stats.linregress(t,tuning_curve)
 
@@ -42,7 +43,8 @@ def lin_reg_ramping(resp, plot=False, save_dir=None, title=None):
             tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
             tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)
             for i_trial in range(len(random_trial_resp_to_plot)):
-                tuning_curve_plot.plot(random_trial_resp_to_plot[i_trial], alpha=0.1, color='blue')
+                tuning_curve_plot.plot(random_trial_resp_to_plot[i_trial], alpha=0.1,
+                                       color='red' if np.logical_and(p_result[i_neuron]<=0.05, np.abs(pearson_R_result[i_neuron])>=0.9) else 'blue')
             tuning_curve_plot.set_title(f'p={p_result[i_neuron]:.5f}\nr={pearson_R_result[i_neuron]:.5f}')
             # tuning_curve_plot.legend()
     if plot:
@@ -71,13 +73,14 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
     n_neurons = np.shape(resp)[2]
     RB_result = np.zeros(n_neurons)
     z_RB_threshold_result = np.zeros(n_neurons)
+    tuning_curves = calculate_tuning_curves(resp)
     if plot:
         plot_cols = 10
         plot_rows = int(np.ceil(n_neurons / plot_cols))
         tuning_curve_fig = plt.figure('ramp_subtracted', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
 
     for i_neuron in tqdm(range(n_neurons)):
-        tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)  # (len_delay, )
+        tuning_curve = tuning_curves[i_neuron]  # (len_delay, )
         if ramping_bool[i_neuron]:  # if i_neuron is a ramping neuron, then subtract the linear regression
             t = np.arange(len_delay)
             slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
@@ -109,12 +112,14 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
             if ramping_bool[i_neuron]:
                 tuning_curve_plot.plot(tuning_curve, color='grey', alpha=1)
                 tuning_curve_plot.plot(lin_reg, color='grey', alpha=0.25)
-                tuning_curve_plot.plot(lin_subtracted_tuning_curve, color='blue', alpha=1)
+                tuning_curve_plot.plot(lin_subtracted_tuning_curve,
+                                       color='red' if RB_result[i_neuron] > z_RB_threshold_result[i_neuron] else 'blue', alpha=1)
             else:
-                tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)
+                tuning_curve_plot.plot(tuning_curve,
+                                       color='red' if RB_result[i_neuron] > z_RB_threshold_result[i_neuron] else 'blue', alpha=1)
             tuning_curve_plot.set_title(f'RB={RB_result[i_neuron]:.5f}\nz_RB={z_RB_threshold_result[i_neuron]:.5f}')
     if plot:
-        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curve_for_seq_identification_new.pdf')) as pdf:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curve_for_seq_identification.pdf')) as pdf:
             try:
                 pdf.savefig(tuning_curve_fig)
                 plt.close(tuning_curve_fig)
@@ -125,7 +130,7 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
     return RB_result, z_RB_threshold_result
 
 
-def trial_reliability_score(resp, split='odd-even', percentile=95, n_shuff=1000):
+def trial_reliability_vs_shuffle_score(resp, split='odd-even', percentile=95, n_shuff=1000):
     """
     Yong et al., 2021
     :param resp: n_total_episodes x len_delay x n_neurons
@@ -382,5 +387,102 @@ def sort_response_by_peak_latency(total_resp, cell_nums_ramp, cell_nums_seq, nor
            sorted_matrix, sorted_matrix_seq, sorted_matrix_ramp, sorted_matrix_nontime
 
 
+def calculate_tuning_curves(resp):
+    """
+    calculate tuning curves (trial-averaged response) for each neuron, assuming len_delay is the same for all trials.
+    :param resp: n_total_episodes x len_delay x n_neurons
+    :return: n_neurons x len_delay
+    """
+    return np.mean(resp, axis=0).T
 
 
+def calculate_tuning_curves_varying_duration(resp):
+    """
+    calculate tuning curves (trial-averaged response) for each neuron, with trials with varying len_delay.
+    :param resp: n_total_episodes x len_delay x n_neurons
+    :return: n_neurons x len_delay
+    """
+    new_resp = resp
+    new_resp[resp==0] = np.nan
+    return np.nanmean(new_resp, axis=0).T
+
+
+def correlation_between_tuning_curves(tuning_curve_A, tuning_curve_B):
+    """
+    calculate the pearson r between the two tuning curves.
+    :param tuning_curve_A: len_delay_A
+    :param tuning_curve_B: len_delay_B
+    :return: r (float), pval (float)
+    """
+    if len(tuning_curve_A) == len(tuning_curve_B):
+        r, pval = stats.pearsonr(tuning_curve_A, tuning_curve_B)
+    elif len(tuning_curve_A) < len(tuning_curve_B):
+        r, pval = stats.pearsonr(tuning_curve_A, tuning_curve_B[:len(tuning_curve_A)])
+    else:
+        r, pval = stats.pearsonr(tuning_curve_A[:len(tuning_curve_B)], tuning_curve_A)
+    return r, pval
+
+
+def calculate_field_width(tuning_curve):
+    """
+    calculate the field width (width of half height of peak activity), which must include the time bin for peak activity
+    :param tuning_curve: len_delay
+    :return: field_width (int)
+    """
+    peak_time = np.argmax(tuning_curve)
+    active_bool = tuning_curve > (peak_time/2)
+    arr = np.where(np.concatenate(([active_bool[0]],active_bool[:-1] != active_bool[1:],[True])))[0]
+    left_bound_idx = np.searchsorted(arr, peak_time) - 1
+    right_bound_idx = np.searchsorted(arr, peak_time)
+    field_width = arr[right_bound_idx] - arr[left_bound_idx]
+    return peak_time, field_width
+
+
+def plot_r_tuning_curves(resp_1, resp_2, label_1, label_2, save_dir, varying_duration=False):
+    """
+    plot the histogram of r(tuning_curves_1, tuning_curves_2).
+    Need to have the same number of neurons.
+    :param resp_1: n_episodes_1, len_delay, n_neurons
+    :param resp_2: n_episodes_2, len_delay, n_neurons
+    :param varying_delay: If resp contains trials with varying length. If true,
+        tuning curves are calculated with a different function.
+    :return: None
+    """
+    assert resp_1.shape[-1] == resp_2.shape[-1], "resp_1 and resp_2 must have the same number of neurons"
+    if varying_duration:
+        r = correlation_between_tuning_curves(
+            calculate_tuning_curves_varying_duration(resp_1),
+            calculate_tuning_curves_varying_duration(resp_2)
+        )
+    else:
+        r = correlation_between_tuning_curves(
+            calculate_tuning_curves(resp_1),
+            calculate_tuning_curves(resp_2)
+        )
+    plt.figure()
+    plt.hist(r, range=(-1,1), bins=50)
+    plt.xlabel(f"r({label_1}, {label_2})")
+    plt.ylabel("Fraction")
+    plt.savefig(os.path.join(save_dir, f"{label_1}_{label_2}_r_hist.svg"))
+
+
+def plot_field_width_vs_peak_time(resp, save_dir, title):
+    """
+    scatter plot field width vs peak time for each neuron. Trials must have same duration.
+    :param resp: n_episodes x len_delay x n_neurons
+    :return: None
+    """
+    tuning_curves = calculate_tuning_curves(resp)
+    n_neurons = resp.shape[-1]
+    field_widths = np.zeros(n_neurons)
+    peak_times = np.zeros(n_neurons)
+    for i_neuron in range(n_neurons):
+        peak_times[i_neuron], field_widths[i_neuron] = calculate_field_width(tuning_curves[i_neuron])
+    plt.figure()
+    plt.scatter(peak_times, field_widths)
+    slope, intercept, r, p, std_err = stats.linregress(x=peak_times, y=field_widths)
+    lin_reg = slope * np.arange(20) + intercept
+    plt.plot(lin_reg, alpha=0.5)
+    plt.xlabel("Peak time")
+    plt.ylabel("Field width")
+    plt.savefig(os.path.join(save_dir, f"{title}p_eak_time_vs_field_width.svg"))
