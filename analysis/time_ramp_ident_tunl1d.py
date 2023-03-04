@@ -18,7 +18,6 @@ parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
 parser.add_argument("--behaviour_only", type=bool, default=False, help="whether the data only includes performance data")
 parser.add_argument("--plot_performance", type=bool, default=True,  help="if behaviour only, whether to plot the performance plot")
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
-parser.add_argument("--separate_trial_types", type=bool, default=True,  help="identify ramp and sequence cells separately for left-stim and right-stim trials and then combine")
 parser.add_argument("--n_shuffle", type=int, default=1000, help="number of shuffles to acquire null distribution")
 parser.add_argument("--percentile", type=float, default=95.0, help="P threshold to determind significance")
 args = parser.parse_args()
@@ -110,106 +109,69 @@ incorrect_resp = delay_resp[binary_nonmatch == 0]
 # tuning_curve_dim_reduction(delay_resp, mode='tsne', save_dir=save_dir, title=f'{seed}_{epi}_all')
 # breakpoint()
 
-separate_trial_types = True if argsdict['separate_trial_types'] == True or argsdict['separate_trial_types'] == 'True' else False
 # Identifying ramping cells
-if separate_trial_types:
-    p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
-    ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
-    cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
-    p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
-    ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
-    cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
-    ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
-    cell_nums_ramp = np.where(ramp_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results_separate.npz'),
-                        p_result_l=p_result_l, slope_result_l=slope_result_l, intercept_result_l=intercept_result_l, R_result_l=R_result_l,
-                        p_result_r=p_result_r,slope_result_r=slope_result_r, intercept_result_r=intercept_result_r, R_result_r=R_result_r,
-                        ramp_cell_bool_l=ramp_cell_bool_l,cell_nums_ramp_l=cell_nums_ramp_l,
-                        ramp_cell_bool_r=ramp_cell_bool_r,cell_nums_ramp_r=cell_nums_ramp_r,
-                        ramp_cell_bool=ramp_cell_bool,cell_nums_ramp=cell_nums_ramp)
-    print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
-else:
-    p_result, slope_result, intercept_result, R_result = lin_reg_ramping(delay_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_all_trials')
-    ramp_cell_bool = np.logical_and(p_result<=0.05, np.abs(R_result)>=0.9)
-    cell_nums_ramp = np.where(ramp_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results_combined.npz'),
-                        p_result=p_result, slope_result=slope_result, intercept_result=intercept_result, R_result=R_result,
-                        ramp_cell_bool=ramp_cell_bool, cell_nums_ramp=cell_nums_ramp)
-    print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
-# breakpoint()
+p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
+ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
+cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
+p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
+ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
+cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
+ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
+cell_nums_ramp = np.where(ramp_cell_bool)[0]
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'),
+                    p_result_l=p_result_l, slope_result_l=slope_result_l, intercept_result_l=intercept_result_l, R_result_l=R_result_l,
+                    p_result_r=p_result_r,slope_result_r=slope_result_r, intercept_result_r=intercept_result_r, R_result_r=R_result_r,
+                    ramp_cell_bool_l=ramp_cell_bool_l,cell_nums_ramp_l=cell_nums_ramp_l,
+                    ramp_cell_bool_r=ramp_cell_bool_r,cell_nums_ramp_r=cell_nums_ramp_r,
+                    ramp_cell_bool=ramp_cell_bool,cell_nums_ramp=cell_nums_ramp)
+print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
 
 # # Identifying sequence cells
-if separate_trial_types:
-    RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
-    seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
-    cell_nums_seq_l = np.where(seq_cell_bool_l)[0]  # takes 30 minutes for 256 neurons for 1000 shuffs
-    RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
-    seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
-    cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
-    seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
-    cell_nums_seq = np.where(seq_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results_separate.npz'),
-                        RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
-                        RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
-                        seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
-    print(f"{len(cell_nums_seq)}/{n_neurons} sequence cells")
-else:
-    RB_result, z_RB_threshold_result = ridge_to_background(delay_resp, ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_all_trials')
-    seq_cell_bool = RB_result > z_RB_threshold_result  # False if z_RB_threshold_result is nan
-    cell_nums_seq = np.where(seq_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir, f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results_combined.npz'),
-                        RB_result=RB_result, z_RB_threshold_result=z_RB_threshold_result,seq_cell_bool=seq_cell_bool,cell_nums_seq=cell_nums_seq)
-    print(f"{len(cell_nums_seq)}/{n_neurons} sequence cells")
-# breakpoint()
+RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
+seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
+cell_nums_seq_l = np.where(seq_cell_bool_l)[0]  # takes 30 minutes for 256 neurons for 1000 shuffs
+RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
+seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
+cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
+seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
+cell_nums_seq = np.where(seq_cell_bool)[0]
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz'),
+                    RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
+                    RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
+                    seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
+print(f"{len(cell_nums_seq)}/{n_neurons} sequence cells")
 
-if separate_trial_types:
-    trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
-    trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
-    trial_reliable_cell_num_l = np.where(trial_reliable_cell_bool_l)[0]
-    trial_reliability_score_result_r, trial_reliability_score_threshold_result_r = trial_reliability_score(right_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
-    trial_reliable_cell_bool_r = trial_reliability_score_result_r >= trial_reliability_score_threshold_result_r
-    trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
-    trial_reliable_cell_bool = np.logical_or(trial_reliable_cell_bool_l, trial_reliable_cell_bool_r)
-    trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results_separate.npz'),
-                        trial_reliability_score_result_l=trial_reliability_score_result_l, trial_reliability_score_threshold_result_l=trial_reliability_score_threshold_result_l,
-                        trial_reliable_cell_bool_l=trial_reliable_cell_bool_l, trial_reliable_cell_num_l=trial_reliable_cell_num_l,
-                        trial_reliability_score_result_r=trial_reliability_score_result_r, trial_reliability_score_threshold_result_r=trial_reliability_score_threshold_result_r,
-                        trial_reliable_cell_bool_r=trial_reliable_cell_bool_r,trial_reliable_cell_num_r=trial_reliable_cell_num_r,
-                        trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
-    print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
-else:
-    trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_score(delay_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)  # Takes 30 minutes for 256 neurons for 1000 shuffs
-    trial_reliable_cell_bool = trial_reliability_score_result >= trial_reliability_score_threshold_result
-    trial_reliable_cell_num = np.where(trial_reliable_cell_bool)
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results_combined.npz'),
-                        trial_reliability_score_result=trial_reliability_score_result, trial_reliability_score_threshold_result=trial_reliability_score_threshold_result,
-                        trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
-    print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
+trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_vs_shuffle_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
+trial_reliable_cell_num_l = np.where(trial_reliable_cell_bool_l)[0]
+trial_reliability_score_result_r, trial_reliability_score_threshold_result_r = trial_reliability_vs_shuffle_score(right_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+trial_reliable_cell_bool_r = trial_reliability_score_result_r >= trial_reliability_score_threshold_result_r
+trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
+trial_reliable_cell_bool = np.logical_or(trial_reliable_cell_bool_l, trial_reliable_cell_bool_r)
+trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results.npz'),
+                    trial_reliability_score_result_l=trial_reliability_score_result_l, trial_reliability_score_threshold_result_l=trial_reliability_score_threshold_result_l,
+                    trial_reliable_cell_bool_l=trial_reliable_cell_bool_l, trial_reliable_cell_num_l=trial_reliable_cell_num_l,
+                    trial_reliability_score_result_r=trial_reliability_score_result_r, trial_reliability_score_threshold_result_r=trial_reliability_score_threshold_result_r,
+                    trial_reliable_cell_bool_r=trial_reliable_cell_bool_r,trial_reliable_cell_num_r=trial_reliable_cell_num_r,
+                    trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
+print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
 
-if separate_trial_types:
-    I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)  # takes 8 hours to do 1000 shuffles for 256 neurons
-    high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
-    high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
-    I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
-    high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
-    high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
-    high_temporal_info_cell_bool = np.logical_or(high_temporal_info_cell_bool_l, high_temporal_info_cell_bool_r)
-    high_temporal_info_cell_nums = np.where(high_temporal_info_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results_separate.npz'),
-                        I_result_l=I_result_l, I_threshold_result_l=I_threshold_result_l,
-                        high_temporal_info_cell_bool_l=high_temporal_info_cell_bool_l,high_temporal_info_cell_nums_l=high_temporal_info_cell_nums_l,
-                        I_result_r=I_result_r, I_threshold_result_r=I_threshold_result_r,
-                        high_temporal_info_cell_bool_r=high_temporal_info_cell_bool_r,high_temporal_info_cell_nums_r=high_temporal_info_cell_nums_r,
-                        high_temporal_info_cell_bool=high_temporal_info_cell_bool, high_temporal_info_cell_nums=high_temporal_info_cell_nums)
-    print(f"{len(high_temporal_info_cell_nums)}/{n_neurons} high temporal-information cells")
-else:
-    I_result, I_threshold_result = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
-    high_temporal_info_cell_bool = I_result >= I_threshold_result
-    high_temporal_info_cell_num = np.where(high_temporal_info_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results_combined.npz'),
-                        I_result=I_result, I_threshold_result=I_threshold_result,
-                        high_temporal_info_cell_bool=high_temporal_info_cell_bool,high_temporal_info_cell_num=high_temporal_info_cell_num)
-    print(f"{len(high_temporal_info_cell_num)}/{n_neurons} high temporal-information cells")
+I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)  # takes 8 hours to do 1000 shuffles for 256 neurons
+high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
+high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
+I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
+high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
+high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
+high_temporal_info_cell_bool = np.logical_or(high_temporal_info_cell_bool_l, high_temporal_info_cell_bool_r)
+high_temporal_info_cell_nums = np.where(high_temporal_info_cell_bool)[0]
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results.npz'),
+                    I_result_l=I_result_l, I_threshold_result_l=I_threshold_result_l,
+                    high_temporal_info_cell_bool_l=high_temporal_info_cell_bool_l,high_temporal_info_cell_nums_l=high_temporal_info_cell_nums_l,
+                    I_result_r=I_result_r, I_threshold_result_r=I_threshold_result_r,
+                    high_temporal_info_cell_bool_r=high_temporal_info_cell_bool_r,high_temporal_info_cell_nums_r=high_temporal_info_cell_nums_r,
+                    high_temporal_info_cell_bool=high_temporal_info_cell_bool, high_temporal_info_cell_nums=high_temporal_info_cell_nums)
+print(f"{len(high_temporal_info_cell_nums)}/{n_neurons} high temporal-information cells")
+
 
 print('Analysis finished')
