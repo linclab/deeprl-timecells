@@ -80,6 +80,71 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
     return np.mean(nonmatch_perc)
 
 
+def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
+    # new policy is calculated from silencing lesion_idx WHILE other hx stay the same
+
+    stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
+    nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
+    first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
+    nonmatch_perc_prime = np.zeros(n_total_episodes, dtype=np.int8)
+    first_action_prime = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
+    kl_div = []
+    for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
+        done = False
+        env.reset()
+        episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
+        if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
+            stim[i_episode] = 0
+        elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
+            stim[i_episode] = 1
+        net.reinit_hid()
+
+        pi_record = []
+        pi_prime_record = []
+
+        action_record = []
+        action_prime_record = []
+
+        reward_record = []
+        reward_prime_record = []
+        while not done:
+            pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float().to(device))  # here, pol is original policy
+            pi_record.append(pol)
+            new_activity = net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
+            new_activity[lesion_idx] = 0  # the new, manipulated hx
+            new_pol = F.softmax(net.output[0](new_activity), dim=1)
+            pi_prime_record.append(new_pol)
+
+            # select action from old and new policy
+            action = Categorical(pol).sample()
+            action_record.append(action)
+            new_action = Categorical(new_pol).sample()
+            action_prime_record.append(new_action)
+
+            # proceed with trial with old policy
+            new_obs, reward, done = env.step(action, episode_sample)
+            reward_record.append(reward)
+            # calculate hypothetical reward if the new action from rehydrated network was taken
+            reward_prime = env.calc_reward_without_stepping(new_action)
+            reward_prime_record.append(reward_prime)
+
+        first_action[i_episode] = action_record[next((i for i, x in enumerate(reward_record) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
+        nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
+        first_action_prime[i_episode] = action_prime_record[next((i for i, x in enumerate(reward_record) if x), 0)] - 1
+        nonmatch_perc_prime[i_episode] = 1 if stim[i_episode]+first_action_prime[i_episode] == 1 else 0
+
+        # calculate KL divergence between original policy pi and new policy pi'
+        kl_divergence = 0
+        for pi, pi_p in zip(pi_record, pi_prime_record):
+            kl_divergence += F.kl_div(pi_p.log(), pi.log(), reduction='batchmean')  # TODO: try removing .log()
+        kl_divergence /= len(pi_record)
+        kl_div.append(kl_divergence.item())
+        # print('KL divergence:', kl_divergence.item())
+
+    del stim, first_action, first_action_prime
+
+    return np.mean(nonmatch_perc), np.mean(nonmatch_perc_prime), np.mean(np.asarray(kl_div))
+
 if __name__ == '__main__':
 
     utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
@@ -94,6 +159,7 @@ if __name__ == '__main__':
     parser.add_argument("--lesion_idx_start", type=int, default=5, help="start of lesion index")
     parser.add_argument("--lesion_idx_end", type=int, default=None, help="end of lesion index. if None (default), end at n_neurons")
     parser.add_argument("--lesion_idx_step", type=int, default=5, help="step of lesion index")
+    parser.add_argument("--expt_type", type=str, default='lesion', help='lesion or rehydration')
     args = parser.parse_args()
     argsdict = args.__dict__
     print(argsdict)
@@ -164,6 +230,7 @@ if __name__ == '__main__':
         n_lesion = np.arange(start=lesion_idx_start, stop=n_neurons, step=lesion_idx_step)
 
     postlesion_perf_array = np.zeros((3, len(n_lesion), num_shuffle))
+    mean_kl_div_array = np.zeros((3, len(n_lesion), num_shuffle))
 
     random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_seq)
 
@@ -182,13 +249,17 @@ if __name__ == '__main__':
                 net.eval()
 
                 lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion]
-    
-                postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle] = lesion_experiment(env=env, net=net, optimizer=optimizer,
+                if argsdict['expt_type'] == 'lesion':
+                    postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle] = lesion_experiment(env=env, net=net, optimizer=optimizer,
                                                                            n_total_episodes=n_total_episodes,
                                                                            lesion_idx=lesion_index,
                                                                            title=f"{lesion_type}_{num_lesion}",
                                                                            save_dir=save_dir, save_net_and_data=save_net_and_data,
                                                                            backprop=backprop)
+                elif argsdict['expt_type'] == 'rehydration':
+                    _, postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle], mean_kl_div_array[i_lesion_type, i_num_lesion, i_shuffle] = rehydration_experiment(env=env, net=net,
+                                                                                                                      n_total_episodes=n_total_episodes,
+                                                                                                                      lesion_idx=lesion_index)
                 if verbose:
                     print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle]*100:.3f}% nonmatch")
                 del env, net, optimizer
@@ -207,12 +278,34 @@ if __name__ == '__main__':
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)-np.std(postlesion_perf_array[2, :, :], axis=-1),
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
-    ax1.hlines(y=0.5, linestyles='dashed', colors='gray')
+    ax1.hlines(y=0.5, linestyles='dashed', colors='gray')  # TODO: check mila cluster - did I fix this at some point?
     ax1.set_xlabel('Number of neurons lesioned')
     ax1.set_ylabel('Fraction Nonmatch')
     ax1.set_ylim(0,1)
     ax1.legend()
     #plt.show()
-    fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_lesion_results.png'))
+    fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_performance_results.png'))
 
-    np.savez_compressed(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_lesion_results.npz'), random_index_dict=random_index_dict, n_lesion=n_lesion, postlesion_perf=postlesion_perf_array)
+    if argsdict["expt_type"] == "rehydration":
+        fig, ax2 = plt.subplots()
+        fig.suptitle(f'{env_title}_{ckpt_name}')
+        ax2.plot(n_lesion, np.mean(mean_kl_div_array[0, :, :], axis=-1), color='gray', label='Random lesion')
+        ax2.fill_between(n_lesion,
+                         np.mean(mean_kl_div_array[0, :, :], axis=-1)-np.std(mean_kl_div_array[0, :, :], axis=-1),
+                         np.mean(mean_kl_div_array[0, :, :], axis=-1)+np.std(mean_kl_div_array[0, :, :], axis=-1), color='lightgray', alpha=0.2)
+        ax2.plot(n_lesion, np.mean(mean_kl_div_array[1, :, :], axis=-1), color='royalblue', label='Ramping cell lesion')
+        ax2.fill_between(n_lesion,
+                         np.mean(mean_kl_div_array[1, :, :], axis=-1)-np.std(mean_kl_div_array[1, :, :], axis=-1),
+                         np.mean(mean_kl_div_array[1, :, :], axis=-1)+np.std(mean_kl_div_array[1, :, :], axis=-1), color='lightsteelblue', alpha=0.2)
+        ax2.plot(n_lesion, np.mean(mean_kl_div_array[2, :, :], axis=-1), color='magenta', label='Time cell lesion')
+        ax2.fill_between(n_lesion,
+                         np.mean(mean_kl_div_array[2, :, :], axis=-1)-np.std(mean_kl_div_array[2, :, :], axis=-1),
+                         np.mean(mean_kl_div_array[2, :, :], axis=-1)+np.std(mean_kl_div_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
+        ax2.set_xlabel('Number of neurons lesioned')
+        ax2.set_ylabel('KL divergence between $\pi$ and $\pi_new$')
+        ax2.legend()
+        #plt.show()
+        fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_kl_div_results.png'))
+
+    np.savez_compressed(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_results.npz'),
+                        random_index_dict=random_index_dict, n_lesion=n_lesion, postlesion_perf=postlesion_perf_array, mean_kl_div=mean_kl_div_array)
