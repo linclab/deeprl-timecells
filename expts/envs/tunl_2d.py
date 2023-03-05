@@ -176,6 +176,43 @@ class Tunl(object):
 
         return self.observation, self.reward, self.done, {}
 
+    def calc_reward_without_stepping(self, action):
+        """
+        Calculate the hypothetical reward from taking this action, without actually changing the environment.
+        :param action
+        :return: reward
+        """
+        assert self.action_space.contains(action)
+        if action in [0, 1, 2, 3, 4]:  # movement
+            if not self.indelay:
+                reward = self.step_rwd  # lightly punish all step actions except during delay
+        else:  # poke
+            if np.sum(self.observation[self.current_loc]) > 255:  # currently at a signal location
+                if self.current_loc == self.initiation_loc:  # currently at initiation signal location
+                    reward = self.poke_rwd
+                elif self.current_loc == self.left_loc:  # currently at left touchscreen
+                    if self.sample == "undefined":  # enter delay
+                        reward = self.poke_rwd
+                    elif self.sample == "L": # poked incorrectly at match location
+                        reward = self.inc_rwd
+                    elif self.sample == "R":  # poked correctly at nonmatch location
+                        reward = self.rwd
+                elif self.current_loc == self.right_loc:  # currently at the right touchscreen
+                    if self.sample == "undefined":  # enter delay
+                        reward = self.poke_rwd
+                    elif self.sample == "R":  # poked incorrectly at match location
+                        reward = self.inc_rwd
+                    elif self.sample == "L":  # poked correctly at nonmatch location
+                        reward = self.rwd
+            else:
+                if not self.indelay:
+                    reward = self.step_rwd  # lightly punish unnecessary poke actions unless during delay
+        if self.indelay:  # delay period
+            if not (self.delay_t == 1 and self.indelay is True):  # unless just poked sample, in which case reward=5
+                reward = 0
+
+        return reward
+
 
 class Tunl_nomem(object):
     def __init__(self, len_delay, len_edge, rwd, step_rwd, poke_rwd, rng_seed=1234):

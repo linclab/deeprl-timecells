@@ -107,6 +107,23 @@ class TunlEnv(object):
                 self.done = False
         return self.observation, self.reward, self.done
 
+    def calc_reward_without_stepping(self, action):
+
+        assert self.action_space.contains(action)
+
+        if np.all(self.observation == array([[0, 0, 1, 1]])):  # choice phase
+            if (np.all(self.sample == array([[0, 0, 1, 0]])) and action == 2) or (
+                    np.all(self.sample == array([[0, 0, 0, 1]])) and action == 1):
+                reward = 1
+            elif (np.all(self.sample == array([[0, 0, 1, 0]])) and action == 1) or (
+                    np.all(self.sample == array([[0, 0, 0, 1]])) and action == 2):
+                reward = -1
+            else:
+                reward = 0
+        else:
+            reward = 0
+        return reward
+
     def reset(self):
         self.observation = array([[1, 1, 0, 0]])
         self.sample = "undefined"  # {array([0,0,1,0])=L, array([0,0,0,1])=R}
