@@ -433,13 +433,46 @@ def tuning_curve_dim_reduction(resp, mode, save_dir, title):
 
 
 def shuffle_activity(delay_resp):
-    #shuffle LSTM activity within each episode
+    #shuffle LSTM activity within each episode for all neurons
     shuffled_delay_resp = np.empty(np.shape(delay_resp))
     n_episodes = np.shape(delay_resp)[0]
     len_delay = np.shape(delay_resp)[1]
+    shift = np.random.randint(np.floor(len_delay*0.3), np.ceil(len_delay*0.7), size=n_episodes)
     for i_eps in range(n_episodes):
-        shift = np.random.randint(np.floor(len_delay*0.3), np.ceil(len_delay*0.7))
-        shuffled_delay_resp[i_eps,:,:] = np.roll(np.squeeze(delay_resp[i_eps,:,:]), shift=shift, axis=0)
+        shuffled_delay_resp[i_eps,:,:] = np.roll(np.squeeze(delay_resp[i_eps,:,:]), shift=shift[i_eps], axis=0)
+    return shuffled_delay_resp
+
+
+def shuffle_activity_single_neuron(delay_resp):
+    #shuffle LSTM activity within each episode for a single neuron
+    assert len(delay_resp.shape) == 2, "must only input resp for single neuron"
+    shuffled_delay_resp = np.empty(np.shape(delay_resp))
+    n_episodes = np.shape(delay_resp)[0]
+    len_delay = np.shape(delay_resp)[1]
+    shift = np.random.randint(np.floor(len_delay*0.3), np.ceil(len_delay*0.7), size=n_episodes)
+    for i_eps in range(n_episodes):
+        shuffled_delay_resp[i_eps,:] = np.roll(delay_resp[i_eps,:], shift=shift[i_eps])
+    return shuffled_delay_resp
+
+
+def shuffle_activity_single_neuron_varying_duration(delay_resp, stim_duration, return_nan=False):
+    """
+    :param delay_resp: n_episodes x len_delay. May contain 0 or NaN.
+    :param stim_duration: n_episodes. Each element is the length (eg. 15, 30)
+    :param return_nan: default=False, i.e. return shuffled response that contains 0
+    :return: shuffled_delay_resp: n_episodes x len_delay. default return 0 for empty elements.
+    """
+    #shuffle LSTM activity within each episode for a single neuron. Trials may have different lengths, stored in stim_duration
+
+    assert len(delay_resp.shape) == 2, "must only input resp for single neuron"
+    shuffled_delay_resp = np.zeros_like(delay_resp)
+    n_episodes = np.shape(delay_resp)[0]
+    for i_eps in range(n_episodes):
+        epi_resp = delay_resp[i_eps, :stim_duration[i_eps]]
+        shift = np.random.randint(np.floor(stim_duration[i_eps]*0.3, np.ceil(stim_duration[i_eps]*0.7)))
+        shuffled_delay_resp[i_eps, :stim_duration[i_eps]] = np.roll(epi_resp, shift=shift)
+    if return_nan:
+        shuffled_delay_resp[shuffled_delay_resp == 0] = np.nan
     return shuffled_delay_resp
 
 # ================= TO CHUCK =================================
