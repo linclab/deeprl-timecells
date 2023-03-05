@@ -133,7 +133,7 @@ for resp, label in zip([left_stim_resp, right_stim_resp], ['left', 'right']):
     plot_r_tuning_curves(odd_trial_resp, even_trial_resp, f"{label}_odd", f"{label}_even", save_dir=save_dir)
 
 
-# cell_nums_all, sorted_matrix_all, cell_nums_seq, sorted_matrix_seq, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_seq(
+# cell_nums_all, sorted_matrix_all, cell_nums_time, sorted_matrix_time, cell_nums_ramp, sorted_matrix_ramp = separate_ramp_and_time(
 #     delay_resp, norm=True)
 
 # tuning_curve_dim_reduction(left_stim_resp, mode='tsne', save_dir=save_dir, title=f'{seed}_{epi}_left')
@@ -141,137 +141,67 @@ for resp, label in zip([left_stim_resp, right_stim_resp], ['left', 'right']):
 # tuning_curve_dim_reduction(delay_resp, mode='tsne', save_dir=save_dir, title=f'{seed}_{epi}_all')
 # breakpoint()
 
-
-if load_time_ramp_results:
-
-    ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'), allow_pickle=True)
-    seq_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz'), allow_pickle=True)
-    trial_reliability_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results.npz'), allow_pickle=True)
-    temporal_info_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results.npz'), allow_pickle=True)
-
-    cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
-    cell_nums_ramp_l = ramp_ident_results['cell_nums_ramp_l']
-    cell_nums_ramp_r = ramp_ident_results['cell_nums_ramp_r']
-    cell_nums_seq = seq_ident_results['cell_nums_seq']
-    cell_nums_seq_l = seq_ident_results['cell_nums_seq_l']
-    cell_nums_seq_r = seq_ident_results['cell_nums_seq_r']
-
-else: # Run time cell and ramping cell identification script
-    # Identifying ramping cells
-    p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
-    ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
-    cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
-    p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
-    ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
-    cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
-    ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
-    cell_nums_ramp = np.where(ramp_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'),
-                        p_result_l=p_result_l, slope_result_l=slope_result_l, intercept_result_l=intercept_result_l, R_result_l=R_result_l,
-                        p_result_r=p_result_r,slope_result_r=slope_result_r, intercept_result_r=intercept_result_r, R_result_r=R_result_r,
-                        ramp_cell_bool_l=ramp_cell_bool_l,cell_nums_ramp_l=cell_nums_ramp_l,
-                        ramp_cell_bool_r=ramp_cell_bool_r,cell_nums_ramp_r=cell_nums_ramp_r,
-                        ramp_cell_bool=ramp_cell_bool,cell_nums_ramp=cell_nums_ramp)
-    print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
-
-    # Identify time cells
-    RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
-    seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
-    cell_nums_seq_l = np.where(seq_cell_bool_l)[0]  # takes 30 minutes for 256 neurons for 1000 shuffs
-    RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
-    seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
-    cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
-    seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
-    cell_nums_seq = np.where(seq_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz'),
-                        RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
-                        RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
-                        seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
-    print(f"{len(cell_nums_seq)}/{n_neurons} sequence cells")
-
-    trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_vs_shuffle_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
-    trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
-    trial_reliable_cell_num_l = np.where(trial_reliable_cell_bool_l)[0]
-    trial_reliability_score_result_r, trial_reliability_score_threshold_result_r = trial_reliability_vs_shuffle_score(right_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
-    trial_reliable_cell_bool_r = trial_reliability_score_result_r >= trial_reliability_score_threshold_result_r
-    trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
-    trial_reliable_cell_bool = np.logical_or(trial_reliable_cell_bool_l, trial_reliable_cell_bool_r)
-    trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results.npz'),
-                        trial_reliability_score_result_l=trial_reliability_score_result_l, trial_reliability_score_threshold_result_l=trial_reliability_score_threshold_result_l,
-                        trial_reliable_cell_bool_l=trial_reliable_cell_bool_l, trial_reliable_cell_num_l=trial_reliable_cell_num_l,
-                        trial_reliability_score_result_r=trial_reliability_score_result_r, trial_reliability_score_threshold_result_r=trial_reliability_score_threshold_result_r,
-                        trial_reliable_cell_bool_r=trial_reliable_cell_bool_r,trial_reliable_cell_num_r=trial_reliable_cell_num_r,
-                        trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
-    print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
-
-    I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)  # takes 8 hours to do 1000 shuffles for 256 neurons
-    high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
-    high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
-    I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
-    high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
-    high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
-    high_temporal_info_cell_bool = np.logical_or(high_temporal_info_cell_bool_l, high_temporal_info_cell_bool_r)
-    high_temporal_info_cell_nums = np.where(high_temporal_info_cell_bool)[0]
-    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results.npz'),
-                        I_result_l=I_result_l, I_threshold_result_l=I_threshold_result_l,
-                        high_temporal_info_cell_bool_l=high_temporal_info_cell_bool_l,high_temporal_info_cell_nums_l=high_temporal_info_cell_nums_l,
-                        I_result_r=I_result_r, I_threshold_result_r=I_threshold_result_r,
-                        high_temporal_info_cell_bool_r=high_temporal_info_cell_bool_r,high_temporal_info_cell_nums_r=high_temporal_info_cell_nums_r,
-                        high_temporal_info_cell_bool=high_temporal_info_cell_bool, high_temporal_info_cell_nums=high_temporal_info_cell_nums)
-    print(f"{len(high_temporal_info_cell_nums)}/{n_neurons} high temporal-information cells")
-
-plot_field_width_vs_peak_time(left_stim_resp[:, :, cell_nums_seq_l], save_dir=save_dir, title='left_time_cells')
-plot_field_width_vs_peak_time(right_stim_resp[:, :, cell_nums_seq_r], save_dir=save_dir, title='Right_time_cells')
+ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'), allow_pickle=True)
+time_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_time_cell_results.npz'), allow_pickle=True)
+cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
+cell_nums_ramp_l = ramp_ident_results['cell_nums_ramp_l']
+cell_nums_ramp_r = ramp_ident_results['cell_nums_ramp_r']
+cell_nums_time = time_ident_results['time_cell_nums']
+cell_nums_time_l = time_ident_results['time_cell_nums_l']
+cell_nums_time_r = time_ident_results['time_cell_nums_l']
 
 
-cell_nums_nontime = np.delete(np.arange(n_neurons), np.intersect1d(cell_nums_seq, cell_nums_ramp))
+plot_field_width_vs_peak_time(left_stim_resp[:, :, cell_nums_time_l], save_dir=save_dir, title='left_time_cells')
+plot_field_width_vs_peak_time(right_stim_resp[:, :, cell_nums_time_r], save_dir=save_dir, title='Right_time_cells')
+
+
+cell_nums_nontime = np.delete(np.arange(n_neurons), np.intersect1d(cell_nums_time, cell_nums_ramp))
 # Here, the cell_nums have not been re-arranged according to peak latency yet
 delay_resp_ramp = delay_resp[:, :, cell_nums_ramp]
-delay_resp_seq = delay_resp[:, :, cell_nums_seq]
+delay_resp_time = delay_resp[:, :, cell_nums_time]
 delay_resp_nontime = delay_resp[:, :, cell_nums_nontime]
 left_stim_resp_ramp = delay_resp_ramp[np.all(stim == [1, 1], axis=1)]
 right_stim_resp_ramp = delay_resp_ramp[np.any(stim != [1, 1], axis=1)]
-left_stim_resp_seq = delay_resp_seq[np.all(stim == [1, 1], axis=1)]
-right_stim_resp_seq = delay_resp_seq[np.any(stim != [1, 1], axis=1)]
+left_stim_resp_time = delay_resp_time[np.all(stim == [1, 1], axis=1)]
+right_stim_resp_time = delay_resp_time[np.any(stim != [1, 1], axis=1)]
 left_stim_resp_nontime = delay_resp_nontime[np.all(stim == [1, 1], axis=1)]
 right_stim_resp_nontime = delay_resp_nontime[np.any(stim != [1, 1], axis=1)]
 n_ramp_neurons = len(cell_nums_ramp)
-n_seq_neurons = len(cell_nums_seq)
+n_time_neurons = len(cell_nums_time)
 n_nontime_neurons = len(cell_nums_nontime)
 
 # Re-arrange cell_nums according to peak latency
-cell_nums_all, cell_nums_seq, cell_nums_ramp, cell_nums_nontime, \
-sorted_matrix_all, sorted_matrix_seq, sorted_matrix_ramp, sorted_matrix_nontime = \
-    sort_response_by_peak_latency(delay_resp, cell_nums_ramp, cell_nums_seq, norm=True)
+cell_nums_all, cell_nums_time, cell_nums_ramp, cell_nums_nontime, \
+sorted_matrix_all, sorted_matrix_time, sorted_matrix_ramp, sorted_matrix_nontime = \
+    sort_response_by_peak_latency(delay_resp, cell_nums_ramp, cell_nums_time, norm=True)
 
 # print('Make a venn diagram of neuron counts...')
-make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, save_dir=save_dir, label=f'{seed}_{epi}', save=True)
+make_venn_diagram(cell_nums_ramp, cell_nums_time, n_neurons, save_dir=save_dir, label=f'{seed}_{epi}', save=True)
 
 print('Sort avg resp analysis...')
-plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=env_title+' Sequence cells', remove_nan=True, save_dir=save_dir, save=True)
+plot_sorted_averaged_resp(cell_nums_time, sorted_matrix_time, title=env_title+' Time cells', remove_nan=True, save_dir=save_dir, save=True)
 plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=env_title+' Ramping cells', remove_nan=True, save_dir=save_dir, save=True)
 plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=env_title+' All cells', remove_nan=True, save_dir=save_dir, save=True)
 
 print('sort in same order analysis...')
 plot_sorted_in_same_order(left_stim_resp_ramp, right_stim_resp_ramp, 'Left', 'Right', big_title=env_title+' Ramping cells', len_delay=len_delay, n_neurons=n_ramp_neurons, save_dir=save_dir, save=True)
-plot_sorted_in_same_order(left_stim_resp_seq, right_stim_resp_seq, 'Left', 'Right', big_title=env_title+' Sequence cells', len_delay=len_delay, n_neurons=n_seq_neurons, save_dir=save_dir, save=True)
+plot_sorted_in_same_order(left_stim_resp_time, right_stim_resp_time, 'Left', 'Right', big_title=env_title+' Time cells', len_delay=len_delay, n_neurons=n_time_neurons, save_dir=save_dir, save=True)
 plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_title=env_title+' All cells', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=True)
 plot_sorted_in_same_order(correct_resp, incorrect_resp, 'Correct', 'Incorrect', big_title=env_title+' All cells ic', len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=True)
 
 print('decode stim analysis...')
 plot_decode_sample_from_single_time(delay_resp, binary_stim, env_title+' All Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=True)
 plot_decode_sample_from_single_time(delay_resp_ramp, binary_stim, env_title+' Ramping Cells', n_fold=5, max_iter=100, save_dir=save_dir, save=True)
-plot_decode_sample_from_single_time(delay_resp_seq, binary_stim, env_title+' Sequence Cells', n_fold=7, max_iter=100, save_dir=save_dir, save=True)
+plot_decode_sample_from_single_time(delay_resp_time, binary_stim, env_title+' Time Cells', n_fold=7, max_iter=100, save_dir=save_dir, save=True)
 
 print('decode time analysis...')
 time_decode_lin_reg(delay_resp, len_delay, n_neurons, 1000, title=env_title+' All cells', save_dir=save_dir, save=True)
 time_decode_lin_reg(delay_resp_ramp, len_delay, n_ramp_neurons, 1000, title=env_title+' Ramping cells', save_dir=save_dir, save=True)
-time_decode_lin_reg(delay_resp_seq, len_delay, n_seq_neurons, 1000, title=env_title+' Sequence cells', save_dir=save_dir, save=True)
+time_decode_lin_reg(delay_resp_time, len_delay, n_time_neurons, 1000, title=env_title+' Time cells', save_dir=save_dir, save=True)
 
 print('Single-cell visualization... SAVE AUTOMATICALLY')
 single_cell_visualization(delay_resp, binary_stim, cell_nums_ramp, type='ramp', save_dir=save_dir)
-single_cell_visualization(delay_resp, binary_stim, cell_nums_seq, type='seq', save_dir=save_dir)
+single_cell_visualization(delay_resp, binary_stim, cell_nums_time, type='time', save_dir=save_dir)
 
 
 # ==========================================
@@ -300,15 +230,15 @@ plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutu
 
 decode_sample_from_trajectory(delay_loc, stim, save_dir=save_dir, save=True)
 
-print("Mutual info for ramping cells and sequence cells")
+print("Mutual info for ramping cells and time cells")
 
 
-ratemap_seq, spatial_occupancy_seq = construct_ratemap(delay_resp_seq, delay_loc)
-mutual_info_seq = calculate_mutual_information(ratemap_seq, spatial_occupancy_seq)
-shuffled_mutual_info_seq = calculate_shuffled_mutual_information(delay_resp_seq, delay_loc, n_total_episodes)
-plot_mutual_info_distribution(mutual_info_seq, title='seq_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_seq, save_dir=save_dir, save=True)
-print("seq: ", np.nanmean(mutual_info_seq))
-print("shuffled seq: ", np.nanmean(shuffled_mutual_info_seq))
+ratemap_time, spatial_occupancy_time = construct_ratemap(delay_resp_time, delay_loc)
+mutual_info_time = calculate_mutual_information(ratemap_time, spatial_occupancy_time)
+shuffled_mutual_info_time = calculate_shuffled_mutual_information(delay_resp_time, delay_loc, n_total_episodes)
+plot_mutual_info_distribution(mutual_info_time, title='time_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info_time, save_dir=save_dir, save=True)
+print("time: ", np.nanmean(mutual_info_time))
+print("shuffled time: ", np.nanmean(shuffled_mutual_info_time))
 
 ratemap_ramp, spatial_occupancy_ramp = construct_ratemap(delay_resp_ramp, delay_loc)
 mutual_info_ramp = calculate_mutual_information(ratemap_ramp, spatial_occupancy_ramp)

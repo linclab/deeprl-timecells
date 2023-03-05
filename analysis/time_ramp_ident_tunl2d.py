@@ -14,8 +14,6 @@ parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_1e-05',help="
 parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/tunl2d', help="main directory in which agent-specific directory will be created")
 parser.add_argument("--seed", type=int, help="seed to analyse")
 parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
-parser.add_argument("--behaviour_only", type=bool, default=False, help="whether the data only includes performance data")
-parser.add_argument("--plot_performance", type=bool, default=True,  help="if behaviour only, whether to plot the performance plot")
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
 parser.add_argument("--n_shuffle", type=int, default=1000, help="number of shuffles to acquire null distribution")
 parser.add_argument("--percentile", type=float, default=95.0, help="P threshold to determind significance")
@@ -48,33 +46,6 @@ if len(hparams) > 5:  # weight_decay or dropout
 env_title = 'Mnemonic_TUNL' if env_type == 'mem' else 'Non-mnemonic_TUNL'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
-behaviour_only = True if argsdict['behaviour_only'] == True or argsdict['behaviour_only'] == 'True' else False  # plot performance data
-plot_performance = True if argsdict['plot_performance'] == True or argsdict['plot_performance'] == 'True' else False
-if behaviour_only:
-    stim = data['stim']  # n_total_episodes x 2
-    choice = data['choice']  # n_total_episodes x 2
-    epi_nav_reward = data['epi_nav_reward']  # n_total_episodes
-    ideal_nav_reward = data['ideal_nav_rwds']  # n_total_episodes
-    n_total_episodes = np.shape(stim)[0]
-    nonmatch = np.any(stim != choice, axis=0)
-    avg_nav_rewards = bin_rewards(epi_nav_reward, n_total_episodes//10)
-    binned_nonmatch_perc = bin_rewards(nonmatch, n_total_episodes//10)
-    if plot_performance:
-        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex='all', figsize=(6, 6))
-        fig.suptitle(f'{env_title} TUNL 2D')
-        ax1.plot(np.arange(n_total_episodes), avg_nav_rewards, label=net_title)
-        ax1.plot(np.arange(n_total_episodes), ideal_nav_reward, label="Ideal navigation reward")
-        ax1.set_xlabel('Episode')
-        ax1.set_ylabel('Navigation reward')
-        ax1.legend()
-
-        ax2.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
-        ax2.set_xlabel('Episode')
-        ax2.set_ylabel('Fraction Nonmatch')
-        ax2.set_ylim(0,1)
-        ax2.legend()
-        fig.savefig(save_dir + f'/performance.svg')
-    sys.exit()
 
 stim = data['stim']  # n_total_episodes x 2
 choice = data['choice']  # n_total_episodes x 2
@@ -158,7 +129,7 @@ np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile
                     RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
                     RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
                     seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
-print(f"{len(cell_nums_seq)}/{n_neurons} sequence cells")
+print(f"{len(cell_nums_seq)}/{n_neurons} significant RB cells")
 
 trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_vs_shuffle_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
 trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
@@ -176,20 +147,28 @@ np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile
                     trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
 print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
 
-I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)
-high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
-high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
-I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
-high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
-high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
-high_temporal_info_cell_bool = np.logical_or(high_temporal_info_cell_bool_l, high_temporal_info_cell_bool_r)
-high_temporal_info_cell_nums = np.where(high_temporal_info_cell_bool)[0]
-np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results.npz'),
-                    I_result_l=I_result_l, I_threshold_result_l=I_threshold_result_l,
-                    high_temporal_info_cell_bool_l=high_temporal_info_cell_bool_l,high_temporal_info_cell_nums_l=high_temporal_info_cell_nums_l,
-                    I_result_r=I_result_r, I_threshold_result_r=I_threshold_result_r,
-                    high_temporal_info_cell_bool_r=high_temporal_info_cell_bool_r,high_temporal_info_cell_nums_r=high_temporal_info_cell_nums_r,
-                    high_temporal_info_cell_bool=high_temporal_info_cell_bool, high_temporal_info_cell_nums=high_temporal_info_cell_nums)
-print(f"{len(high_temporal_info_cell_nums)}/{n_neurons} high temporal-information cells")
+# I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, n_shuff=n_shuffle, percentile=percentile)
+# high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
+# high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
+# I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, n_shuff=n_shuffle, percentile=percentile)
+# high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
+# high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
+# high_temporal_info_cell_bool = np.logical_or(high_temporal_info_cell_bool_l, high_temporal_info_cell_bool_r)
+# high_temporal_info_cell_nums = np.where(high_temporal_info_cell_bool)[0]
+# np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_temporal_info_results.npz'),
+#                     I_result_l=I_result_l, I_threshold_result_l=I_threshold_result_l,
+#                     high_temporal_info_cell_bool_l=high_temporal_info_cell_bool_l,high_temporal_info_cell_nums_l=high_temporal_info_cell_nums_l,
+#                     I_result_r=I_result_r, I_threshold_result_r=I_threshold_result_r,
+#                     high_temporal_info_cell_bool_r=high_temporal_info_cell_bool_r,high_temporal_info_cell_nums_r=high_temporal_info_cell_nums_r,
+#                     high_temporal_info_cell_bool=high_temporal_info_cell_bool, high_temporal_info_cell_nums=high_temporal_info_cell_nums)
+# print(f"{len(high_temporal_info_cell_nums)}/{n_neurons} high temporal-information cells")
+
+# Identify time cells: combination of RB and trial reliability
+time_cell_nums_l = np.intersect1d(cell_nums_seq_l, trial_reliable_cell_num_l)
+time_cell_nums_r = np.intersect1d(cell_nums_seq_r, trial_reliable_cell_num_r)
+time_cell_nums = np.intersect1d(time_cell_nums_l, time_cell_nums_r)
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_time_cell_results.npz'),
+                    time_cell_nums_l=time_cell_nums_l, time_cell_nums_r=time_cell_nums_r, time_cell_nums=time_cell_nums)
+print(f"{len(time_cell_nums)}/{n_neurons} time cells")
 
 print('Analysis finished')
