@@ -203,12 +203,12 @@ def plot_decode_sample_from_single_time(total_resp, total_stim, title, save_dir,
     accuracies, accuracies_shuff = decode_sample_from_single_time(total_resp, total_stim, n_fold=n_fold)
     len_delay = np.shape(total_resp)[1]
     fig, ax = plt.subplots()
-    ax.plot(np.arange(len_delay), np.mean(accuracies, axis=0), label='unshuffled', color=linclab_plot_utils.LINCLAB_COLS['green']) # TODO: green/purple for mem/nomem
+    ax.plot(np.arange(len_delay), np.mean(accuracies, axis=0), label='unshuffled', color=utils_linclab_plot.LINCLAB_COLS['green']) # TODO: green/purple for mem/nomem
     ax.fill_between(np.arange(len_delay), np.mean(accuracies, axis=0) - np.std(accuracies, axis=0), np.mean(accuracies, axis=0) + np.std(accuracies, axis=0), facecolor=
-    linclab_plot_utils.LINCLAB_COLS['green'], alpha=0.5)
-    ax.plot(np.arange(len_delay), np.mean(accuracies_shuff, axis=0), label='unit-shuffled', color=linclab_plot_utils.LINCLAB_COLS['grey'])
+    utils_linclab_plot.LINCLAB_COLS['green'], alpha=0.5)
+    ax.plot(np.arange(len_delay), np.mean(accuracies_shuff, axis=0), label='unit-shuffled', color=utils_linclab_plot.LINCLAB_COLS['grey'])
     ax.fill_between(np.arange(len_delay), np.mean(accuracies_shuff, axis=0) - np.std(accuracies_shuff, axis=0), np.mean(accuracies_shuff, axis=0) + np.std(accuracies_shuff, axis=0), facecolor=
-    linclab_plot_utils.LINCLAB_COLS['grey'], alpha=0.5)
+    utils_linclab_plot.LINCLAB_COLS['grey'], alpha=0.5)
     ax.set(xlabel='Time since delay onset', ylabel='Stimulus decoding accuracy',
            title=title)
     ax.set_xticks(np.arange(len_delay, step=10))
@@ -262,7 +262,7 @@ def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_
     ax.set_xlabel('Time since delay onset')
     ax.set_ylabel('Decoded time')
     ax.plot(np.arange(len_delay), np.arange(len_delay),color='k')
-    ax.plot(np.arange(len_delay), mean_pred, color=linclab_plot_utils.LINCLAB_COLS['blue'])
+    ax.plot(np.arange(len_delay), mean_pred, color=utils_linclab_plot.LINCLAB_COLS['blue'])
     ax.fill_between(np.arange(len_delay), mean_pred-std_pred,  mean_pred+std_pred, color='skyblue',alpha=0.4)
     ax.set_xticks([0, len_delay])
     ax.set_xticklabels(['0', str(len_delay)])
@@ -311,8 +311,8 @@ def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir
         ax2.set_yticklabels(['1', '100'])
         ax2.set_ylabel(f'Right trials')
 
-        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Left', color=linclab_plot_utils.LINCLAB_COLS['yellow'])
-        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Right', color=linclab_plot_utils.LINCLAB_COLS['brown'])
+        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xl, axis=0), axis=0), label='Left', color=utils_linclab_plot.LINCLAB_COLS['yellow'])
+        ax3.plot(np.arange(len_delay), stats.zscore(np.mean(xr, axis=0), axis=0), label='Right', color=utils_linclab_plot.LINCLAB_COLS['brown'])
         ax3.set_xlabel('Time since delay period onset')
         ax3.legend(loc='upper right', fontsize='medium')
         ax3.set_ylabel('Avg activation')
@@ -498,7 +498,7 @@ def plot_dim_vs_delay_t(delay_resp, title, save_dir, n_trials=5, var_explained=0
             cumsum = pca_model.explained_variance_ratio_.cumsum()
             dim[i_trial, t-1] = next(x[0] for x in enumerate(cumsum) if x[1] > var_explained)
     fig, ax0 = plt.subplots()
-    ax0.plot(np.arange(len_delay-1), np.mean(dim, axis=0), color=linclab_plot_utils.LINCLAB_COLS['blue'])
+    ax0.plot(np.arange(len_delay-1), np.mean(dim, axis=0), color=utils_linclab_plot.LINCLAB_COLS['blue'])
     ax0.fill_between(np.arange(len_delay-1), np.mean(dim, axis=0) - np.std(dim, axis=0), np.mean(dim, axis=0) + np.std(dim, axis=0), color='skyblue')
     ax0.set_xlabel('Time since delay onset')
     ax0.set_ylabel('Cumulative Dimensionality')
