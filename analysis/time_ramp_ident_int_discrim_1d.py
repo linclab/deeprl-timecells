@@ -1,0 +1,114 @@
+from utils_time_ramp import *
+from utils_analysis import *
+import sys
+import argparse
+
+
+parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/timing',help="main data directory")
+parser.add_argument("--data_dir",type=str,default='lstm_256_5e-06',help="directory in which .npz is saved")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/timing', help="main directory in which agent-specific directory will be created")
+parser.add_argument("--seed", type=int, help="seed to analyse")
+parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
+parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
+parser.add_argument("--n_shuffle", type=int, default=1000, help="number of shuffles to acquire null distribution")
+parser.add_argument("--percentile", type=float, default=95.0, help="P threshold to determind significance")
+args = parser.parse_args()
+argsdict = args.__dict__
+print(argsdict)
+main_dir = argsdict['main_dir']
+data_dir = argsdict['data_dir']
+save_dir = os.path.join(argsdict['main_save_dir'], data_dir)
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+seed = argsdict['seed']
+epi = argsdict['episode']
+n_shuffle = argsdict['n_shuffle']
+percentile = argsdict['percentile']
+data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
+
+hparams = data_dir.split('_')
+hidden_type = hparams[0]
+n_neurons = int(hparams[1])
+lr = float(hparams[2])
+if len(hparams) > 3:  # weight_decay or dropout
+    if 'wd' in hparams[3]:
+        wd = float(hparams[3][2:])
+    if 'p' in hparams[3]:
+        p = float(hparams[3][1:])
+        dropout_type = hparams[4]
+env_title = 'Interval_Discrimination_1D'
+net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
+
+action_hist = data["action_hist"]
+correct_trials = data["correct_trial"]
+stim = data["stim"]
+stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+n_total_episodes = np.shape(stim)[0]
+
+normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
+if normalize:
+    reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
+
+    reshape_resp = np.reshape(stim2_resp, (n_total_episodes*40, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
+
+    reshape_resp = np.reshape(delay_resp, (n_total_episodes*20, n_neurons))
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
+
+time_cell_id = []
+ramp_cell_id = []
+# Define period that we want to analyse
+for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,0],stim[:,1], None], ['stimulus_1', 'stimulus_2', 'delay']):
+    print(f"analysing data from {label}")
+    # Identifying ramping cells (Toso 2021)
+    if label=='delay':
+        p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+    else:
+        p_result, slope_result, intercept_result, R_result = lin_reg_ramping_varying_duration(resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+    ramp_cell_bool = np.logical_and(p_result<=0.05, np.abs(R_result)>=0.9)
+    cell_nums_ramp = np.where(ramp_cell_bool)[0]
+    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_ramp_ident_results.npz'),
+                        p_result=p_result, slope_result=slope_result, intercept_result=intercept_result, R_result=R_result,
+                        ramp_cell_bool=ramp_cell_bool, cell_nums_ramp=cell_nums_ramp)
+    print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
+    ramp_cell_id.append(cell_nums_ramp)
+
+    # # Identifying sequence cells
+    if label == 'delay':
+        RB_result, z_RB_threshold_result = ridge_to_background(resp, ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+    else:
+        RB_result, z_RB_threshold_result = ridge_to_background_varying_duration(resp, stim,  ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+    seq_cell_bool = RB_result > z_RB_threshold_result
+    cell_nums_seq = np.where(seq_cell_bool)[0]
+    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_seq_ident_results.npz'),
+                        RB_result=RB_result, z_RB_threshold_result=z_RB_threshold_result,seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq,)
+    print(f"{len(cell_nums_seq)}/{n_neurons} significant RB cells")
+
+    if label=='delay':
+        trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_vs_shuffle_score(resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+    else:
+        trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_vs_shuffle_score_varying_duration(resp, stim, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+    trial_reliable_cell_bool = trial_reliability_score_result >= trial_reliability_score_threshold_result
+    trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
+    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_trial_reliability_results.npz'),
+                        trial_reliability_score_result=trial_reliability_score_result, trial_reliability_score_threshold_result=trial_reliability_score_threshold_result,
+                        trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
+    print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
+
+    # Identify time cells: combination of RB and trial reliability
+    time_cell_nums = np.intersect1d(cell_nums_seq, trial_reliable_cell_num)
+    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_time_cell_results.npz'),time_cell_nums=time_cell_nums)
+    print(f"{len(time_cell_nums)}/{n_neurons} time cells")
+
+    time_cell_id.append(time_cell_nums)
+
+print(f"Time cell ID: \nStim1:{time_cell_id[0]}\nStim2:{time_cell_id[1]}\nDelay:{time_cell_id[2]}")
+print(f"Ramping cell ID: \nStim1:{ramp_cell_id[0]}\nStim2:{ramp_cell_id[1]}\nDelay:{ramp_cell_id[2]}")
+print('Analysis finished')
