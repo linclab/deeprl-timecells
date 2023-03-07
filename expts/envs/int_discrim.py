@@ -95,6 +95,27 @@ class IntervalDiscrimination(object):
 
         return self.observation, self.reward, self.done
 
+    def calc_reward_without_stepping(self, action=None):
+        """
+        :param action
+        :return: observation, reward, done
+        """
+
+        if self.task_stage == "init":               # the agent needs to take an action
+            if action == 1:
+                reward = 1
+            else:
+                reward = -1
+        elif self.task_stage == "choice_init":                      # the agent needs to take an action
+            if action == self.groundtruth:
+                reward = self.rwd
+            else:
+                reward = self.inc_rwd
+        else:
+            reward = 0
+
+        return reward
+
 
     def select_second_stim(self):
         stimulus_set_copy = copy.deepcopy(self.stimulus_set)
