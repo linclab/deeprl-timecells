@@ -112,7 +112,8 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
             pi_record.append(pol)
             new_activity = net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
             new_activity[lesion_idx] = 0  # the new, manipulated hx
-            new_pol = F.softmax(net.output[0](new_activity), dim=1)
+            lin_out = F.relu(net.hidden[net.hidden_types.index("linear")](new_activity))
+            new_pol = F.softmax(net.output[0](lin_out), dim=1)
             pi_prime_record.append(new_pol)
 
             # select action from old and new policy
@@ -140,7 +141,7 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
         kl_divergence /= len(pi_record)
         kl_div.append(kl_divergence.item())
         # print('KL divergence:', kl_divergence.item())
-
+        del reward_record, reward_prime_record
     del stim, first_action, first_action_prime
 
     return np.mean(nonmatch_perc), np.mean(nonmatch_perc_prime), np.mean(np.asarray(kl_div))

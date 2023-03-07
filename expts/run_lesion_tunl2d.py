@@ -118,8 +118,6 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
         action_record = []
         action_prime_record = []
 
-        reward_record = []
-        reward_prime_record = []
         nav_reward_prime = 0
         while not done:
             obs = torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
@@ -128,7 +126,8 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
             pi_record.append(pol)
             new_activity = net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
             new_activity[lesion_idx] = 0  # the new, manipulated hx
-            new_pol = F.softmax(net.output[0](new_activity), dim=1)
+            lin_out = F.relu(net.hidden[net.hidden_types.index("linear")](new_activity))
+            new_pol = F.softmax(net.output[0](lin_out), dim=1)
             pi_prime_record.append(new_pol)
 
             # select action from old and new policy
@@ -139,10 +138,8 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
 
             # proceed with trial with old policy
             new_obs, reward, done = env.step(action)
-            reward_record.append(reward)
             # calculate hypothetical reward if the new action from rehydrated network was taken
             reward_prime = env.calc_reward_without_stepping(new_action)
-            reward_prime_record.append(reward_prime)
             if reward_prime == env.step_rwd or reward_prime == env.poke_rwd or reward_prime == 0:  # navigation reward
                 nav_reward_prime += reward_prime
 
