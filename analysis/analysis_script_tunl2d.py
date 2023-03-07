@@ -19,7 +19,6 @@ parser.add_argument("--plot_performance", type=bool, default=True,  help="if beh
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
 parser.add_argument("--n_shuffle", type=int, default=1000, help="number of shuffles to acquire null distribution")
 parser.add_argument("--percentile", type=float, default=95.0, help="P threshold to determind significance")
-parser.add_argument("--load_time_ramp_results", type=bool, default=True, help="if true, make sure to have results from time_ramp_ident in save_dir")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -32,7 +31,6 @@ seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']
 percentile = argsdict['percentile']
-load_time_ramp_results = True if argsdict['load_time_ramp_results'] == True or argsdict['load_time_ramp_results'] == 'True' else False
 data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')
