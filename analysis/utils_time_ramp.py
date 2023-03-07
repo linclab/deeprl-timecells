@@ -511,6 +511,44 @@ def plot_field_width_vs_peak_time(resp, save_dir, title):
     plt.savefig(os.path.join(save_dir, f"{title}p_eak_time_vs_field_width.svg"))
 
 
+def identify_stimulus_selective_neurons(resp, stim_labels, alpha=0.01):
+    """
+    Identify stimulus-selective neurons based on their response to different stimuli using the method described
+    in Toso et al. (2021). Returns a boolean array indicating which neurons are selective.
+
+    To use this function, you would pass in an array resp of shape (n_neurons, n_trials) containing the neural response
+    to different stimuli, and an array stim_labels of length n_trials containing labels for each stimulus. The function
+    returns a boolean array is_selective indicating which neurons are selective based on a significance level alpha
+    (default 0.01) for the ANOVA test. Stimulus-selective neurons are those for which the null hypothesis of equal mean
+    responses across all stimuli is rejected.
+
+    Parameters:
+        resp: (n_total_trials x len_delay x n_neurons)
+        stim_labels: (n_total_trials,)
+        alpha (float, optional): Significance level for statistical test. Default is 0.01.
+
+    Returns:
+    is_selective (ndarray): Boolean array of length n_neurons indicating which neurons are selective.
+    """
+
+    # Get unique stimulus labels
+    unique_labels = np.unique(stim_labels)  # 0, 1
+
+    # Compute mean response to each stimulus for each neuron  # <-- tuning curves for L vs R
+    mean_resp = np.zeros((resp.shape[0], resp.shape[1], len(unique_labels)))  # n_neurons x len_delay x 2
+    for i, label in enumerate(unique_labels):
+        mean_resp[:, :, i] = calculate_tuning_curves(resp[stim_labels==label])
+
+    # Compute ANOVA for each neuron
+    p_vals = np.zeros((resp.shape[0],))  # n_neurons
+    for i in range(resp.shape[0]):  # for each neuron in n_neurons
+        _, p_vals[i] = stats.f_oneway(*[resp[i, :, stim_labels == label] for label in unique_labels])
+
+    # Identify selective neurons
+    is_selective = (p_vals < alpha)
+
+    return is_selective
+
 #=================== TO CHUCK? =============================
 def skaggs_temporal_information(resp, n_shuff=1000, percentile=95):
     """
