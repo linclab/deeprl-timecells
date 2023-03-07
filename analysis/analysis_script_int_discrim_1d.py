@@ -1,34 +1,52 @@
 from utils_int_discrim import *
-from analysis_utils import single_cell_visualization, time_decode, time_decode_lin_reg, make_venn_diagram
-from analysis.linclab_utils import plot_utils
+from utils_analysis import time_decode_lin_reg, make_venn_diagram, plot_sorted_averaged_resp
+from analysis import utils_linclab_plot
 import numpy as np
 import os
-import sklearn
 import sys
+import argparse
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 
-plot_utils.linclab_plt_defaults()
-plot_utils.set_font(font='Helvetica')
-
-main_dir = '/Users/dongyanlin/Desktop/TUNL_publication/Sci_Reports/data/timing/trained'
-data_dir = 'lstm_128_1e-05'
-save_dir = os.path.join(main_dir.replace('data', 'figure'), data_dir)
+parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/timing',help="main data directory")
+parser.add_argument("--data_dir",type=str,default='lstm_128_1e-05',help="directory in which .npz is saved")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/timing', help="main directory in which agent-specific directory will be created")
+parser.add_argument("--seed", type=int, help="seed to analyse")
+parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
+parser.add_argument("--behaviour_only", type=bool, default=False, help="whether the data only includes performance data")
+parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
+parser.add_argument("--n_shuffle", type=int, default=100, help="number of shuffles to acquire null distribution")
+parser.add_argument("--percentile", type=float, default=99.9, help="P threshold to determind significance")
+parser.add_argument("--load_time_ramp_results", type=bool, default=True, help="if true, make sure to have results from time_ramp_ident in save_dir")
+args = parser.parse_args()
+argsdict = args.__dict__
+print(argsdict)
+main_dir = argsdict['main_dir']
+data_dir = argsdict['data_dir']
+save_dir = os.path.join(argsdict['main_save_dir'], data_dir)
 if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
-data = np.load(os.path.join(main_dir, data_dir, data_dir+'_seed_1_epi149999.pt_data.npz'), allow_pickle=True)  # data.npz file
+    os.makedirs(save_dir)
+seed = argsdict['seed']
+epi = argsdict['episode']
+n_shuffle = argsdict['n_shuffle']
+percentile = argsdict['percentile']
+data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')
 hidden_type = hparams[0]
 n_neurons = int(hparams[1])
 lr = float(hparams[2])
-env_title = 'Interval_Discrimination'
+if len(hparams) > 3:  # weight_decay or dropout
+    if 'wd' in hparams[3]:
+        wd = float(hparams[3][2:])
+    if 'p' in hparams[3]:
+        p = float(hparams[3][1:])
+        dropout_type = hparams[4]
+env_title = 'Interval_Discrimination_1D'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
+behaviour_only = True if argsdict['behaviour_only'] == True or argsdict['behaviour_only'] == 'True' else False  # plot performance data
 
-behavioral_analysis = False
-lesion_experiment = False
-
-# ------------------------------ Behavioral analysis ----------------------------------
-behaviour_only = False  # plot performance data
 if behaviour_only:
     action_hist = data["action_hist"]
     correct_trials = data["correct_trial"]
@@ -39,18 +57,17 @@ if behaviour_only:
     plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
     plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
     # plot_training_performance() # TODO: fix this function
-    # sys.exit()
-else:
-    action_hist = data["action_hist"]
-    correct_trials = data["correct_trial"]
-    stim = data["stim"]
-    stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity of Feedforward network
-    stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
-    delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
-    n_total_episodes = np.shape(stim)[0]
-    plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
-    plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
-    # sys.exit()
+    sys.exit()
+
+action_hist = data["action_hist"]
+correct_trials = data["correct_trial"]
+stim = data["stim"]
+stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+n_total_episodes = np.shape(stim)[0]
+plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
+plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
 
 # Select units with large enough variation in its activation
 # big_var_neurons = []
@@ -61,7 +78,7 @@ else:
 # delay_resp = delay_resp_hx[:, :, [x for x in range(512) if x in big_var_neurons]]
 # stim2_resp = stim2_resp[:, :, [x for x in range(512) if x in big_var_neurons]]
 
-normalize = True
+normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
     reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
     reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
@@ -75,15 +92,8 @@ if normalize:
     reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
 
-resp_hx = np.concatenate((stim1_resp, delay_resp, stim2_resp), axis=1)
 last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
 
-resp = stim1_resp  # Or stim2_resp or delay_resp
-stimulus = stim[:, 0]  # or stim[:, 1]
-label = 'stimulus_1'
-# Identifying ramping cells
-p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title='stim1')
-breakpoint() #TODO: this will give NAN because not every trial's resp has the same length
 
 # Plot cell activities in all combinations of stimulus length
 
@@ -106,70 +116,70 @@ compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="populat
 
 # Identify time cells and ramping cells
 # =============================================
+short_trial_resp = stim1_resp[stim[:, 0] <= 25, :25, :]
+long_trial_resp = stim1_resp[stim[:, 0] > 25]
+plot_r_tuning_curves(short_trial_resp, long_trial_resp, 'short_trial_stim_1', 'long_trial_stim_1', save_dir=save_dir, varying_duration=True)
 
+
+split_1_idx = np.arange(start=0, stop=len(stim1_resp)-1, step=2)
+split_2_idx = np.arange(start=1, stop=len(stim1_resp), step=2)
+odd_trial_resp = stim1_resp[split_2_idx]
+even_trial_resp = stim1_resp[split_1_idx]
+plot_r_tuning_curves(odd_trial_resp, even_trial_resp, 'odd_trial_stim_1', 'even_trial_stim_1', save_dir=save_dir, varying_duration=True)
+
+short_trial_resp = stim2_resp[stim[:, 0] <= 25, :25, :]
+long_trial_resp = stim2_resp[stim[:, 0] > 25]
+plot_r_tuning_curves(short_trial_resp, long_trial_resp, 'short_trial_stim_2', 'long_trial_stim_2', save_dir=save_dir, varying_duration=True)
+
+split_1_idx = np.arange(start=0, stop=len(stim2_resp)-1, step=2)
+split_2_idx = np.arange(start=1, stop=len(stim2_resp), step=2)
+odd_trial_resp = stim2_resp[split_2_idx]
+even_trial_resp = stim2_resp[split_1_idx]
+plot_r_tuning_curves(odd_trial_resp, even_trial_resp, 'odd_trial_stim_2', 'even_trial_stim_2', save_dir=save_dir, varying_duration=True)
+
+plot_r_tuning_curves(stim1_resp, stim2_resp, 'stim_1', 'stim_2', save_dir=save_dir, varying_duration=True)
+
+
+#=================
 # Define period that we want to analyse
-resp = stim1_resp  # Or stim2_resp or delay_resp
-stimulus = stim[:, 0]  # or stim[:, 1]
-label = 'stimulus_1'
-# Identifying ramping cells
-p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title='stim1')
-breakpoint()
-ramp_cell_bool = np.logical_and(p_result<=0.05, slope_result<=0.05)
-cell_nums_ramp = np.where(ramp_cell_bool)[0]
+for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,0],stim[:,1], None], ['stimulus_1', 'stimulus_2', 'delay']):
+    print(f"analysing data from {label}")
+    ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_ramp_ident_results.npz'), allow_pickle=True)
+    time_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_time_cell_results.npz'), allow_pickle=True)
+    cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
+    cell_nums_time = time_ident_results['time_cell_nums']
 
-# Identifying sequence cells
-RB_result, z_RB_threshold_result = ridge_to_background(resp, ramp_cell_bool, percentile=95, n_shuff=1000)
-seq_cell_bool = RB_result > z_RB_threshold_result
-cell_nums_seq = np.where(seq_cell_bool)[0]
+    cell_nums_nontime = np.remove(np.arange(n_neurons), np.intersect1d(cell_nums_time, cell_nums_ramp))
 
-if np.shape(resp)[1] == 20:  # Delay period with consistent trial duration
-    I_result, I_threshold_result = skaggs_temporal_information(resp, n_shuff=1000, percentile=95)
-else:
-    I_result, I_threshold_result = skaggs_temporal_information_varying_duration(resp, stim, n_shuff=1000, percentile=95)
-high_temporal_info_cell_bool = I_result > I_threshold_result
+    # Here, the cell_nums have not been re-arranged according to peak latency yet
+    resp_ramp = resp[:, :, cell_nums_ramp]
+    resp_time = resp[:, :, cell_nums_time]
+    resp_nontime = resp[:, :, cell_nums_nontime]
+    n_ramp_neurons = len(cell_nums_ramp)
+    n_time_neurons = len(cell_nums_time)
+    n_nontime_neurons = len(cell_nums_nontime)
+    
+    # See if time cell/ramping cell/nontime cells can decode time
+    time_decode_all_stim_len(resp_ramp, stimulus, title=label+' ramp', save_dir=save_dir, save=True)  # decode time, grouped by stimulus length
+    time_decode_all_stim_len(resp_time, stimulus, title=label+' time', save_dir=save_dir, save=True)
+    time_decode_all_stim_len(resp_nontime, stimulus, title=label+' nontime', save_dir=save_dir, save=True)
+    time_decode_lin_reg(resp_ramp, np.shape(resp[1]), n_ramp_neurons, 1000, title=label+' ramp', save_dir=save_dir, save=True)
+    time_decode_lin_reg(resp_time, np.shape(resp[1]), n_time_neurons, 1000, title=label+' time', save_dir=save_dir, save=True)
+    time_decode_lin_reg(resp_nontime, np.shape(resp[1]), n_nontime_neurons, 1000, title=label+' nontime', save_dir=save_dir, save=True)
+    
+    
+    # Re-arrange cell_nums according to peak latency
+    cell_nums_all, cell_nums_time, cell_nums_ramp, cell_nums_nontime, \
+    sorted_matrix_all, sorted_matrix_time, sorted_matrix_ramp, sorted_matrix_nontime = \
+        sort_response_by_peak_latency(resp, cell_nums_ramp, cell_nums_time, norm=True)
+    
+    # print('Make a venn diagram of neuron counts...')
+    make_venn_diagram(cell_nums_ramp, cell_nums_time, n_neurons, label=label, save_dir=save_dir, save=True)
 
-R_result, pval_result = trial_consistency_across_durations(stim, stim1_resp, stim2_resp, type='absolute')  # also try 'relative'
+    plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=label+"_all_cell_activity", remove_nan=True, save_dir=save_dir, save=True)
+    plot_sorted_averaged_resp(cell_nums_time, sorted_matrix_time, title=label+"_time_cell_activity", remove_nan=True, save_dir=save_dir, save=True)
+    plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=label+"_ramp_cell_activity", remove_nan=True, save_dir=save_dir, save=True)
+    plot_sorted_averaged_resp(cell_nums_nontime, sorted_matrix_nontime, title=label+"_nontime_cell_activity", remove_nan=True, save_dir=save_dir, save=True)
 
-cell_nums_nontime = np.remove(np.arange(n_neurons), np.intersect1d(cell_nums_seq, cell_nums_ramp))
-
-
-# Here, the cell_nums have not been re-arranged according to peak latency yet
-resp_ramp = resp[:, :, cell_nums_ramp]
-resp_seq = resp[:, :, cell_nums_seq]
-resp_nontime = resp[:, :, cell_nums_nontime]
-n_ramp_neurons = len(cell_nums_ramp)
-n_seq_neurons = len(cell_nums_seq)
-n_nontime_neurons = len(cell_nums_nontime)
-
-
-# See if time cell/ramping cell/nontime cells can decode time
-time_decode_all_stim_len(resp[cell_nums_ramp], stimulus, title=label+' ramp', save_dir=save_dir, save=False)  # decode time, grouped by stimulus length
-time_decode_all_stim_len(resp[cell_nums_seq], stimulus, title=label+' seq', save_dir=save_dir, save=False)
-time_decode_all_stim_len(resp[cell_nums_nontime], stimulus, title=label+' nontime', save_dir=save_dir, save=False)
-time_decode_lin_reg(resp[cell_nums_ramp], np.shape(resp[1]), n_ramp_neurons, 1000, title=label+' ramp', save_dir=save_dir, save=False)
-time_decode_lin_reg(resp[cell_nums_seq], np.shape(resp[1]), n_seq_neurons, 1000, title=label+' seq', save_dir=save_dir, save=False)
-time_decode_lin_reg(resp[cell_nums_nontime], np.shape(resp[1]), n_nontime_neurons, 1000, title=label+' nontime', save_dir=save_dir, save=False)
-
-
-# Re-arrange cell_nums according to peak latency
-cell_nums_all, cell_nums_seq, cell_nums_ramp, cell_nums_nontime, \
-sorted_matrix_all, sorted_matrix_seq, sorted_matrix_ramp, sorted_matrix_nontime = \
-    sort_response_by_peak_latency(resp, cell_nums_ramp, cell_nums_seq, norm=True)
-
-# print('Make a venn diagram of neuron counts...')
-make_venn_diagram(cell_nums_ramp, cell_nums_seq, n_neurons, title=label, save_dir=save_dir, save=False)
-
-
-plot_sorted_averaged_resp(cell_nums_all, sorted_matrix_all, title=label+"_all_cell_activity", remove_nan=True, save_dir=save_dir, save=False)
-plot_sorted_averaged_resp(cell_nums_seq, sorted_matrix_seq, title=label+"_seq_cell_activity", remove_nan=True, save_dir=save_dir, save=False)
-plot_sorted_averaged_resp(cell_nums_ramp, sorted_matrix_ramp, title=label+"_ramp_cell_activity", remove_nan=True, save_dir=save_dir, save=False)
-plot_sorted_averaged_resp(cell_nums_nontime, sorted_matrix_nontime, title=label+"_nontime_cell_activity", remove_nan=True, save_dir=save_dir, save=False)
-
-
-# ------------------------------ Lesion experiment ----------------------------------
-
-if lesion_experiment:
-    data = np.load('data/lesion.npz')
-    postlesion_acc = data['postlesion_perf']
-    #plot_postlesion_performance(postlesion_acc, compare="lesion type")
-    plot_postlesion_performance(postlesion_acc, compare="stimulus length")
+    if label == 'delay':  # this function only makes sense if the trial durations are the same
+        plot_field_width_vs_peak_time(resp[:, :, cell_nums_time], save_dir, title='delay_time_cells')
