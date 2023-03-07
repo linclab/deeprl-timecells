@@ -511,7 +511,7 @@ def plot_field_width_vs_peak_time(resp, save_dir, title):
     plt.savefig(os.path.join(save_dir, f"{title}p_eak_time_vs_field_width.svg"))
 
 
-def identify_stimulus_selective_neurons(resp, stim_labels, alpha=0.01):
+def identify_stimulus_selective_neurons(resp, stim_labels, alpha=0.01, varying_duration=False):
     """
     Identify stimulus-selective neurons based on their response to different stimuli using the method described
     in Toso et al. (2021). Returns a boolean array indicating which neurons are selective.
@@ -537,7 +537,10 @@ def identify_stimulus_selective_neurons(resp, stim_labels, alpha=0.01):
     # Compute mean response to each stimulus for each neuron  # <-- tuning curves for L vs R
     mean_resp = np.zeros((resp.shape[0], resp.shape[1], len(unique_labels)))  # n_neurons x len_delay x 2
     for i, label in enumerate(unique_labels):
-        mean_resp[:, :, i] = calculate_tuning_curves(resp[stim_labels==label])
+        if varying_duration:
+            mean_resp[:, :, i] = calculate_tuning_curves_varying_duration(resp[stim_labels==label])
+        else:
+            mean_resp[:, :, i] = calculate_tuning_curves(resp[stim_labels==label])
 
     # Compute ANOVA for each neuron
     p_vals = np.zeros((resp.shape[0],))  # n_neurons
