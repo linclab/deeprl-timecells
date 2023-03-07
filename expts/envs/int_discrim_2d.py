@@ -183,6 +183,26 @@ class IntervalDiscrimination_2D(object):
 
         return self.observation, self.reward, self.done, {}
 
+    def calc_reward_without_stepping(self, action):
+        assert self.action_space.contains(action)
+        reward = 0
+        if action in [0, 1, 2, 3, 4]:  # movement
+            if self.phase != "delay":
+                reward = self.step_rwd  # lightly punish all step actions except during delay
+        else: # poke
+            if self.phase == 'initiation' and self.current_loc == self.initiation_loc:
+                reward = self.poke_rwd
+            elif self.phase == "choice" and (self.current_loc == self.left_loc or self.current_loc == self.right_loc):
+                if self.current_loc == self.correct_loc:
+                    reward = self.rwd
+                else:
+                    reward = self.inc_rwd
+            else:
+                if not self.indelay:
+                    reward = self.step_rwd
+
+        return reward
+
 
 
 

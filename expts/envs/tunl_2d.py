@@ -183,6 +183,7 @@ class Tunl(object):
         :return: reward
         """
         assert self.action_space.contains(action)
+        reward = 0
         if action in [0, 1, 2, 3, 4]:  # movement
             if not self.indelay:
                 reward = self.step_rwd  # lightly punish all step actions except during delay
