@@ -5,12 +5,14 @@ import numpy as np
 import os
 import sys
 import argparse
-utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
+import sys
+sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
-parser = argparse.ArgumentParser(description="Head-fixed 1D interval discrimination task simulation")
-parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/timing',help="main data directory")
+parser = argparse.ArgumentParser(description="Non location-fixed 2D interval discrimination task simulation")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/timing2d',help="main data directory")
 parser.add_argument("--data_dir",type=str,default='lstm_128_1e-05',help="directory in which .npz is saved")
-parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/timing', help="main directory in which agent-specific directory will be created")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/timing2d', help="main directory in which agent-specific directory will be created")
 parser.add_argument("--seed", type=int, help="seed to analyse")
 parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
 parser.add_argument("--behaviour_only", type=bool, default=False, help="whether the data only includes performance data")
@@ -41,31 +43,31 @@ if len(hparams) > 3:  # weight_decay or dropout
     if 'p' in hparams[3]:
         p = float(hparams[3][1:])
         dropout_type = hparams[4]
-env_title = 'Interval_Discrimination_1D'
+env_title = 'Interval_Discrimination_2D'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
 behaviour_only = True if argsdict['behaviour_only'] == True or argsdict['behaviour_only'] == 'True' else False  # plot performance data
 
 if behaviour_only:
-    action_hist = data["action_hist"]
-    correct_trials = data["correct_trial"]
+    reward_hist = data["reward_hist"]
+    correct_perc = data["correct_perc"]
     stim = data["stim"]
     n_total_episodes = np.shape(stim)[0]
     # plot_training_performance()
-    plot_training_accuracy(stim, action_hist, title=env_title, save_dir=save_dir, save=False, base_episode=0)
-    plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
+    plot_training_accuracy(stim, action_hist, title=env_title, save_dir=save_dir, save=False, base_episode=0) # TODO: write 2D version of this function
+    plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')  # TODO: write 2D version of this function
     plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
     # plot_training_performance() # TODO: fix this function
     sys.exit()
 
-action_hist = data["action_hist"]
-correct_trials = data["correct_trial"]
+reward_hist = data["reward_hist"]
+correct_perc = data["correct_perc"]
 stim = data["stim"]
-stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity of Feedforward network
-stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+stim1_resp = data["stim_1_resp"]  # Note: this could also be linear activity of Feedforward network
+stim2_resp = data["stim_2_resp"]  # Note: this could also be linear activity of Feedforward network
 delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
 n_total_episodes = np.shape(stim)[0]
-plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
+plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')  # TODO: write 2D version of this function
 plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
 
 # Select units with large enough variation in its activation
@@ -106,8 +108,8 @@ time_decode_all_stim_len(stim1_resp, stim[:,0], title='stim1_resp', save_dir=sav
 time_decode_lin_reg(stim1_resp, 40, n_neurons, 1000, "stim1", save_dir=save_dir, save=False)
 time_decode_lin_reg(stim2_resp, 40, n_neurons, 1000, "stim2", save_dir=save_dir, save=False)
 time_decode_lin_reg(delay_resp, 20, n_neurons, 1000, "delay", save_dir=save_dir, save=False)
-compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="decoding", resp2=stim2_resp, title='', save_dir=save_dir, save=False)  # decode time; train on corr, test on incorr
-compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="population", resp2=stim2_resp, title='', save_dir=save_dir, save=False)  # plot population sequence for corr and incorr trials
+compare_correct_vs_incorrect(stim1_resp, stim, correct_perc, analysis="decoding", resp2=stim2_resp, title='', save_dir=save_dir, save=False)  # decode time; train on corr, test on incorr
+compare_correct_vs_incorrect(stim1_resp, stim, correct_perc, analysis="population", resp2=stim2_resp, title='', save_dir=save_dir, save=False)  # plot population sequence for corr and incorr trials
 # single_cell_visualization(stim2_resp, correct_trials, np.arange(n_neurons), "")
 
 
@@ -157,7 +159,7 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     n_ramp_neurons = len(cell_nums_ramp)
     n_time_neurons = len(cell_nums_time)
     n_nontime_neurons = len(cell_nums_nontime)
-    
+
     # See if time cell/ramping cell/nontime cells can decode time
     time_decode_all_stim_len(resp_ramp, stimulus, title=label+' ramp', save_dir=save_dir, save=True)  # decode time, grouped by stimulus length
     time_decode_all_stim_len(resp_time, stimulus, title=label+' time', save_dir=save_dir, save=True)
@@ -165,13 +167,13 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     time_decode_lin_reg(resp_ramp, np.shape(resp[1]), n_ramp_neurons, 1000, title=label+' ramp', save_dir=save_dir, save=True)
     time_decode_lin_reg(resp_time, np.shape(resp[1]), n_time_neurons, 1000, title=label+' time', save_dir=save_dir, save=True)
     time_decode_lin_reg(resp_nontime, np.shape(resp[1]), n_nontime_neurons, 1000, title=label+' nontime', save_dir=save_dir, save=True)
-    
-    
+
+
     # Re-arrange cell_nums according to peak latency
     cell_nums_all, cell_nums_time, cell_nums_ramp, cell_nums_nontime, \
     sorted_matrix_all, sorted_matrix_time, sorted_matrix_ramp, sorted_matrix_nontime = \
         sort_response_by_peak_latency(resp, cell_nums_ramp, cell_nums_time, norm=True)
-    
+
     # print('Make a venn diagram of neuron counts...')
     make_venn_diagram(cell_nums_ramp, cell_nums_time, n_neurons, label=label, save_dir=save_dir, save=True)
 
