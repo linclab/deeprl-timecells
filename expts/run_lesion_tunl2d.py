@@ -183,6 +183,8 @@ if __name__ == '__main__':
     parser.add_argument("--lesion_idx_end", type=int, default=None, help="end of lesion index. if None (default), end at n_neurons")
     parser.add_argument("--lesion_idx_step", type=int, default=5, help="step of lesion index")
     parser.add_argument("--expt_type", type=str, default='lesion', help='lesion or rehydration')
+    parser.add_argument("--n_ramp_time_shuffle", type=int, default=100, help="Number of shuffles used for identifying ramping and time cells")
+    parser.add_argument("--ramp_time_percentile", type=float, default=99.9, help="Percentile at which ramping and time cells are identified")
     args = parser.parse_args()
     argsdict = args.__dict__
     print(argsdict)
@@ -196,6 +198,8 @@ if __name__ == '__main__':
     lesion_idx_start = argsdict['lesion_idx_start']
     lesion_idx_step = argsdict['lesion_idx_step']
     lesion_idx_end = argsdict['lesion_idx_end']
+    n_ramp_time_shuffle = argsdict['n_ramp_time_shuffle']
+    ramp_time_percentile = argsdict['ramp_time_percentile']
 
     # Load_model_path: mem_40_lstm_256_5e-06/seed_1_epi999999.pt, relative to training/tunl2d
     config_dir = load_model_path.split('/')[0]
@@ -203,12 +207,12 @@ if __name__ == '__main__':
     pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
     seed = int(pt[1])
     epi = int(pt[2])
-    main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/tunl2d_100_99.9'
+    main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/tunl2d'
     data_analysis_dir = os.path.join(main_data_analysis_dir, config_dir)
-    ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_ramp_ident_results_separate.npz'), allow_pickle=True)
-    seq_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_seq_ident_results_separate.npz'), allow_pickle=True)
+    ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_ramp_ident_results.npz'), allow_pickle=True)
+    time_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_time_cell_results.npz'), allow_pickle=True)
     cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
-    cell_nums_seq = seq_ident_results['cell_nums_seq']
+    cell_nums_time = time_ident_results['time_cell_nums']
 
     # Load existing model
     ckpt_name = load_model_path.replace('/', '_').replace('.pt', '_pt')  # 'mem_40_lstm_256_5e-06_seed_1_epi999999_pt'
@@ -257,7 +261,7 @@ if __name__ == '__main__':
     postlesion_nav_array = np.zeros((3, len(n_lesion), num_shuffle))
     mean_kl_div_array = np.zeros((3, len(n_lesion), num_shuffle))
 
-    random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_seq)
+    random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_time)
 
     rfsize = 2
     padding = 0
@@ -272,7 +276,7 @@ if __name__ == '__main__':
     layer_3_out_h, layer_3_out_w = conv_output(layer_2_out_h, layer_2_out_w, padding, dilation, rfsize, stride)
     layer_4_out_h, layer_4_out_w = conv_output(layer_3_out_h, layer_3_out_w, padding, dilation, rfsize, stride)
 
-    for i_lesion_type, lesion_type in enumerate(['random', 'ramp', 'seq']):
+    for i_lesion_type, lesion_type in enumerate(['random', 'ramp', 'time']):
         for i_num_lesion, num_lesion in enumerate(n_lesion):
             for i_shuffle in tqdm(range(num_shuffle)):
                 gc.collect()
