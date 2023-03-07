@@ -4,10 +4,10 @@ import sys
 import argparse
 
 
-parser = argparse.ArgumentParser(description="Head-fixed 1D interval discrimination task simulation")
-parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/timing',help="main data directory")
+parser = argparse.ArgumentParser(description="Non location-fixed 2D interval discrimination task simulation")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/timing2d',help="main data directory")
 parser.add_argument("--data_dir",type=str,default='lstm_256_5e-06',help="directory in which .npz is saved")
-parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/timing', help="main directory in which agent-specific directory will be created")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/timing2d', help="main directory in which agent-specific directory will be created")
 parser.add_argument("--seed", type=int, help="seed to analyse")
 parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
@@ -37,14 +37,14 @@ if len(hparams) > 3:  # weight_decay or dropout
     if 'p' in hparams[3]:
         p = float(hparams[3][1:])
         dropout_type = hparams[4]
-env_title = 'Interval_Discrimination_1D'
+env_title = 'Interval_Discrimination_2D'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
-action_hist = data["action_hist"]
-correct_trials = data["correct_trial"]
+reward_hist = data["reward_hist"]
+correct_perc = data["correct_perc"]
 stim = data["stim"]
-stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity of Feedforward network
-stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
+stim1_resp = data["stim_1_resp"]  # Note: this could also be linear activity of Feedforward network
+stim2_resp = data["stim_2_resp"]  # Note: this could also be linear activity of Feedforward network
 delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
 n_total_episodes = np.shape(stim)[0]
 
