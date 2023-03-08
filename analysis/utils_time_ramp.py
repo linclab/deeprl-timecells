@@ -669,3 +669,25 @@ def skaggs_temporal_information_varying_duration(resp, stim, n_shuff=1000, perce
     return I_result, I_threshold_result
 
 
+def identify_place_cells(resp, loc, n_shuff, percentile):
+    from utils_mutual_info import construct_ratemap, construct_ratemap_occupancy
+    n_neurons = resp.shape[-1]
+    RB_arr = np.zeros(n_neurons)
+    zRB_threshold_arr = np.zeros(n_neurons)
+    is_place_cell = np.zeros(n_neurons)
+    for i_neuron in range(n_neurons):
+        # generate occupancy-normalized heatmap
+        ratemap, spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=True)
+        # TODO: check if is ratemap occupancy-normalized here?
+        ratemap /= spatial_occupancy
+        RB = np.max(ratemap) / np.mean(ratemap)
+
+        zRB = np.zeros(n_shuff)
+        for i_shuff in range(n_shuff):
+            shuffled_ratemap, shuffled_spatial_occupancy = construct_ratemap_occupancy(delay_resp=resp, delay_loc=loc, shuffle=True)
+            shuffled_ratemap /= shuffled_spatial_occupancy
+            zRB[i_shuff] = np.max(shuffled_ratemap) / np.mean(shuffled_ratemap)
+
+        zRB_threshold_arr[i_neuron] = np.percentile(zRB, percentile)
+        is_place_cell[i_neuron] = RB > zRB_threshold_arr
+    return RB_arr, zRB_threshold_arr, is_place_cell
