@@ -104,13 +104,13 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
             pi_record.append(pol)
             new_activity = net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
             new_activity[lesion_idx] = 0  # the new, manipulated hx
-            lin_out = F.relu(net.hidden[net.hidden_types.index("linear")](new_activity))
-            new_pol = F.softmax(net.output[0](lin_out), dim=1)
+            lin_out = F.relu(net.hidden[net.hidden_types.index("linear")](torch.from_numpy(new_activity).to(device)))
+            new_pol = F.softmax(net.output[0](lin_out), dim=0)
             pi_prime_record.append(new_pol)
 
-            action = Categorical(pol).sample()
+            action = Categorical(pol).sample().item()
             action_record.append(action)
-            new_action = Categorical(new_pol).sample()
+            new_action = Categorical(new_pol).sample().item()
             action_prime_record.append(new_action)
 
             # proceed with trial with old policy
@@ -128,7 +128,7 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
         # calculate KL divergence between original policy pi and new policy pi'
         kl_divergence = 0
         for pi, pi_p in zip(pi_record, pi_prime_record):
-            kl_divergence += F.kl_div(pi_p.log(), pi.log(), reduction='batchmean')  # TODO: try removing .log()
+            kl_divergence += F.kl_div(pi_p, pi, reduction='batchmean')
         kl_divergence /= len(pi_record)
         kl_div.append(kl_divergence.item())
         # print('KL divergence:', kl_divergence.item())
@@ -258,7 +258,7 @@ if __name__ == '__main__':
                 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
                 net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing', load_model_path)))
                 net.eval()
-                lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion]
+                lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion].astype(int)
                 if argsdict['expt_type'] == 'lesion':
                     postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle] = lesion_experiment(env=env, net=net, optimizer=optimizer,
                                                                                                       n_total_episodes=n_total_episodes,
@@ -288,7 +288,7 @@ if __name__ == '__main__':
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)-np.std(postlesion_perf_array[2, :, :], axis=-1),
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
-    ax1.hlines(y=0.5, linestyles='dashed', colors='gray')  # TODO: check mila cluster - did I fix this at some point?
+    ax1.hlines(y=0.5, xmin=0, xmax=1, transform=ax1.get_yaxis_transform(), linestyles='dashed', colors='gray')
     ax1.set_xlabel('Number of neurons lesioned')
     ax1.set_ylabel('Fraction Nonmatch')
     ax1.set_ylim(0,1)
@@ -312,7 +312,7 @@ if __name__ == '__main__':
                          np.mean(mean_kl_div_array[2, :, :], axis=-1)-np.std(mean_kl_div_array[2, :, :], axis=-1),
                          np.mean(mean_kl_div_array[2, :, :], axis=-1)+np.std(mean_kl_div_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
         ax2.set_xlabel('Number of neurons lesioned')
-        ax2.set_ylabel('KL divergence between $\pi$ and $\pi_new$')
+        ax2.set_ylabel('KL divergence between $\pi$ and $\pi_{new}$')
         ax2.legend()
         #plt.show()
         fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_kl_div_results.png'))
