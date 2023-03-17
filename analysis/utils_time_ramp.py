@@ -153,25 +153,24 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
             slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
             lin_reg = slope * t + intercept
             lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
-
-        if ramping_bool[i_neuron]:
-            # Re-normalize lin-subtracted resp
-
+            lin_subtracted_tuning_curve += 0 - np.min(lin_subtracted_tuning_curve)  # shift response to above 0
             RB_result[i_neuron] = np.max(lin_subtracted_tuning_curve) / np.mean(lin_subtracted_tuning_curve)
             shuffled_RB = np.zeros(n_shuff)
             lin_subtracted_resp = resp[:, :, i_neuron] - np.tile(lin_reg, (n_total_episodes, 1))
-
             for i_shuff in range(n_shuff):
                 shuffled_resp = shuffle_activity_single_neuron(lin_subtracted_resp)
                 new_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
+                new_tuning_curve += 0 - np.min(new_tuning_curve)
                 shuffled_RB[i_shuff] = np.max(new_tuning_curve) / np.mean(new_tuning_curve)
             z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
         else:
+            tuning_curve += 0 - np.min(tuning_curve)
             RB_result[i_neuron] = np.max(tuning_curve) / np.mean(tuning_curve)
             shuffled_RB = np.zeros(n_shuff)
             for i_shuff in range(n_shuff):
                 shuffled_resp = shuffle_activity_single_neuron(resp[:, :, i_neuron])
                 new_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
+                new_tuning_curve += 0 - np.min(new_tuning_curve)
                 shuffled_RB[i_shuff] = np.max(new_tuning_curve) / np.mean(new_tuning_curve)
             z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
 
@@ -687,7 +686,7 @@ def identify_place_cells(resp, loc, n_shuff, percentile):
     is_place_cell = np.zeros(n_neurons)
     for i_neuron in range(n_neurons):
         # generate occupancy-normalized heatmap
-        ratemap, spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=True)
+        ratemap, spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=False)  # resp is already unit-normalized
         # TODO: check if is ratemap occupancy-normalized here?
         ratemap /= spatial_occupancy
         RB = np.max(ratemap) / np.mean(ratemap)
