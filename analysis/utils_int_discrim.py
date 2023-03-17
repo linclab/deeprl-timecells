@@ -6,9 +6,8 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import KFold
 from sklearn import svm
 import os
-from analysis_utils import make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, time_decode
-from cell_identification.time_ramp import *
-
+from utils_analysis import make_piechart, plot_sorted_averaged_resp, plot_sorted_in_same_order, time_decode
+from utils_time_ramp import *
 import numpy as np
 
 

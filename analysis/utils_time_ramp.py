@@ -10,7 +10,10 @@ import sklearn
 import scikit_posthocs as sp
 import utils_linclab_plot
 from utils_analysis import shuffle_activity, shuffle_activity_single_neuron, shuffle_activity_single_neuron_varying_duration
-utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
+import sys
+sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+from analysis import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
 
 def calculate_tuning_curves(resp):
