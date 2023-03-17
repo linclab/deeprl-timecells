@@ -51,15 +51,15 @@ n_total_episodes = np.shape(stim)[0]
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
     reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
 
     reshape_resp = np.reshape(stim2_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
 
     reshape_resp = np.reshape(delay_resp, (n_total_episodes*20, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
 
 time_cell_id = []

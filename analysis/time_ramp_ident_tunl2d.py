@@ -60,7 +60,7 @@ delay_resp = delay_resp_hx
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
     reshape_resp = np.reshape(delay_resp, (n_total_episodes*len_delay, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
 
 
