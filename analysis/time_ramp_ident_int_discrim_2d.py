@@ -69,9 +69,9 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     print(f"analysing data from {label}")
     # Identifying ramping cells (Toso 2021)
     if label=='delay':
-        p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+        p_result, slope_result, intercept_result, R_result = lin_reg_ramping(resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
     else:
-        p_result, slope_result, intercept_result, R_result = lin_reg_ramping_varying_duration(resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+        p_result, slope_result, intercept_result, R_result = lin_reg_ramping_varying_duration(resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
     ramp_cell_bool = np.logical_and(p_result<=0.05, np.abs(R_result)>=0.9)
     cell_nums_ramp = np.where(ramp_cell_bool)[0]
     np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_ramp_ident_results.npz'),
@@ -82,9 +82,9 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
 
     # # Identifying sequence cells
     if label == 'delay':
-        RB_result, z_RB_threshold_result = ridge_to_background(resp, ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+        RB_result, z_RB_threshold_result = ridge_to_background(resp, ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
     else:
-        RB_result, z_RB_threshold_result = ridge_to_background_varying_duration(resp, stim,  ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{label}')
+        RB_result, z_RB_threshold_result = ridge_to_background_varying_duration(resp, stim,  ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
     seq_cell_bool = RB_result > z_RB_threshold_result
     cell_nums_seq = np.where(seq_cell_bool)[0]
     np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_seq_ident_results.npz'),

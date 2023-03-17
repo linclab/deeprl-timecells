@@ -101,10 +101,10 @@ incorrect_loc = delay_loc[binary_nonmatch == 0]
 # breakpoint()
 
 # Identifying ramping cells
-p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
+p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left')
 ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
 cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
-p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
+p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_right')
 ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
 cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
 ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
@@ -117,10 +117,10 @@ np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile
                     ramp_cell_bool=ramp_cell_bool,cell_nums_ramp=cell_nums_ramp)
 print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
 
-RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_left')
+RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left')
 seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
 cell_nums_seq_l = np.where(seq_cell_bool_l)[0]
-RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_right')
+RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_right')
 seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
 cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
 seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)

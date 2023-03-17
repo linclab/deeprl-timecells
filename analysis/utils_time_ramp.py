@@ -106,7 +106,9 @@ def lin_reg_ramping(resp, plot=False, save_dir=None, title=None):
         if plot:
             random_trial_resp_to_plot = resp[random_trial_id, :, i_neuron]
             tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
-            tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)  # TODO: remove boundary when running on cluster
+            tuning_curve_plot.plot(tuning_curve,
+                                   color='red' if np.logical_and(p_result[i_neuron]<=0.05, np.abs(pearson_R_result[i_neuron])>=0.9) else 'blue',
+                                   alpha=1)
             for i_trial in range(len(random_trial_resp_to_plot)):
                 tuning_curve_plot.plot(random_trial_resp_to_plot[i_trial], alpha=0.1,
                                        color='red' if np.logical_and(p_result[i_neuron]<=0.05, np.abs(pearson_R_result[i_neuron])>=0.9) else 'blue')
@@ -153,9 +155,12 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
             lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
 
         if ramping_bool[i_neuron]:
+            # Re-normalize lin-subtracted resp
+
             RB_result[i_neuron] = np.max(lin_subtracted_tuning_curve) / np.mean(lin_subtracted_tuning_curve)
             shuffled_RB = np.zeros(n_shuff)
             lin_subtracted_resp = resp[:, :, i_neuron] - np.tile(lin_reg, (n_total_episodes, 1))
+
             for i_shuff in range(n_shuff):
                 shuffled_resp = shuffle_activity_single_neuron(lin_subtracted_resp)
                 new_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
@@ -182,11 +187,11 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
                                        color='red' if RB_result[i_neuron] > z_RB_threshold_result[i_neuron] else 'blue', alpha=1)
             tuning_curve_plot.set_title(f'RB={RB_result[i_neuron]:.5f}\nz_RB={z_RB_threshold_result[i_neuron]:.5f}')
     if plot:
-        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curve_for_seq_identification.pdf')) as pdf:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curves_for_seq_identification.pdf')) as pdf:
             try:
                 pdf.savefig(tuning_curve_fig)
                 plt.close(tuning_curve_fig)
-                print(f'{title}_tuning_curve_for_seq_identification.pdf saved to {save_dir}')
+                print(f'{title}_tuning_curves_for_seq_identification.pdf saved to {save_dir}')
             except:
                 pass
 
@@ -267,7 +272,9 @@ def lin_reg_ramping_varying_duration(resp, plot=False, save_dir=None, title=None
         if plot:
             random_trial_resp_to_plot = resp[random_trial_id, :, i_neuron]
             tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
-            tuning_curve_plot.plot(tuning_curve, color='blue', alpha=1)
+            tuning_curve_plot.plot(tuning_curve,
+                                   color='red' if np.logical_and(p_result[i_neuron]<=0.05, np.abs(pearson_R_result[i_neuron])>=0.9) else 'blue',
+                                   alpha=1)
             for i_trial in range(len(random_trial_resp_to_plot)):
                 tuning_curve_plot.plot(random_trial_resp_to_plot[i_trial], alpha=0.1,
                                        color='red' if np.logical_and(p_result[i_neuron]<=0.05, np.abs(pearson_R_result[i_neuron])>=0.9) else 'blue')
@@ -343,11 +350,11 @@ def ridge_to_background_varying_duration(resp, stim_duration, ramping_bool, perc
                                        color='red' if RB_result[i_neuron] > z_RB_threshold_result[i_neuron] else 'blue', alpha=1)
             tuning_curve_plot.set_title(f'RB={RB_result[i_neuron]:.5f}\nz_RB={z_RB_threshold_result[i_neuron]:.5f}')
     if plot:
-        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curve_for_seq_identification.pdf')) as pdf:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curves_for_seq_identification.pdf')) as pdf:
             try:
                 pdf.savefig(tuning_curve_fig)
                 plt.close(tuning_curve_fig)
-                print(f'{title}_tuning_curve_for_seq_identification.pdf saved to {save_dir}')
+                print(f'{title}_tuning_curves_for_seq_identification.pdf saved to {save_dir}')
             except:
                 pass
 
