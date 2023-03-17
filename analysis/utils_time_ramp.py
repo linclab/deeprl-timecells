@@ -683,16 +683,12 @@ def identify_place_cells(resp, loc, n_shuff, percentile):
     for i_neuron in range(n_neurons):
         # generate occupancy-normalized heatmap
         ratemap, spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=False)  # resp is already unit-normalized
-        # TODO: check if is ratemap occupancy-normalized here?
-        ratemap /= spatial_occupancy
         RB = np.max(ratemap) / np.mean(ratemap)
 
         zRB = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
-            shuffled_ratemap, shuffled_spatial_occupancy = construct_ratemap_occupancy(delay_resp=resp, delay_loc=loc, shuffle=True)
-            shuffled_ratemap /= shuffled_spatial_occupancy
+            shuffled_ratemap, shuffled_spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=False, shuffle=True)
             zRB[i_shuff] = np.max(shuffled_ratemap) / np.mean(shuffled_ratemap)
-
         zRB_threshold_arr[i_neuron] = np.percentile(zRB, percentile)
         is_place_cell[i_neuron] = RB > zRB_threshold_arr
     return RB_arr, zRB_threshold_arr, is_place_cell

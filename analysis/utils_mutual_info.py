@@ -182,7 +182,7 @@ def compare_mutual_info(path):
 
 
 
-def construct_ratemap(delay_resp, delay_loc, norm=True):  # TODO: vs. construct_ratemap_occupancy?
+def construct_ratemap(delay_resp, delay_loc, norm=False, shuffle=False):  # TODO: vs. construct_ratemap_occupancy?
     """
     Stack all steps across all episodes, normalize the activity according to the
     maximum and minimum of each cell (optional), and construct the rate map of each cell.
@@ -191,6 +191,9 @@ def construct_ratemap(delay_resp, delay_loc, norm=True):  # TODO: vs. construct_
     n_episodes = np.shape(delay_resp)[0]
     n_steps = np.shape(delay_resp)[1]
     n_neurons = np.shape(delay_resp)[2]
+
+    if shuffle:
+        delay_resp = shuffle_activity(delay_resp)
 
     delay_resp_aggregate = np.concatenate(delay_resp, axis=0)
     delay_loc_flatten = np.concatenate(delay_loc, axis=0)
@@ -202,12 +205,12 @@ def construct_ratemap(delay_resp, delay_loc, norm=True):  # TODO: vs. construct_
                                                               keepdims=True)) / np.ptp(delay_resp_aggregate, axis=0, keepdims=True)
 
     for x in range(4):
-        for y in range(7):
+        for y in range(7):  # for each location on the map
             idx = np.all(np.hstack((np.expand_dims(delay_loc_flatten[:,0]==x+1,1),
-                                    np.expand_dims(delay_loc_flatten[:,1]==y+1,1))), axis=1)
+                                    np.expand_dims(delay_loc_flatten[:,1]==y+1,1))), axis=1)  # which timesteps has the agent been here
             if np.sum(idx)>0:
-                ratemap[:,x,y] = np.mean(delay_resp_aggregate[idx, :], axis=0)
-                spatial_occupancy[x,y] = np.sum(idx) / (n_episodes*n_steps)
+                ratemap[:,x,y] = np.mean(delay_resp_aggregate[idx, :], axis=0)  # mean activity at this timestep
+                spatial_occupancy[x,y] = np.sum(idx) / (n_episodes*n_steps)  # occupancy percentage
 
     return (ratemap, spatial_occupancy)
 
