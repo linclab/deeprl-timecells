@@ -100,6 +100,18 @@ incorrect_loc = delay_loc[binary_nonmatch == 0]
 # tuning_curve_dim_reduction(delay_resp, mode='tsne', save_dir=save_dir, title=f'{seed}_{epi}_all')
 # breakpoint()
 
+# Identify place cells
+RB_arr_l, zRB_threshold_arr_l, is_place_cell_l = identify_place_cells(left_stim_resp, left_stim_loc, percentile, save_dir=save_dir, title=f'{seed}_{epi}_{percentile}_left')
+RB_arr_r, zRB_threshold_arr_r, is_place_cell_r = identify_place_cells(right_stim_resp, right_stim_loc, percentile, save_dir=save_dir, title=f'{seed}_{epi}_{percentile}_right')
+is_place_cell = np.logical_or(is_place_cell_l, is_place_cell_r)
+place_cell_nums = np.where(is_place_cell)[0]
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_place_cell_results.npz'),
+                    RB_arr_l=RB_arr_l, zRB_threshold_arr_l=zRB_threshold_arr_l, is_place_cell_l=is_place_cell_l,
+                    RB_arr_r=RB_arr_r, zRB_threshold_arr_r=zRB_threshold_arr_r, is_place_cell_r=is_place_cell_r,
+                    is_place_cell=is_place_cell, place_cell_nums=place_cell_nums)
+print(f"{len(place_cell_nums)}/{n_neurons} place cells")
+print('Analysis finished')
+
 # Identifying ramping cells
 p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left')
 ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
@@ -172,14 +184,3 @@ np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile
 print(f"{len(time_cell_nums)}/{n_neurons} time cells")
 
 
-# Identify place cells
-RB_arr_l, zRB_threshold_arr_l, is_place_cell_l = identify_place_cells(left_stim_resp, left_stim_loc, n_shuffle, percentile)
-RB_arr_r, zRB_threshold_arr_r, is_place_cell_r = identify_place_cells(left_stim_resp, left_stim_loc, n_shuffle, percentile)
-is_place_cell = np.logical_or(is_place_cell_l, is_place_cell_r)
-place_cell_nums = np.where(is_place_cell)[0]
-np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_place_cell_results.npz'),
-                    RB_arr_l=RB_arr_l, zRB_threshold_arr_l=zRB_threshold_arr_l, is_place_cell_l=is_place_cell_l,
-                    RB_arr_r=RB_arr_r, zRB_threshold_arr_r=zRB_threshold_arr_r, is_place_cell_r=is_place_cell_r,
-                    is_place_cell=is_place_cell, place_cell_nums=place_cell_nums)
-print(f"{len(place_cell_nums)}/{n_neurons} place cells")
-print('Analysis finished')

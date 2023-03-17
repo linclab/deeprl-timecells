@@ -674,21 +674,39 @@ def skaggs_temporal_information_varying_duration(resp, stim, n_shuff=1000, perce
     return I_result, I_threshold_result
 
 
-def identify_place_cells(resp, loc, n_shuff, percentile):
-    from utils_mutual_info import construct_ratemap, construct_ratemap_occupancy
+def identify_place_cells(resp, loc, percentile, save_dir, title, n_shuff=100, plot=True):
+    from utils_mutual_info import construct_ratemap
     n_neurons = resp.shape[-1]
     RB_arr = np.zeros(n_neurons)
     zRB_threshold_arr = np.zeros(n_neurons)
     is_place_cell = np.zeros(n_neurons)
-    for i_neuron in range(n_neurons):
+    if plot:
+        plot_cols = 10
+        plot_rows = int(np.ceil(n_neurons / plot_cols))
+        ratemap_fig = plt.figure('ratemaps', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
+    for i_neuron in tqdm(range(n_neurons)):
         # generate occupancy-normalized heatmap
-        ratemap, spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=False)  # resp is already unit-normalized
+        ratemap, spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=False, shuffle=False)  # resp is already unit-normalized
         RB = np.max(ratemap) / np.mean(ratemap)
-
+        RB_arr[i_neuron] = RB
         zRB = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
             shuffled_ratemap, shuffled_spatial_occupancy = construct_ratemap(delay_resp=resp, delay_loc=loc, norm=False, shuffle=True)
             zRB[i_shuff] = np.max(shuffled_ratemap) / np.mean(shuffled_ratemap)
         zRB_threshold_arr[i_neuron] = np.percentile(zRB, percentile)
-        is_place_cell[i_neuron] = RB > zRB_threshold_arr
+        is_place_cell[i_neuron] = RB > zRB_threshold_arr[i_neuron]
+
+        if plot:
+            ratemap_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
+            ratemap_plot.imshow(ratemap, cmap='jet')
+            ratemap_plot.set_title(f'RB={RB_arr[i_neuron]:.5f}\nzRB={zRB_threshold_arr[i_neuron]:.5f}')
+    if plot:
+        with PdfPages(os.path.join(save_dir, f'{title}_ratemaps.pdf')) as pdf:
+            try:
+                pdf.savefig(ratemap_fig)
+                plt.close(ratemap_fig)
+                print(f'{title}_ratemaps.pdf saved to {save_dir}')
+            except:
+                pass
+
     return RB_arr, zRB_threshold_arr, is_place_cell
