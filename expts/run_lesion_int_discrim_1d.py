@@ -175,8 +175,8 @@ if __name__ == '__main__':
     pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
     seed = int(pt[1])
     epi = int(pt[2])
-    main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/timing'
-    data_analysis_dir = os.path.join(main_data_analysis_dir, config_dir)
+    main_dir = '/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_results/timing1d'
+    data_analysis_dir = os.path.join(main_dir, config_dir)
 
     cell_nums_ramp = []
     cell_nums_time = []
@@ -211,10 +211,10 @@ if __name__ == '__main__':
     print(hidden_type, n_neurons, lr, seed, epi, env_title, net_title)
 
     # Make directory in /lesion to save data and model
-    main_dir = '/network/scratch/l/lindongy/timecell/lesion/timing'
-    save_dir = os.path.join(main_dir, f'{config_dir}_seed{seed}_epi{epi}')
+    agent_str = f"{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}"
+    save_dir = os.path.join(main_dir, config_dir, agent_str, argsdict['expt_type'])
     if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir)
     print(f'Saving to {save_dir}')
 
     # Setting up cuda and seeds
@@ -256,7 +256,7 @@ if __name__ == '__main__':
                         hidden_dimensions=[n_neurons, n_neurons],  # hidden dims
                         batch_size=1)
                 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-                net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing', load_model_path)))
+                net.load_state_dict(torch.load(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/timing', load_model_path)))
                 net.eval()
                 lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion].astype(int)
                 if argsdict['expt_type'] == 'lesion':
