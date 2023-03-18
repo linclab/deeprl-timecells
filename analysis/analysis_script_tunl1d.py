@@ -1,10 +1,11 @@
 from utils_time_ramp import *
 from utils_analysis import *
 #from expts.envs.tunl_1d import *
-import utils_linclab_plot
 import sys
 import argparse
-utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
+sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+from analysis import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
 
 def single_cell_plot(total_resp, binary_stim, i_neuron, start_trial):

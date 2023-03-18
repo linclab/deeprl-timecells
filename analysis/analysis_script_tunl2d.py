@@ -3,8 +3,11 @@ from utils_mutual_info import *
 from utils_time_ramp import *
 from utils_analysis import bin_rewards, make_venn_diagram, plot_sorted_averaged_resp, plot_sorted_in_same_order, \
     single_cell_visualization, plot_decode_sample_from_single_time, time_decode_lin_reg
-import sys
 import argparse
+import sys
+sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+from analysis import utils_linclab_plot
+utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
 

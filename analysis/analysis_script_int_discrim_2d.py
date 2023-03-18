@@ -1,12 +1,11 @@
 from utils_int_discrim import *
 from utils_analysis import time_decode_lin_reg, make_venn_diagram, plot_sorted_averaged_resp
-from analysis import utils_linclab_plot
 import numpy as np
 import os
-import sys
 import argparse
 import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
 parser = argparse.ArgumentParser(description="Non location-fixed 2D interval discrimination task simulation")
