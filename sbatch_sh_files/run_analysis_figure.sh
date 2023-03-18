@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --array=0-8
 #SBATCH --job-name=tunl1d_figures
-#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl1d_og/figures-%j.out
-#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl1d_og/figures-%j.err
+#SBATCH --output=/network/scratch/l/lindongy/timecell/sbatch_out/tunl1d_og/figures-%A.%a.out
+#SBATCH --error=/network/scratch/l/lindongy/timecell/sbatch_err/tunl1d_og/figures-%A.%a.err
 #SBATCH --partition=long
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=6
@@ -17,7 +17,7 @@ mem_list=("mem" "mem" "mem" "mem" "mem" "nomem" "nomem" "nomem")
 
 num_units_list=(128 128 256 256 512 128 256 512)
 
-lr_list=(0.0001 0.0001 0.0001 0.0001 0.0001 0.001 0.001 0.001 0.001 0.001 0.001 0.001 0.001 0.001 0.001 0.0001 0.0001 0.0001 0.0001 0.0001 0.0001 0.001 0.0001 0.0001 0.0001 0.0001 0.0001 0.0001 0.0001 0.0001 0.001 0.001 0.001 0.001 0.001 0.0001 0.0001 0.0001 0.0001 0.0001)
+lr_list=(0.0001 0.0001 0.0001 0.001 0.0001 0.0001 0.001 0.0001)
 
 dropout_prob_list=(0.0 0.0 0.5 0.25 0.1 0.0 0.0 0.0)
 
@@ -41,4 +41,5 @@ else
   model_path=${mem}"_40_lstm_${num_units}_${lr}_p${dropout_prob}_${dropout_type}"
 fi
 
-python analysis/analysis_script_tunl1d.py --main_dir /home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/data/tunl1d --main_save_dir /home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_figures/tunl1d --n_shuffle 1000 --percentile 99.999 --data_dir $model_path --seed $seed --episode $episode
+python analysis/analysis_script_tunl1d.py --main_dir /home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/data/tunl1d --main_save_dir /home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_results/tunl1d --n_shuffle 1000 --percentile 99.999 --data_dir $model_path --seed $seed --episode $episode
+
