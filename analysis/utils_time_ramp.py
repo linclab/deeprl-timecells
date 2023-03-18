@@ -518,7 +518,7 @@ def plot_field_width_vs_peak_time(resp, save_dir, title):
     plt.plot(lin_reg, alpha=0.5)
     plt.xlabel("Peak time")
     plt.ylabel("Field width")
-    plt.savefig(os.path.join(save_dir, f"{title}p_eak_time_vs_field_width.svg"))
+    plt.savefig(os.path.join(save_dir, f"{title}_peak_time_vs_field_width.svg"))
 
 
 def identify_stimulus_selective_neurons(resp, stim_labels, alpha=0.01, varying_duration=False):
