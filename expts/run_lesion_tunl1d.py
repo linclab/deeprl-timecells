@@ -51,12 +51,7 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
         while not done:
             pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float().to(device), lesion_idx=lesion_idx)
             if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
-                if net.hidden_types[1] == 'linear':
-                    resp.append(net.cell_out[net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
-                elif net.hidden_types[1] == 'lstm':
-                    resp.append(net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
-                elif net.hidden_types[1] == 'gru':
-                    resp.append(net.hx[net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())  # hidden state of GRU cell
+                resp.append(net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
             act, p, v = select_action(net, pol, val)
             new_obs, reward, done = env.step(act, episode_sample)
             net.rewards.append(reward)
@@ -185,8 +180,8 @@ if __name__ == '__main__':
     pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
     seed = int(pt[1])
     epi = int(pt[2])
-    main_data_analysis_dir = '/network/scratch/l/lindongy/timecell/data_analysis/tunl1d_og'
-    data_analysis_dir = os.path.join(main_data_analysis_dir, config_dir)
+    main_dir = '/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_results/tunl1d'
+    data_analysis_dir = os.path.join(main_dir, config_dir)
     ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_ramp_ident_results.npz'), allow_pickle=True)
     time_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_time_cell_results.npz'), allow_pickle=True)
     cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
@@ -216,10 +211,10 @@ if __name__ == '__main__':
     print(hidden_type, n_neurons, lr, seed, epi, env_title, net_title)
 
     # Make directory in /lesion to save data and model
-    main_dir = '/network/scratch/l/lindongy/timecell/lesion/tunl1d_og'
-    save_dir = os.path.join(main_dir, f'{config_dir}_seed{seed}_epi{epi}')
+    agent_str = f"{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}"
+    save_dir = os.path.join(main_dir, config_dir, agent_str, argsdict['expt_type'])
     if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir)
     print(f'Saving to {save_dir}')
 
     # Setting up cuda and seeds
@@ -250,7 +245,7 @@ if __name__ == '__main__':
                 else:
                     net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
                 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-                net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
+                net.load_state_dict(torch.load(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/tunl1d_og', load_model_path)))
                 net.eval()
 
                 lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion].astype(int)
