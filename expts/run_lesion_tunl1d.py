@@ -69,8 +69,8 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
     if save_net_and_data:
         net_and_data_dir = os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_net_and_data')
         os.mkdir(net_and_data_dir)
-        torch.save(net.state_dict(), os.path.join(net_and_data_dir, f'/postlesion_{title}.pt'))
-        np.savez_compressed(os.path.join(net_and_data_dir, f'/lesion_{title}_data.npz'), stim=stim, first_action=first_action, delay_resp=delay_resp)
+        #torch.save(net.state_dict(), os.path.join(net_and_data_dir, f'postlesion_{title}.pt'))
+        np.savez_compressed(os.path.join(net_and_data_dir, f'lesion_{title}_data.npz'), stim=stim, first_action=first_action, delay_resp=delay_resp)
     del stim, first_action, delay_resp
     return np.mean(nonmatch_perc)
 
