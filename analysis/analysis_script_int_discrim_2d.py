@@ -145,8 +145,8 @@ plot_r_tuning_curves(stim1_resp, stim2_resp, 'stim_1', 'stim_2', save_dir=save_d
 # Define period that we want to analyse
 for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,0],stim[:,1], None], ['stimulus_1', 'stimulus_2', 'delay']):
     print(f"analysing data from {label}")
-    ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_ramp_ident_results.npz'), allow_pickle=True)
-    time_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_time_cell_results.npz'), allow_pickle=True)
+    ramp_ident_results = np.load(os.path.join(os.path.join(argsdict['main_save_dir'], data_dir),f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_ramp_ident_results.npz'), allow_pickle=True)
+    time_ident_results = np.load(os.path.join(os.path.join(argsdict['main_save_dir'], data_dir),f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_time_cell_results.npz'), allow_pickle=True)
     cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
     cell_nums_time = time_ident_results['time_cell_nums']
 

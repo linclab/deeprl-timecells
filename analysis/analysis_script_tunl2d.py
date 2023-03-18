@@ -143,8 +143,8 @@ for resp, label in zip([left_stim_resp, right_stim_resp], ['left', 'right']):
 # tuning_curve_dim_reduction(delay_resp, mode='tsne', save_dir=save_dir, title=f'{seed}_{epi}_all')
 # breakpoint()
 
-ramp_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'), allow_pickle=True)
-time_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_time_cell_results.npz'), allow_pickle=True)
+ramp_ident_results = np.load(os.path.join(os.path.join(argsdict['main_save_dir'], data_dir),f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'), allow_pickle=True)
+time_ident_results = np.load(os.path.join(os.path.join(argsdict['main_save_dir'], data_dir),f'{seed}_{epi}_{n_shuffle}_{percentile}_time_cell_results.npz'), allow_pickle=True)
 cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
 cell_nums_ramp_l = ramp_ident_results['cell_nums_ramp_l']
 cell_nums_ramp_r = ramp_ident_results['cell_nums_ramp_r']
