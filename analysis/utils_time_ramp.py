@@ -308,7 +308,7 @@ def ridge_to_background_varying_duration(resp, stim_duration, ramping_bool, perc
         tuning_curve_fig = plt.figure('ramp_subtracted', figsize=(24, plot_rows * 4))  # , figsize=(24, plot_rows * 4)
 
     for i_neuron in tqdm(range(n_neurons)):
-        tuning_curve = calculate_tuning_curves_single_neuron_varying_duration(resp, return_trimmed=True)
+        tuning_curve = calculate_tuning_curves_single_neuron_varying_duration(resp[:, :, i_neuron], return_trimmed=True)
         if ramping_bool[i_neuron]:  # if i_neuron is a ramping neuron, then subtract the linear regression
             t = np.arange(len(tuning_curve))
             slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
@@ -318,6 +318,7 @@ def ridge_to_background_varying_duration(resp, stim_duration, ramping_bool, perc
         if ramping_bool[i_neuron]:
             RB_result[i_neuron] = np.nanmax(lin_subtracted_tuning_curve) / np.nanmean(lin_subtracted_tuning_curve)
             shuffled_RB = np.zeros(n_shuff)
+            #breakpoint()
             lin_subtracted_resp = nan_resp[:, :len(tuning_curve), i_neuron] - np.tile(lin_reg, (n_total_episodes, 1))
             for i_shuff in range(n_shuff):
                 shuffled_resp = shuffle_activity_single_neuron_varying_duration(lin_subtracted_resp, stim_duration, return_nan=False)  # contains 0
@@ -477,18 +478,22 @@ def plot_r_tuning_curves(resp_1, resp_2, label_1, label_2, save_dir, varying_dur
     :return: None
     """
     assert resp_1.shape[-1] == resp_2.shape[-1], "resp_1 and resp_2 must have the same number of neurons"
+    n_neurons = resp_1.shape[-1]
+    r_arr, pval_arr = np.zeros(n_neurons), np.zeros(n_neurons)
     if varying_duration:
-        r = correlation_between_tuning_curves(
-            calculate_tuning_curves_varying_duration(resp_1),
-            calculate_tuning_curves_varying_duration(resp_2)
+        for i_neuron in range(n_neurons):
+            r_arr[i_neuron], pval_arr[i_neuron] = correlation_between_tuning_curves(
+            calculate_tuning_curves_single_neuron_varying_duration(resp_1[:, :, i_neuron]),
+            calculate_tuning_curves_single_neuron_varying_duration(resp_2[:, :, i_neuron])
         )
     else:
-        r = correlation_between_tuning_curves(
-            calculate_tuning_curves(resp_1),
-            calculate_tuning_curves(resp_2)
-        )
+        for i_neuron in range(n_neurons):
+            r_arr[i_neuron], pval_arr[i_neuron] = correlation_between_tuning_curves(
+                calculate_tuning_curves_single_neuron(resp_1[:, :, i_neuron]),
+                calculate_tuning_curves_single_neuron(resp_2[:, :, i_neuron])
+            )
     plt.figure()
-    plt.hist(r, range=(-1,1), bins=50)
+    plt.hist(r_arr, range=(-1,1), bins=50)
     plt.xlabel(f"r({label_1}, {label_2})")
     plt.ylabel("Fraction")
     plt.savefig(os.path.join(save_dir, f"{label_1}_{label_2}_r_hist.svg"))
