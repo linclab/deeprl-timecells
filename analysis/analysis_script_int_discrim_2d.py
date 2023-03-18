@@ -24,13 +24,14 @@ argsdict = args.__dict__
 print(argsdict)
 main_dir = argsdict['main_dir']
 data_dir = argsdict['data_dir']
-save_dir = os.path.join(argsdict['main_save_dir'], data_dir)
-if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
 seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']
 percentile = argsdict['percentile']
+agent_str = f"{seed}_{epi}_{n_shuffle}_{percentile}"
+save_dir = os.path.join(argsdict['main_save_dir'], data_dir, agent_str)
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
 data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')
@@ -82,15 +83,15 @@ plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_typ
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
     reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
 
     reshape_resp = np.reshape(stim2_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
 
     reshape_resp = np.reshape(delay_resp, (n_total_episodes*20, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=1, keepdims=True)) / np.ptp(reshape_resp, axis=1, keepdims=True)
+    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
 
 last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
