@@ -698,7 +698,7 @@ def identify_place_cells(resp, loc, percentile, save_dir, title, n_shuff=100, pl
 
         if plot:
             ratemap_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
-            ratemap_plot.imshow(ratemap, cmap='jet')
+            ratemap_plot.imshow(ratemap[i_neuron], cmap='jet')
             ratemap_plot.set_title(f'RB={RB_arr[i_neuron]:.5f}\nzRB={zRB_threshold_arr[i_neuron]:.5f}')
     if plot:
         with PdfPages(os.path.join(save_dir, f'{title}_ratemaps.pdf')) as pdf:
