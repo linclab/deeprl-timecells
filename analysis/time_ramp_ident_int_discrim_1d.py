@@ -20,11 +20,16 @@ main_dir = argsdict['main_dir']
 data_dir = argsdict['data_dir']
 save_dir = os.path.join(argsdict['main_save_dir'], data_dir)
 if not os.path.exists(save_dir):
+    breakpoint()
     os.makedirs(save_dir, exist_ok=True)
 seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']
 percentile = argsdict['percentile']
+if os.path.exists(os.path.join(save_dir, f'{seed}_{epi}_{n_shuffle}_{percentile}_delay_time_cell_results.npz')):
+    print("cell identification analysis already been done. exiting.")
+    sys.exit()
+
 data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')
