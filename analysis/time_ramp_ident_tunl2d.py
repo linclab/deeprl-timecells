@@ -29,8 +29,16 @@ seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']
 percentile = argsdict['percentile']
-data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
+if not os.path.exists(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/tunl2d', data_dir, f'seed_{seed}_epi{epi}.pt')):
+    print("agent does not exist. exiting.")
+    sys.exit()
+
+if os.path.exists(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_time_cell_results.npz')):
+    print("cell identification analysis already done. exiting.")
+    sys.exit()
+
+data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 hparams = data_dir.split('_')
 env_type = hparams[0]
 len_delay = int(hparams[1])
