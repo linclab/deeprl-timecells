@@ -29,6 +29,12 @@ percentile = argsdict['percentile']
 if os.path.exists(os.path.join(save_dir, f'{seed}_{epi}_{n_shuffle}_{percentile}_delay_time_cell_results.npz')):
     print("cell identification analysis already been done. exiting.")
     sys.exit()
+if not os.path.exists(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/timing', data_dir, f'seed_{seed}_epi{epi}.pt')):
+    print("agent does not exist. exiting.")
+    sys.exit()
+if not os.path.exists(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz')):
+    print("data does not exist. exiting.")
+    sys.exit()
 
 data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
