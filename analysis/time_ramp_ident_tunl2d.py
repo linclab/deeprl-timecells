@@ -62,7 +62,7 @@ if normalize:
     reshape_resp = np.reshape(delay_resp, (n_total_episodes*len_delay, n_neurons))
     reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
-
+delay_resp[np.isnan(delay_resp)] = 0
 
 # # Select units with large enough variation in its activation
 # big_var_neurons = []
@@ -118,19 +118,25 @@ np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile
                     ramp_cell_bool=ramp_cell_bool,cell_nums_ramp=cell_nums_ramp)
 print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
 
-RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left')
-seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
-cell_nums_seq_l = np.where(seq_cell_bool_l)[0]
-RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_right')
-seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
-cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
-seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
-cell_nums_seq = np.where(seq_cell_bool)[0]
-np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz'),
-                    RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
-                    RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
-                    seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
-print(f"{len(cell_nums_seq)}/{n_neurons} significant RB cells")
+if os.path.exists(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz')):
+    print('seq_ident_results.npz already exists')
+    seq_ident_results = np.load(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz'), allow_pickle=True)
+    cell_nums_seq_l = seq_ident_results['cell_nums_seq_l']
+    cell_nums_seq_r = seq_ident_results['cell_nums_seq_r']
+else:
+    RB_result_l, z_RB_threshold_result_l = ridge_to_background(left_stim_resp, ramp_cell_bool_l, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left')
+    seq_cell_bool_l = RB_result_l > z_RB_threshold_result_l
+    cell_nums_seq_l = np.where(seq_cell_bool_l)[0]
+    RB_result_r, z_RB_threshold_result_r = ridge_to_background(right_stim_resp, ramp_cell_bool_r, percentile=percentile, n_shuff=n_shuffle,plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_right')
+    seq_cell_bool_r = RB_result_r > z_RB_threshold_result_r
+    cell_nums_seq_r = np.where(seq_cell_bool_r)[0]
+    seq_cell_bool = np.logical_or(seq_cell_bool_l, seq_cell_bool_r)
+    cell_nums_seq = np.where(seq_cell_bool)[0]
+    np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_seq_ident_results.npz'),
+                        RB_result_l=RB_result_l, z_RB_threshold_result_l=z_RB_threshold_result_l,seq_cell_bool_l=seq_cell_bool_l, cell_nums_seq_l=cell_nums_seq_l,
+                        RB_result_r=RB_result_r, z_RB_threshold_result_r=z_RB_threshold_result_r,seq_cell_bool_r=seq_cell_bool_r,cell_nums_seq_r=cell_nums_seq_r,
+                        seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
+    print(f"{len(cell_nums_seq)}/{n_neurons} significant RB cells")
 
 trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_vs_shuffle_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
 trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
