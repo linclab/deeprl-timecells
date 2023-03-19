@@ -472,7 +472,7 @@ def shuffle_activity_single_neuron_varying_duration(delay_resp, stim_duration, r
     n_episodes = np.shape(delay_resp)[0]
     for i_eps in range(n_episodes):
         epi_resp = delay_resp[i_eps, :stim_duration[i_eps]]
-        shift = np.random.randint(np.floor(stim_duration[i_eps]*0.3, np.ceil(stim_duration[i_eps]*0.7)))
+        shift = np.random.randint(np.floor(stim_duration[i_eps]*0.3), np.ceil(stim_duration[i_eps]*0.7))
         shuffled_delay_resp[i_eps, :stim_duration[i_eps]] = np.roll(epi_resp, shift=shift)
     if return_nan:
         shuffled_delay_resp[shuffled_delay_resp == 0] = np.nan
