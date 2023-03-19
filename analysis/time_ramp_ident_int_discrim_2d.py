@@ -20,7 +20,7 @@ main_dir = argsdict['main_dir']
 data_dir = argsdict['data_dir']
 save_dir = os.path.join(argsdict['main_save_dir'], data_dir)
 if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']

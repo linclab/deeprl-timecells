@@ -9,8 +9,6 @@ sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
-utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="../analysis/fonts")
-
 parser = argparse.ArgumentParser(description="Non-location-fixed 2D TUNL task simulation")
 parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl2d',help="main data directory")
 parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_1e-05',help="directory in which .npz is saved")

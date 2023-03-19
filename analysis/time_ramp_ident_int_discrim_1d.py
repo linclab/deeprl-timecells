@@ -20,7 +20,7 @@ main_dir = argsdict['main_dir']
 data_dir = argsdict['data_dir']
 save_dir = os.path.join(argsdict['main_save_dir'], data_dir)
 if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']
@@ -84,7 +84,7 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     if label == 'delay':
         RB_result, z_RB_threshold_result = ridge_to_background(resp, ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
     else:
-        RB_result, z_RB_threshold_result = ridge_to_background_varying_duration(resp, stim,  ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
+        RB_result, z_RB_threshold_result = ridge_to_background_varying_duration(resp, stimulus,  ramp_cell_bool, percentile=percentile, n_shuff=n_shuffle, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}')
     seq_cell_bool = RB_result > z_RB_threshold_result
     cell_nums_seq = np.where(seq_cell_bool)[0]
     np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_seq_ident_results.npz'),
@@ -94,7 +94,7 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     if label=='delay':
         trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_vs_shuffle_score(resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
     else:
-        trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_vs_shuffle_score_varying_duration(resp, stim, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+        trial_reliability_score_result, trial_reliability_score_threshold_result = trial_reliability_vs_shuffle_score_varying_duration(resp, stimulus, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
     trial_reliable_cell_bool = trial_reliability_score_result >= trial_reliability_score_threshold_result
     trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
     np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_{label}_trial_reliability_results.npz'),
