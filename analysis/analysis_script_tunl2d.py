@@ -32,7 +32,10 @@ percentile = argsdict['percentile']
 agent_str = f"{seed}_{epi}_{n_shuffle}_{percentile}"
 save_dir = os.path.join(argsdict['main_save_dir'], data_dir, agent_str)
 if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
+if not os.path.exists(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/tunl2d', data_dir, f'seed_{seed}_epi{epi}.pt')):
+    print("agent does not exist. exiting.")
+    sys.exit()
 data = np.load(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz'), allow_pickle=True)  # data.npz file
 
 hparams = data_dir.split('_')

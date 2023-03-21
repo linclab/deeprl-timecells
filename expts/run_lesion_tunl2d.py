@@ -198,6 +198,9 @@ if __name__ == '__main__':
     lesion_idx_end = argsdict['lesion_idx_end']
     n_ramp_time_shuffle = argsdict['n_ramp_time_shuffle']
     ramp_time_percentile = argsdict['ramp_time_percentile']
+    if not os.path.exists(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/tunl2d', load_model_path)):
+        print("agent does not exist. exiting.")
+    sys.exit()
 
     # Load_model_path: mem_40_lstm_256_5e-06/seed_1_epi999999.pt, relative to training/tunl2d
     config_dir = load_model_path.split('/')[0]
