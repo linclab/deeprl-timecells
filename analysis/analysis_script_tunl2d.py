@@ -96,7 +96,7 @@ if normalize:
     reshape_resp = np.reshape(delay_resp, (n_total_episodes*len_delay, n_neurons))
     reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
-
+delay_resp[np.isnan(delay_resp)] = 0
 
 # # Select units with large enough variation in its activation
 # big_var_neurons = []
@@ -153,7 +153,8 @@ cell_nums_time = time_ident_results['time_cell_nums']
 cell_nums_time_l = time_ident_results['time_cell_nums_l']
 cell_nums_time_r = time_ident_results['time_cell_nums_l']
 
-
+plot_r_tuning_curves(left_stim_resp[:, :, cell_nums_ramp], right_stim_resp[:, :, cell_nums_ramp], 'left_ramp', 'right_ramp', save_dir=save_dir)
+plot_r_tuning_curves(left_stim_resp[:, :, cell_nums_time], right_stim_resp[:, :, cell_nums_time], 'left_time', 'right_time', save_dir=save_dir)
 plot_field_width_vs_peak_time(left_stim_resp[:, :, cell_nums_time_l], save_dir=save_dir, title='left_time_cells')
 plot_field_width_vs_peak_time(right_stim_resp[:, :, cell_nums_time_r], save_dir=save_dir, title='Right_time_cells')
 
@@ -220,7 +221,7 @@ shuffled_mutual_info = calculate_shuffled_mutual_information(delay_resp, delay_l
 
 plot_mutual_info_distribution(mutual_info, title='all_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info, save_dir=save_dir, save=False)
 
-joint_encoding_info(delay_resp, delay_loc, analysis='selectivity', recalculate=True)
+joint_encoding_info(delay_resp, delay_loc, save_dir=save_dir, analysis='selectivity', recalculate=True)
 plot_joint_encoding_information(save_dir=save_dir, title='all_cells')
 
 ratemap_left_sti, spatial_occupancy_left_sti = construct_ratemap(left_stim_resp, left_stim_loc)

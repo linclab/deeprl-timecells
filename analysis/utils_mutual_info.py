@@ -539,7 +539,7 @@ def informativeness(delay_resp, delay_loc, randomize=None, shuffle=None):
     return mutual_info(ratemap, occupancy)
 
 
-def joint_encoding_info(delay_resp, delay_loc, variables="place+time", analysis=None, recalculate=False):
+def joint_encoding_info(delay_resp, delay_loc, save_dir, variables="place+time", analysis=None, recalculate=False):
     if variables=="place+time":
         if recalculate:
             n_neurons = np.shape(delay_resp)[-1]
@@ -557,11 +557,9 @@ def joint_encoding_info(delay_resp, delay_loc, variables="place+time", analysis=
             I_unsfl_unrmd, I_unsfl_posrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_posrmd[sig_cells], I_unsfl_timermd[sig_cells]
             I_sfl_unrmd, I_sfl_posrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_posrmd[sig_cells], I_sfl_timermd[sig_cells]
 
-            # np.savez_compressed(os.getcwd() + '/joint_encoding.npz', analysis="20211112_place_time_joint_encoding",
-            #                     I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_posrmd=I_unsfl_posrmd, I_unsfl_timermd=I_unsfl_timermd,
-            #                     I_sfl_unrmd=I_sfl_unrmd, I_sfl_posrmd=I_sfl_posrmd, I_sfl_timermd=I_sfl_timermd)
+            np.savez_compressed(os.path.join(save_dir, 'joint_encoding.npz'), I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_posrmd=I_unsfl_posrmd, I_unsfl_timermd=I_unsfl_timermd, I_sfl_unrmd=I_sfl_unrmd, I_sfl_posrmd=I_sfl_posrmd, I_sfl_timermd=I_sfl_timermd)
         else:
-            info = np.load('joint_encoding.npz')
+            info = np.load(os.path.join(save_dir, 'joint_encoding.npz'))
             I_unsfl_unrmd,  I_unsfl_posrmd, I_unsfl_timermd = info["I_unsfl_unrmd"], info["I_unsfl_posrmd"], info["I_unsfl_timermd"]
             I_sfl_unrmd,  I_sfl_posrmd, I_sfl_timermd = info["I_sfl_unrmd"], info["I_sfl_posrmd"], info["I_sfl_timermd"]
 
@@ -582,7 +580,7 @@ def joint_encoding_info(delay_resp, delay_loc, variables="place+time", analysis=
 
 
 def plot_joint_encoding_information(save_dir, title, logInfo=False, save=False):
-    I = np.load('joint_encoding.npz')
+    I = np.load(os.path.join(save_dir, 'joint_encoding.npz'))
     if logInfo:
         unrmd, posrmd, timermd = np.log(I['I_unsfl_unrmd']), np.log(I['I_unsfl_posrmd']), np.log(I['I_unsfl_timermd'])
     else:
