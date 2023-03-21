@@ -200,7 +200,7 @@ if __name__ == '__main__':
     ramp_time_percentile = argsdict['ramp_time_percentile']
     if not os.path.exists(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/tunl2d', load_model_path)):
         print("agent does not exist. exiting.")
-    sys.exit()
+        sys.exit()
 
     # Load_model_path: mem_40_lstm_256_5e-06/seed_1_epi999999.pt, relative to training/tunl2d
     config_dir = load_model_path.split('/')[0]
@@ -340,7 +340,7 @@ if __name__ == '__main__':
                     print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle]*100:.3f}% nonmatch")
                 del env, net, optimizer
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncol=1)
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1)
     fig.suptitle(f'{env_title}_{ckpt_name}')
     ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), color='gray', label='Random lesion')
     ax1.fill_between(n_lesion,

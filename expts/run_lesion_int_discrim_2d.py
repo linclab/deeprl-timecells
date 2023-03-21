@@ -334,7 +334,7 @@ if __name__ == '__main__':
                         print(f"Lesion type: {lesion_type} ; Lesion number: {num_lesion} ; completed. {postlesion_perf_array[i_lesion_type, i_num_lesion, i_shuffle]*100:.3f}% nonmatch")
                     del env, net, optimizer
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncol=1)
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1)
     fig.suptitle(f'{env_title}_{ckpt_name}')
     ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), color='gray', label='Random lesion')
     ax1.fill_between(n_lesion,
