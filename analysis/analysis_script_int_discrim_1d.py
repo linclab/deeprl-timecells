@@ -27,6 +27,12 @@ seed = argsdict['seed']
 epi = argsdict['episode']
 n_shuffle = argsdict['n_shuffle']
 percentile = argsdict['percentile']
+if not os.path.exists(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/timing', data_dir, f'seed_{seed}_epi{epi}.pt')):
+    print("agent does not exist. exiting.")
+    sys.exit()
+if not os.path.exists(os.path.join(main_dir, data_dir, data_dir+f'_seed_{seed}_epi{epi}.pt_data.npz')):
+    print("data does not exist. exiting.")
+    sys.exit()
 agent_str = f"{seed}_{epi}_{n_shuffle}_{percentile}"
 save_dir = os.path.join(argsdict['main_save_dir'], data_dir, agent_str)
 if not os.path.exists(save_dir):
@@ -98,18 +104,19 @@ last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
 
 # Plot cell activities in all combinations of stimulus length
 
-plot_time_cell_sorted_same_order(stim, stim1_resp, stim2_resp,save_dir=save_dir, save=False)  # Plot stim1 and stim2 time cells sorted in same order
-single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir=save_dir, compare_correct=False)  # if compare_correct, then SAVE AUTOMATICALLY
+plot_time_cell_sorted_same_order(stim, stim1_resp, stim2_resp,save_dir=save_dir, save=True)  # Plot stim1 and stim2 time cells sorted in same order
+single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir=save_dir, compare_correct=True)  # if compare_correct, then SAVE AUTOMATICALLY
 retiming(stim, stim1_resp, stim2_resp, save_dir=save_dir, verbose=True)  # SAVE AUTOMATICALLY. Takes ~10 minutes
 linear_readout(stim, stim1_resp, stim2_resp, save_dir=save_dir)  # SAVE AUTOMATICALLY
-decoding(stim, last_step_resp, save_dir=save_dir, save=False)  # decodes stim1, stim2, stim1>stim2, and stim1-stim2
-manifold(stim, last_step_resp, save_dir=save_dir, save=False)  # splits last step resp into stim1>stim2 and stim1<stim2 conditions
-time_decode_all_stim_len(stim1_resp, stim[:,0], title='stim1_resp', save_dir=save_dir, save=False)  # decode time, grouped by stimulus length
-time_decode_lin_reg(stim1_resp, 40, n_neurons, 1000, "stim1", save_dir=save_dir, save=False)
-time_decode_lin_reg(stim2_resp, 40, n_neurons, 1000, "stim2", save_dir=save_dir, save=False)
-time_decode_lin_reg(delay_resp, 20, n_neurons, 1000, "delay", save_dir=save_dir, save=False)
-compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="decoding", resp2=stim2_resp, title='', save_dir=save_dir, save=False)  # decode time; train on corr, test on incorr
-compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="population", resp2=stim2_resp, title='', save_dir=save_dir, save=False)  # plot population sequence for corr and incorr trials
+decoding(stim, last_step_resp, save_dir=save_dir, save=True)  # decodes stim1, stim2, stim1>stim2, and stim1-stim2
+manifold(stim, last_step_resp, save_dir=save_dir, save=True)  # splits last step resp into stim1>stim2 and stim1<stim2 conditions
+time_decode_all_stim_len(stim1_resp, stim[:,0], title='stim1_resp', save_dir=save_dir, save=True)  # decode time, grouped by stimulus length
+time_decode_lin_reg(stim1_resp, 40, n_neurons, 1000, "stim1", save_dir=save_dir, save=True)
+time_decode_lin_reg(stim2_resp, 40, n_neurons, 1000, "stim2", save_dir=save_dir, save=True)
+time_decode_lin_reg(delay_resp, 20, n_neurons, 1000, "delay", save_dir=save_dir, save=True)
+
+compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="decoding", resp2=stim2_resp, title='', save_dir=save_dir, save=True)  # decode time; train on corr, test on incorr
+compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="population", resp2=stim2_resp, title='', save_dir=save_dir, save=True)  # plot population sequence for corr and incorr trials
 # single_cell_visualization(stim2_resp, correct_trials, np.arange(n_neurons), "")
 
 
@@ -140,7 +147,6 @@ plot_r_tuning_curves(odd_trial_resp, even_trial_resp, 'odd_trial_stim_2', 'even_
 
 plot_r_tuning_curves(stim1_resp, stim2_resp, 'stim_1', 'stim_2', save_dir=save_dir, varying_duration=True)
 
-
 #=================
 # Define period that we want to analyse
 for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,0],stim[:,1], None], ['stimulus_1', 'stimulus_2', 'delay']):
@@ -150,7 +156,7 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
     cell_nums_time = time_ident_results['time_cell_nums']
 
-    cell_nums_nontime = np.remove(np.arange(n_neurons), np.intersect1d(cell_nums_time, cell_nums_ramp))
+    cell_nums_nontime = np.delete(np.arange(n_neurons), np.intersect1d(cell_nums_time, cell_nums_ramp))
 
     # Here, the cell_nums have not been re-arranged according to peak latency yet
     resp_ramp = resp[:, :, cell_nums_ramp]
@@ -161,12 +167,13 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
     n_nontime_neurons = len(cell_nums_nontime)
     
     # See if time cell/ramping cell/nontime cells can decode time
-    time_decode_all_stim_len(resp_ramp, stimulus, title=label+' ramp', save_dir=save_dir, save=True)  # decode time, grouped by stimulus length
-    time_decode_all_stim_len(resp_time, stimulus, title=label+' time', save_dir=save_dir, save=True)
-    time_decode_all_stim_len(resp_nontime, stimulus, title=label+' nontime', save_dir=save_dir, save=True)
-    time_decode_lin_reg(resp_ramp, np.shape(resp[1]), n_ramp_neurons, 1000, title=label+' ramp', save_dir=save_dir, save=True)
-    time_decode_lin_reg(resp_time, np.shape(resp[1]), n_time_neurons, 1000, title=label+' time', save_dir=save_dir, save=True)
-    time_decode_lin_reg(resp_nontime, np.shape(resp[1]), n_nontime_neurons, 1000, title=label+' nontime', save_dir=save_dir, save=True)
+    if label != 'delay':
+        time_decode_all_stim_len(resp_ramp, stimulus, title=label+' ramp', save_dir=save_dir, save=True)  # decode time, grouped by stimulus length
+        time_decode_all_stim_len(resp_time, stimulus, title=label+' time', save_dir=save_dir, save=True)
+        time_decode_all_stim_len(resp_nontime, stimulus, title=label+' nontime', save_dir=save_dir, save=True)
+    time_decode_lin_reg(resp_ramp, np.shape(resp)[1], n_ramp_neurons, 1000, title=label+' ramp', save_dir=save_dir, save=True)
+    time_decode_lin_reg(resp_time, np.shape(resp)[1], n_time_neurons, 1000, title=label+' time', save_dir=save_dir, save=True)
+    time_decode_lin_reg(resp_nontime, np.shape(resp)[1], n_nontime_neurons, 1000, title=label+' nontime', save_dir=save_dir, save=True)
     
     
     # Re-arrange cell_nums according to peak latency
