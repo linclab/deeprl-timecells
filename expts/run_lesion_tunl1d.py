@@ -215,7 +215,7 @@ if __name__ == '__main__':
     agent_str = f"{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}"
     save_dir = os.path.join(main_dir, config_dir, agent_str, argsdict['expt_type'])
     if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+        os.makedirs(save_dir, exist_ok=True)
     print(f'Saving to {save_dir}')
 
     # Setting up cuda and seeds
