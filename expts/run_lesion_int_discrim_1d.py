@@ -44,7 +44,7 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, title, 
         stim[i_episode,0] = env.first_stim
         stim[i_episode,1] = env.second_stim
         while not done:
-            pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0), lesion_idx=lesion_idx)  # forward
+            pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0).to(device), lesion_idx=lesion_idx)  # forward
             if env.task_stage in ['init', 'choice_init']:
                 act, p, v = select_action(net, pol, val)
                 new_obs, reward, done = env.step(act)
@@ -101,7 +101,7 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
         action_record = []
         action_prime_record = []
         while not done:
-            pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0))
+            pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0).to(device))
             pi_record.append(pol)
             new_activity = net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
             new_activity[lesion_idx] = 0  # the new, manipulated hx
@@ -179,17 +179,23 @@ if __name__ == '__main__':
     main_dir = '/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_results/timing1d'
     data_analysis_dir = os.path.join(main_dir, config_dir)
 
-    cell_nums_ramp = []
-    cell_nums_time = []
+    cell_bools_ramp = []
+    cell_bools_time = []
     for label in ['stimulus_1', 'stimulus_2']:
         print(f"analysing data from {label}")
         ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_{label}_ramp_ident_results.npz'), allow_pickle=True)
-        time_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_{label}_time_cell_results.npz'), allow_pickle=True)
-        cell_nums_ramp.append(ramp_ident_results['cell_nums_ramp'])
-        cell_nums_time.append(time_ident_results['time_cell_nums'])
-    cell_nums_ramp = np.logical_or(cell_nums_ramp[0], cell_nums_ramp[1])  # ramping cell for either stim_1 or stim_2
-    cell_nums_time = np.logical_or(cell_nums_time[0], cell_nums_time[1])  # time cell for either stim_1 or stim_2
-
+        trial_reliability_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_{label}_trial_reliability_results.npz'), allow_pickle=True)
+        RB_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_{label}_seq_ident_results.npz'), allow_pickle=True)
+        ramp_cell_bool = ramp_ident_results['ramp_cell_bool']
+        trial_reliable_cell_bool = trial_reliability_results['trial_reliable_cell_bool']
+        seq_cell_bool = RB_results['seq_cell_bool']
+        time_cell_bool = np.logical_and(trial_reliable_cell_bool, seq_cell_bool)
+        cell_bools_time.append(time_cell_bool)
+        cell_bools_ramp.append(ramp_cell_bool)
+    cell_bools_ramp = np.logical_or(cell_bools_ramp[0], cell_bools_ramp[1])  # ramping cell for either stim_1 or stim_2
+    cell_bools_time = np.logical_or(cell_bools_time[0], cell_bools_time[1])  # time cell for either stim_1 or stim_2
+    cell_nums_ramp = np.where(cell_bools_ramp)[0]
+    cell_nums_time = np.where(cell_bools_time)[0]
 
     # Load existing model
     ckpt_name = load_model_path.replace('/', '_').replace('.pt', '_pt')  # 'lstm_512_5e-06_seed_1_epi59999_pt'
