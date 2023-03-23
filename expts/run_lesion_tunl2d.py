@@ -138,7 +138,7 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
             action_prime_record.append(new_action)
 
             # proceed with trial with old policy
-            new_obs, reward, done = env.step(action)
+            new_obs, reward, done, _ = env.step(action)
             # calculate hypothetical reward if the new action from rehydrated network was taken
             reward_prime = env.calc_reward_without_stepping(new_action)
             if reward_prime == env.step_rwd or reward_prime == env.poke_rwd or reward_prime == 0:  # navigation reward
@@ -147,7 +147,6 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
         choice[i_episode] = env.current_loc
         if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
             nonmatch_perc[i_episode] = 1
-            breakpoint()  # check: reward == env.rwd
         if reward_prime == env.rwd:
             nonmatch_perc_prime[i_episode] = 1
         epi_nav_reward[i_episode] = env.nav_reward
