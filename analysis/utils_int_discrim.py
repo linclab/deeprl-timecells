@@ -17,6 +17,8 @@ def compare_correct_vs_incorrect(resp, stim_all, correct_trial, title, save_dir,
     incorr_resp = resp[correct_trial == 0, :, :]
     print("Number of correct episodes: ", np.shape(corr_resp)[0])
     print("Number of incorrect episodes: ", np.shape(incorr_resp)[0])
+    n_neurons = resp.shape[2]
+    len_delay = resp.shape[1]
     # n_episodes = np.shape(incorr_resp)[0]
     # idx_episodes = np.random.choice(np.shape(corr_resp)[0], size=(n_episodes,1), replace=False)
     # corr_resp = np.squeeze(corr_resp[idx_episodes, :, :])
@@ -103,7 +105,7 @@ def compare_correct_vs_incorrect(resp, stim_all, correct_trial, title, save_dir,
         corr_resp = np.concatenate((corr_resp, corr_resp2), axis=0)
         incorr_resp = np.concatenate((incorr_resp, incorr_resp2), axis=0)
         plot_sorted_in_same_order(corr_resp, incorr_resp, 'Correct trials', 'Incorrect trials', big_title="",
-                                  len_delay=40, n_neurons=512, save_dir=save_dir, save=save)
+                                  len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=save)
 
 
 def time_decode_all_stim_len(stim_resp, stim, save_dir, title, save=False, bin_size=1000):
