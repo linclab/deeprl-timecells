@@ -19,6 +19,7 @@ from matplotlib.cbook import _reshape_2D
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+from scipy.stats import entropy
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
@@ -655,7 +656,102 @@ def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_da
 
 
 
+def calculate_time_stimulus_mutual_info(resp, stim):
 
+    """
+    calculate the shannon mutual information carried by each neuron's activity about time and stimulus.
+    :param resp: (n_trials, len_delay, n_neurons)
+    :param stim: (n_trials,)
+    :return: mutual_info (n_neurons,)
+    """
+    n_neurons = resp.shape[-1]
+    len_delay = resp.shape[1]
+    n_total_trials = resp.shape[0]
+    MI_arr = np.zeros(n_neurons)
+    for i_neuron in n_neurons:
+        # Calculate the probability of each trial type and time point
+        p_trial_A = p_trial_B = p_time = np.zeros(len_delay)
+        for t in range(len_delay):
+            p_trial_A[t] = np.sum(resp[stim==0, t]) / np.sum(stim==0)*len_delay
+            p_trial_B[t] = np.sum(resp[stim==1:, t]) / np.sum(stim==1)*len_delay
+            p_time[t] = np.sum(resp[:, t]) / n_total_trials*len_delay
+        # Calculate the entropy of trial type and time
+        H_trial = entropy([0.5, 0.5], base=2)
+        H_time = entropy(p_time, base=2)
+
+        # Calculate the joint entropy of trial type and time
+        p_joint = np.zeros((2, len_delay))
+        p_joint[0, :] = p_trial_A
+        p_joint[1, :] = p_trial_B
+        H_joint = entropy(p_joint.reshape(8), base=2)
+
+        # Calculate the conditional entropy of firing rate given trial type and time
+        H_cond = 0
+        for i in range(2):  # trial_type, a
+            for j in range(len_delay):  # t
+                p_fr_given_t_and_a = np.sum(resp[stim==i, j]) / np.sum(p_joint[i, j])
+                H_cond += p_joint[i, j] * entropy([p_fr_given_t_and_a, 1-p_fr_given_t_and_a])
+
+        # Calculate the mutual information
+        MI_arr[i_neuron] = H_trial + H_time - H_joint - H_cond
+        # print("Mutual information:", MI)
+    return MI_arr
+
+
+def shuffle_trial(resp):
+    """
+    shuffle trial axis
+    :param resp: (n_trials, len_delay, n_neurons)
+    :return: shuffled_resp
+    """
+    shuffled_resp = resp
+    np.random.shuffle(shuffled_resp)
+    return shuffled_resp
+
+
+def shuffle_time(resp):
+    """
+    shuffle time axis
+    :param resp: (n_trials, len_delay, n_neurons)
+    :return: shuffled_resp
+    """
+    shuffled_resp = np.moveaxis(resp, 1, 0)
+    np.random.shuffle(shuffled_resp)
+    return np.moveaxis(shuffled_resp, 0, 1)
+
+
+def plot_mutual_info_vs_shuffled(resp, stim, title, save_dir, logInfo=False):
+    MI = calculate_time_stimulus_mutual_info(resp, stim)
+    time_shuffled_resp = shuffle_time(resp)
+    MI_time_shuffled = calculate_time_stimulus_mutual_info(time_shuffled_resp, stim)
+    trial_shuffled_resp = shuffle_trial(resp)
+    MI_trial_shuffled = calculate_time_stimulus_mutual_info(trial_shuffled_resp, stim)
+
+    if logInfo:
+        unrmd, timermd, trialrmd = np.log(MI), np.log(MI_time_shuffled), np.log(MI_trial_shuffled)
+    else:
+        unrmd, timermd, trialrmd = MI, MI_time_shuffled, MI_trial_shuffled
+    n_neurons = len(unrmd)
+    info = np.transpose([unrmd, timermd, trialrmd])
+
+    stats = cbook.boxplot_stats(info, labels=['Unshuffled', 'Time shuffled', 'Trial-type shuffled'], bootstrap=10000)
+    for i in range(len(stats)):
+        stats[i]['whislo'] = np.min(info[:,i], axis=0)
+        stats[i]['whishi'] = np.max(info[:,i], axis=0)
+
+    fig, axs = plt.subplots(1,1)
+    fig.suptitle(title)
+    for i in range(n_neurons):
+        plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
+
+    props = dict(color='indigo', linewidth=1.5)
+    axs.bxp(stats, showfliers=False, boxprops=props,
+            capprops=props, whiskerprops=props, medianprops=props)
+    if logInfo:
+        plt.ylabel("log(mutual information)", fontsize=19)
+    else:
+        plt.ylabel("Mutual information", fontsize=19)
+    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_{title}{"_logInfo" if logInfo else ""}.svg'))
 
 
 
