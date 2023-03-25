@@ -275,41 +275,56 @@ def plot_time_cell_sorted_same_order(stim, stim1_resp, stim2_resp, save_dir, sav
                                   save_dir=save_dir, save=save)
 
 
-def single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir, compare_correct=False):
+def single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir):
     stim_set = np.sort(np.unique(stim))
     stim_set.astype(int)
     num_stim = np.max(np.shape(stim_set))
-    if not os.path.exists(os.path.join(save_dir, 'single_cell_temporal_tuning')):
-        os.mkdir(os.path.join(save_dir, 'single_cell_temporal_tuning'))
-    save_dir = os.path.join(save_dir, 'single_cell_temporal_tuning')
+    if not os.path.exists(os.path.join(save_dir, 'single_cell_temporal_tuning_new')):
+        os.mkdir(os.path.join(save_dir, 'single_cell_temporal_tuning_new'))
+    save_dir = os.path.join(save_dir, 'single_cell_temporal_tuning_new')
 
-    if not compare_correct:
-        for unit in range(np.shape(stim1_resp)[-1]):
-            recep_field = np.zeros((num_stim, int(np.max(stim_set)), 2))
-            recep_field[:, :, :] = np.nan
-            for stim_idx in range(num_stim):
-                stim_len = int(stim_set[stim_idx])
-                episode_idx_1 = stim[:, 0] == stim_len
-                episode_idx_2 = stim[:, 1] == stim_len
-                recep_field[stim_idx, :stim_len, 0] = np.mean(np.squeeze(stim1_resp[episode_idx_1, :stim_len, unit]),
-                                                              axis=0)
-                recep_field[stim_idx, :stim_len, 1] = np.mean(np.squeeze(stim2_resp[episode_idx_2, :stim_len, unit]),
-                                                              axis=0)
-            fig, (ax1, ax2) = plt.subplots(ncols=2)
-            ax1.imshow(recep_field[:, :, 0], cmap='jet')
-            ax2.imshow(recep_field[:, :, 1], cmap='jet')
-            ax1.set_title('Correct trials')
-            ax2.set_title('Incorrect trials')
-            ax1.set_xticks(stim_set)
-            ax2.set_xticks(stim_set)
-            ax1.set_yticks([])
-            ax2.set_yticks([])
-            ax1.set_xlabel('Stimulus length')
-            ax2.set_xlabel('Stimulus length')
-            fig.suptitle("Single Unit Temporal Tuning")
-            ax1.set_aspect('auto')
-            ax2.set_aspect('auto')
-            plt.savefig(os.path.join(save_dir, f'{str(unit)}.svg'))
+    for unit in tqdm(range(np.shape(stim1_resp)[-1])):
+        tuning_curves = np.zeros((num_stim, int(np.max(stim_set)), 2))
+        tuning_curves[:, :, :] = np.nan
+        example_trials = np.zeros((num_stim*10, int(np.max(stim_set)), 2))
+        example_trials[:, :, :] = np.nan
+
+        for stim_idx in range(num_stim):
+            stim_len = int(stim_set[stim_idx])
+            episode_idx_1 = stim[:, 0] == stim_len
+            episode_idx_2 = stim[:, 1] == stim_len
+            random_trial_idx = np.random.choice(np.min(len(episode_idx_1), len(episode_idx_2)), 10)
+            tuning_curves[stim_idx, :stim_len, 0] = np.mean(np.squeeze(stim1_resp[episode_idx_1, :stim_len, unit]),
+                                                          axis=0)
+            tuning_curves[stim_idx, :stim_len, 1] = np.mean(np.squeeze(stim2_resp[episode_idx_2, :stim_len, unit]),
+                                                          axis=0)
+            example_trials[stim_idx*10:(stim_idx+1)*10, :stim_len, 0] = stim1_resp[episode_idx_1[random_trial_idx], :stim_len, unit]
+            example_trials[stim_idx*10:(stim_idx+1)*10, :stim_len, 1] = stim2_resp[episode_idx_2[random_trial_idx], :stim_len, unit]
+        fig, axs = plt.subplots(nrows=2, ncols=2, sharey='True', sharex='True')
+        axs[0,0].imshow(example_trials[:, :, 0], cmap='jet')
+        axs[0,1].imshow(example_trials[:, :, 1], cmap='jet')
+        axs[0,0].set_title('Stimulus 1')
+        axs[0,1].set_title('Stimulus 2')
+        axs[0,0].set_xticks(stim_set)
+        axs[0,1].set_xticks(stim_set)
+        axs[0,0].set_yticks([])
+        axs[0,1].set_yticks([])
+        fig.suptitle("Single Unit Temporal Tuning")
+        axs[0,0].set_aspect('auto')
+        axs[0,1].set_aspect('auto')
+        for stim_idx in range(num_stim):
+            stim_len = int(stim_set[stim_idx])
+            axs[1,0].plot(np.arange(stim_len, tuning_curves[stim_idx, :stim_len, 0], label=f"t={stim_len}"))
+            axs[1,1].plot(np.arange(stim_len, tuning_curves[stim_idx, :stim_len, 1], label=f"t={stim_len}"))
+        axs[1,0].set_xticks(stim_set)
+        axs[1,1].set_xticks(stim_set)
+        axs[1,0].set_yticks([])
+        axs[1,1].set_yticks([])
+        axs[1,0].set_xlabel('Stimulus length')
+        axs[1,1].set_xlabel('Stimulus length')
+        axs[1,0].set_ylabel("Avg activity")
+        axs[0,0].set_ylabel("Example trials")
+        plt.savefig(os.path.join(save_dir, f'{str(unit)}.svg'))
 
 
 def plot_postlesion_performance(accuracy, compare="lesion type"):
