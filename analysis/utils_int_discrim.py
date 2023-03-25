@@ -293,14 +293,16 @@ def single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir):
             stim_len = int(stim_set[stim_idx])
             episode_idx_1 = stim[:, 0] == stim_len
             episode_idx_2 = stim[:, 1] == stim_len
-            random_trial_idx = np.random.choice(np.min(len(episode_idx_1), len(episode_idx_2)), 10)
+            num_episodes_1 = np.sum(episode_idx_1)
+            num_episodes_2 = np.sum(episode_idx_2)
+            random_trial_idx = np.random.choice(np.min((num_episodes_1, num_episodes_2)), 10)
             tuning_curves[stim_idx, :stim_len, 0] = np.mean(np.squeeze(stim1_resp[episode_idx_1, :stim_len, unit]),
                                                           axis=0)
             tuning_curves[stim_idx, :stim_len, 1] = np.mean(np.squeeze(stim2_resp[episode_idx_2, :stim_len, unit]),
                                                           axis=0)
-            example_trials[stim_idx*10:(stim_idx+1)*10, :stim_len, 0] = stim1_resp[episode_idx_1[random_trial_idx], :stim_len, unit]
-            example_trials[stim_idx*10:(stim_idx+1)*10, :stim_len, 1] = stim2_resp[episode_idx_2[random_trial_idx], :stim_len, unit]
-        fig, axs = plt.subplots(nrows=2, ncols=2, sharey='True', sharex='True')
+            example_trials[stim_idx*10:(stim_idx+1)*10, :stim_len, 0] = stim1_resp[episode_idx_1][random_trial_idx, :stim_len, unit]
+            example_trials[stim_idx*10:(stim_idx+1)*10, :stim_len, 1] = stim2_resp[episode_idx_2][random_trial_idx, :stim_len, unit]
+        fig, axs = plt.subplots(nrows=2, ncols=2)
         axs[0,0].imshow(example_trials[:, :, 0], cmap='jet')
         axs[0,1].imshow(example_trials[:, :, 1], cmap='jet')
         axs[0,0].set_title('Stimulus 1')
@@ -314,8 +316,8 @@ def single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir):
         axs[0,1].set_aspect('auto')
         for stim_idx in range(num_stim):
             stim_len = int(stim_set[stim_idx])
-            axs[1,0].plot(np.arange(stim_len, tuning_curves[stim_idx, :stim_len, 0], label=f"t={stim_len}"))
-            axs[1,1].plot(np.arange(stim_len, tuning_curves[stim_idx, :stim_len, 1], label=f"t={stim_len}"))
+            axs[1,0].plot(np.arange(stim_len), tuning_curves[stim_idx, :stim_len, 0], label=f"t={stim_len}")
+            axs[1,1].plot(np.arange(stim_len), tuning_curves[stim_idx, :stim_len, 1], label=f"t={stim_len}")
         axs[1,0].set_xticks(stim_set)
         axs[1,1].set_xticks(stim_set)
         axs[1,0].set_yticks([])
