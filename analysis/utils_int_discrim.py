@@ -142,7 +142,7 @@ def time_decode_all_stim_len(stim_resp, stim, save_dir, title, save=False, bin_s
     ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
     ax.set_title("Accuracy = " + str(np.mean(accuracy * 100)) + "%")
     if save:
-        plt.savefig(os.path.join(save_dir, 'time_decode_all_stim_len.svg'))
+        plt.savefig(os.path.join(save_dir, f'time_decode_all_stim_len_{title}.svg'))
     else:
         plt.show()
 
