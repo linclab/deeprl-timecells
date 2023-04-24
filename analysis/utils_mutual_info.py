@@ -668,12 +668,12 @@ def calculate_time_stimulus_mutual_info(resp, stim):
     len_delay = resp.shape[1]
     n_total_trials = resp.shape[0]
     MI_arr = np.zeros(n_neurons)
-    for i_neuron in n_neurons:
+    for i_neuron in range(n_neurons):
         # Calculate the probability of each trial type and time point
         p_trial_A = p_trial_B = p_time = np.zeros(len_delay)
         for t in range(len_delay):
             p_trial_A[t] = np.sum(resp[stim==0, t]) / np.sum(stim==0)*len_delay
-            p_trial_B[t] = np.sum(resp[stim==1:, t]) / np.sum(stim==1)*len_delay
+            p_trial_B[t] = np.sum(resp[stim==1, t]) / np.sum(stim==1)*len_delay
             p_time[t] = np.sum(resp[:, t]) / n_total_trials*len_delay
         # Calculate the entropy of trial type and time
         H_trial = entropy([0.5, 0.5], base=2)
@@ -683,17 +683,19 @@ def calculate_time_stimulus_mutual_info(resp, stim):
         p_joint = np.zeros((2, len_delay))
         p_joint[0, :] = p_trial_A
         p_joint[1, :] = p_trial_B
-        H_joint = entropy(p_joint.reshape(8), base=2)
-
+        H_joint = entropy(p_joint.reshape(80), base=2)
+        '''
         # Calculate the conditional entropy of firing rate given trial type and time
         H_cond = 0
         for i in range(2):  # trial_type, a
             for j in range(len_delay):  # t
+                breakpoint()
                 p_fr_given_t_and_a = np.sum(resp[stim==i, j]) / np.sum(p_joint[i, j])
                 H_cond += p_joint[i, j] * entropy([p_fr_given_t_and_a, 1-p_fr_given_t_and_a])
-
+        '''
         # Calculate the mutual information
-        MI_arr[i_neuron] = H_trial + H_time - H_joint - H_cond
+        #breakpoint()
+        MI_arr[i_neuron] = H_trial + H_time - H_joint
         # print("Mutual information:", MI)
     return MI_arr
 
@@ -726,7 +728,7 @@ def plot_mutual_info_vs_shuffled(resp, stim, title, save_dir, logInfo=False):
     MI_time_shuffled = calculate_time_stimulus_mutual_info(time_shuffled_resp, stim)
     trial_shuffled_resp = shuffle_trial(resp)
     MI_trial_shuffled = calculate_time_stimulus_mutual_info(trial_shuffled_resp, stim)
-
+    #breakpoint()
     if logInfo:
         unrmd, timermd, trialrmd = np.log(MI), np.log(MI_time_shuffled), np.log(MI_trial_shuffled)
     else:
