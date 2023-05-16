@@ -563,7 +563,7 @@ def identify_stimulus_selective_neurons(resp, stim_labels, alpha=0.01, varying_d
     return is_selective
 
 #=================== TO CHUCK? =============================
-def skaggs_temporal_information(resp, n_shuff=1000, percentile=95):
+def skaggs_temporal_information(resp, ramping_bool, title, save_dir, n_shuff=1000, percentile=95, plot=False):
     """
     Heys & Dombeck, 2018
     :return: I_result, I_threshold_result
@@ -573,18 +573,48 @@ def skaggs_temporal_information(resp, n_shuff=1000, percentile=95):
     n_neurons = np.shape(resp)[2]
     I_result = np.zeros(n_neurons)
     I_threshold_result = np.zeros(n_neurons)
+    if plot:
+        plot_cols = 10
+        plot_rows = int(np.ceil(n_neurons / plot_cols))
+        tuning_curve_fig = plt.figure('ramp_subtracted_skaggs', figsize=(24, plot_rows * 4))  # figsize=(24, plot_rows * 4)
+
     for i_neuron in tqdm(range(n_neurons)):
         p_t = 1 / len_delay
         tuning_curve = np.mean(resp[:, :, i_neuron], axis=0)  # (len_delay, )
+        if ramping_bool[i_neuron]:  # if i_neuron is a ramping neuron, then subtract the linear regression
+            t = np.arange(len_delay)
+            slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
+            lin_reg = slope * t + intercept
+            lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
+            tuning_curve = lin_subtracted_tuning_curve
         I_result[i_neuron] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
 
         I_surrogate = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
             shuffled_resp = shuffle_activity_single_neuron(resp[:, :, i_neuron])
-            tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
-            I_surrogate[i_shuff] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
-
+            shuffled_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
+            I_surrogate[i_shuff] = np.sum(shuffled_tuning_curve * (p_t * np.log2(shuffled_tuning_curve / np.mean(shuffled_tuning_curve))))
         I_threshold_result[i_neuron] = np.percentile(I_surrogate, percentile)
+
+        if plot:
+            tuning_curve_plot = plt.subplot(plot_rows, plot_cols, i_neuron+1)
+            if ramping_bool[i_neuron]:
+                tuning_curve_plot.plot(tuning_curve, color='grey', alpha=1)
+                tuning_curve_plot.plot(lin_reg, color='grey', alpha=0.25)
+                tuning_curve_plot.plot(lin_subtracted_tuning_curve,
+                                       color='red' if I_result[i_neuron] > I_threshold_result[i_neuron] else 'blue', alpha=1)
+            else:
+                tuning_curve_plot.plot(tuning_curve,
+                                       color='red' if I_result[i_neuron] > I_threshold_result[i_neuron] else 'blue', alpha=1)
+            tuning_curve_plot.set_title(f'I={I_result[i_neuron]:.5f}\nI_thresh={I_threshold_result[i_neuron]:.5f}')
+    if plot:
+        with PdfPages(os.path.join(save_dir, f'{title}_tuning_curves_for_seq_identification.pdf')) as pdf:
+            try:
+                pdf.savefig(tuning_curve_fig)
+                plt.close(tuning_curve_fig)
+                print(f'{title}_tuning_curves_for_seq_identification.pdf saved to {save_dir}')
+            except:
+                pass
 
     return I_result, I_threshold_result
 
