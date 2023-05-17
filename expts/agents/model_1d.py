@@ -5,6 +5,7 @@ from torch import autograd, optim, nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from collections import namedtuple
+from variant_rnn import GRUCellVariant, LSTMCellVariant
 
 use_cuda = True
 if torch.cuda.is_available() and use_cuda:
@@ -85,12 +86,12 @@ class AC_Net(nn.Module):
                         self.hx.append(None) ##
                         self.cx.append(None) ##
                     elif htype == 'lstm':
-                        self.hidden.append(nn.LSTMCell(input_d, output_d))
+                        self.hidden.append(LSTMCellVariant(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     elif htype == 'gru':
-                        self.hidden.append(nn.GRUCell(input_d, output_d))
+                        self.hidden.append(GRUCellVariant(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
@@ -106,12 +107,12 @@ class AC_Net(nn.Module):
                         self.hx.append(None)
                         self.cx.append(None)
                     elif htype == 'lstm':
-                        self.hidden.append(nn.LSTMCell(input_d, output_d))
+                        self.hidden.append(LSTMCellVariant(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     elif htype == 'gru':
-                        self.hidden.append(nn.GRUCell(input_d, output_d))
+                        self.hidden.append(GRUCellVariant(input_d, output_d))
                         self.cell_out.append(None) ##
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
@@ -152,7 +153,7 @@ class AC_Net(nn.Module):
                 self.cell_out[i] = layer(x)
                 x = F.relu(self.cell_out[i])
                 lin_activity = x
-            elif isinstance(layer, nn.LSTMCell):
+            elif isinstance(layer, LSTMCellVariant):
                 if lesion_idx is None:
                     if self.dropout_type == 2:
                         x = self.dropout(x) # dropout on input to LSTM. will affect LSTM
@@ -170,7 +171,7 @@ class AC_Net(nn.Module):
                     self.hx[i] = x.clone()
                     self.cx[i] = cx.clone()
                     del hx_copy, cx_copy
-            elif isinstance(layer, nn.GRUCell):
+            elif isinstance(layer, GRUCellVariant):
                 if lesion_idx is None:
                     x = layer(x, self.hx[i])
                     self.hx[i] = x.clone()
@@ -201,11 +202,11 @@ class AC_Net(nn.Module):
                 self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device)) ##
                 self.hx.append(None)##
                 self.cx.append(None)##
-            elif isinstance(layer, nn.LSTMCell):
+            elif isinstance(layer, LSTMCellVariant):
                 self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cell_out.append(None) ##
-            elif isinstance(layer, nn.GRUCell):
+            elif isinstance(layer, GRUCellVariant):
                 self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cx.append(None)
                 self.cell_out.append(None)##
