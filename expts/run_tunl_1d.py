@@ -68,7 +68,7 @@ dropout_type = argsdict['dropout_type']
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/nonneg_rnn/tunl1d_og'
 save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}'
 if weight_decay != 0:
     save_dir_str += f'_wd{weight_decay}'
