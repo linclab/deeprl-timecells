@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation
 parser.add_argument("--n_total_episodes",type=int,default=50000,help="Total episodes to train the model on task")
 parser.add_argument("--save_ckpt_per_episodes",type=int,default=5000,help="Save model every this number of episodes")
 parser.add_argument("--record_data", type=bool, default=False, help="Whether to collect data while training.")
-parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/tunl1d_og")
+parser.add_argument("--load_model_path", type=str, default='None', help="path RELATIVE TO $SCRATCH/timecell/training/nonneg_rnn/tunl1d_og")
 parser.add_argument("--save_ckpts", type=bool, default=False, help="Whether to save model every save_ckpt_per_epidoes episodes")
 parser.add_argument("--n_neurons", type=int, default=512, help="Number of neurons in the LSTM layer and linear layer")
 parser.add_argument("--len_delay", type=int, default=40, help="Number of timesteps in the delay period")
@@ -107,7 +107,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/nonneg_rnn/tunl1d_og', load_model_path)))
 
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
