@@ -66,7 +66,7 @@ p_dropout = argsdict['p_dropout']
 dropout_type = argsdict['dropout_type']
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/nonneg_rnn/tunl1d_og'
 else:
     main_dir = '/network/scratch/l/lindongy/timecell/training/nonneg_rnn/tunl1d_og'
 save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}'
