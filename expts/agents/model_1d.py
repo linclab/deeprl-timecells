@@ -5,7 +5,7 @@ from torch import autograd, optim, nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from collections import namedtuple
-from variant_rnn import GRUCellVariant, LSTMCellVariant
+from agents.variant_rnn import GRUCellVariant, LSTMCellVariant
 
 use_cuda = True
 if torch.cuda.is_available() and use_cuda:

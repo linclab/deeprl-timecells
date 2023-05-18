@@ -1,5 +1,5 @@
 import numpy as np
-from variant_rnn import GRUCellVariant, LSTMCellVariant
+from agents.variant_rnn import GRUCellVariant, LSTMCellVariant
 import torch
 from torch.autograd import Variable
 from torch import autograd, optim, nn
