@@ -85,6 +85,11 @@ class AC_Net(nn.Module):
                         self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
                         self.hx.append(None) ##
                         self.cx.append(None) ##
+                    elif htype == 'rnn':
+                        self.hidden.append(nn.RNNCell(input_d, output_d, nonlinearity='relu'))  # Use ReLU to ensure non-negativity
+                        self.cell_out.append(None)
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
                     elif htype == 'lstm':
                         self.hidden.append(LSTMCellVariant(input_d, output_d))
                         self.cell_out.append(None) ##
@@ -105,6 +110,11 @@ class AC_Net(nn.Module):
                         self.hidden.append(nn.Linear(input_d, output_d))
                         self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
                         self.hx.append(None)
+                        self.cx.append(None)
+                    elif htype == 'rnn':
+                        self.hidden.append(nn.RNNCell(input_d, output_d, nonlinearity='relu'))  # Use ReLU to ensure non-negativity
+                        self.cell_out.append(None)
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
                     elif htype == 'lstm':
                         self.hidden.append(LSTMCellVariant(input_d, output_d))
@@ -181,6 +191,16 @@ class AC_Net(nn.Module):
                     x = layer(x, hx_copy)
                     self.hx[i] = x.clone()
                     del hx_copy
+            elif isinstance(layer, nn.RNNCell):
+                if lesion_idx is None:
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    x = layer(x, hx_copy)
+                    self.hx[i] = x.clone()
+                    del hx_copy
         # pass to the output layers
         if self.dropout_type == 4:
             x = self.dropout(x)
@@ -210,6 +230,10 @@ class AC_Net(nn.Module):
                 self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cx.append(None)
                 self.cell_out.append(None)##
+            elif isinstance(layer, nn.RNNCell):
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(None)
+                self.cell_out.append(None)
 
 
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
