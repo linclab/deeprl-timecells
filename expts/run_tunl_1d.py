@@ -132,12 +132,14 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float().to(device))
         if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
             if record_data:
-                if net.hidden_types[1] == 'linear':
+                if hidden_type == 'linear':
                     resp.append(net.cell_out[net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
-                elif net.hidden_types[1] == 'lstm':
+                elif hidden_type == 'lstm':
                     resp.append(net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
-                elif net.hidden_types[1] == 'gru':
+                elif hidden_type == 'gru':
                     resp.append(net.hx[net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())  # hidden state of GRU cell
+                elif hidden_type == 'rnn':
+                    resp.append(net.hx[net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())   # hidden state of RNN cell
         act, p, v = select_action(net, pol, val)
         new_obs, reward, done = env.step(act, episode_sample)
         net.rewards.append(reward)
