@@ -69,13 +69,13 @@ class LSTMCellVariant(nn.Module):
 
         ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
 
-        ingate = torch.relu(ingate)
-        forgetgate = torch.relu(forgetgate)
-        cellgate = torch.relu(cellgate)
-        outgate = torch.relu(outgate)
+        ingate = torch.sigmoid(ingate)
+        forgetgate = torch.sigmoid(forgetgate)
+        cellgate = torch.tanh(cellgate)
+        outgate = torch.sigmoid(outgate)
 
         cy = torch.mul(forgetgate, c) + torch.mul(ingate, cellgate)
-        hy = torch.mul(outgate, torch.relu(cy))
+        hy = torch.mul(outgate, torch.relu(cy))  # Apply ReLU nonlinearity to the cell state
 
         return hy, cy
 
