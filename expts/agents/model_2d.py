@@ -49,7 +49,7 @@ class AC_Net(nn.Module):
         self.input_d = input_dimensions
         # determine input type
         if type(input_dimensions) == int:
-            assert (hidden_types[0] == 'linear' or hidden_types[0] == 'lstm' or hidden_types[0] == 'gru')
+            assert (hidden_types[0] == 'linear' or hidden_types[0] == 'lstm' or hidden_types[0] == 'gru' or hidden_types[0] == 'rnn')
             self.hidden_types = hidden_types
             self.input_type = 'vector'
         elif type(input_dimensions) == tuple:

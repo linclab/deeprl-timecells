@@ -43,7 +43,7 @@ class AC_Net(nn.Module):
         self.input_d = input_dimensions
 
         # check input type
-        assert (hidden_types[0] == 'linear' or hidden_types[0] == 'lstm' or hidden_types[0] == 'gru')
+        assert (hidden_types[0] == 'linear' or hidden_types[0] == 'lstm' or hidden_types[0] == 'gru' or hidden_types[0] == 'rnn')
         self.input_type = 'vector'
         self.hidden_types = hidden_types
 
@@ -73,7 +73,7 @@ class AC_Net(nn.Module):
             self.cell_out = [] ##
             for i, htype in enumerate(hidden_types):
                 # check if hidden layer type is correct
-                assert htype in ['linear', 'lstm', 'gru']
+                assert htype in ['linear', 'lstm', 'gru', 'rnn']
                 # get the input dimensions
                 # first hidden layer
                 if i == 0:
