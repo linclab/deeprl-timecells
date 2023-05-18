@@ -182,7 +182,11 @@ class AC_Net(nn.Module):
                     del hx_copy, cx_copy
             elif isinstance(layer, nn.GRUCell):
                 if lesion_idx is None:
+                    if self.dropout_type == 2:
+                        x = self.dropout(x) # dropout on input to GRU. will affect GRU
                     x = layer(x, self.hx[i])
+                    if self.dropout_type == 3:
+                        x = self.dropout(x)  # will affect both GRU and linear
                     self.hx[i] = x.clone()
                 else:
                     hx_copy = self.hx[i].clone().detach()
@@ -192,7 +196,11 @@ class AC_Net(nn.Module):
                     del hx_copy
             elif isinstance(layer, nn.RNNCell):
                 if lesion_idx is None:
+                    if self.dropout_type == 2:
+                        x = self.dropout(x)  # dropout on input to RNN. will affect RNN
                     x = layer(x, self.hx[i])
+                    if self.dropout_type == 3:
+                        x = self.dropout(x)  # will affect both RNN and linear
                     self.hx[i] = x.clone()
                 else:
                     hx_copy = self.hx[i].clone().detach()
