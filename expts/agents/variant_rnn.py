@@ -86,6 +86,45 @@ class LSTMCellVariant(nn.Module):
         return hy, cy
 
 
+class RNNCellVariant(nn.Module):
+    def __init__(self, input_size, hidden_size, nonlinearity='relu'):
+        super(RNNCellVariant, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.weight_ih = nn.Parameter(torch.Tensor(hidden_size, input_size))
+        self.weight_hh = nn.Parameter(torch.Tensor(hidden_size, hidden_size))
+        self.bias_ih = nn.Parameter(torch.Tensor(hidden_size))
+        self.bias_hh = nn.Parameter(torch.Tensor(hidden_size))
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        self.reset_parameters()
+        self.nonlinearity = nonlinearity
+
+    def reset_parameters(self):
+        nn.init.kaiming_uniform_(self.weight_ih, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.weight_hh, a=math.sqrt(5))
+        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight_ih)
+        bound = 1 / math.sqrt(fan_in)
+        nn.init.uniform_(self.bias_ih, -bound, bound)
+        nn.init.uniform_(self.bias_hh, -bound, bound)
+
+    def forward(self, input, hx=None):
+        if hx is None:
+            hx = input.new_zeros(input.size(0), self.hidden_size, requires_grad=False)
+
+        hy = torch.matmul(input, self.weight_ih.t()) + self.bias_ih \
+             + torch.matmul(hx, self.weight_hh.t()) + self.bias_hh
+
+        hy = self.layer_norm(hy)
+        if self.nonlinearity == 'tanh':
+            hy = torch.tanh(hy)
+        elif self.nonlinearity == 'relu':
+            hy = torch.relu(hy)
+        else:
+            raise ValueError('Unknown nonlinearity: {}'.format(self.nonlinearity))
+
+        return hy
+
+
 #class RNNLayer(jit.ScriptModule):
 class RNNLayer(nn.Module):
     """

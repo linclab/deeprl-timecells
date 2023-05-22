@@ -5,7 +5,7 @@ from torch import autograd, optim, nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from collections import namedtuple
-from agents.variant_rnn import LSTMCellVariant, GRUCellVariant, RNNLayer, LayerNormRNNCell, RNNCell
+from agents.variant_rnn import LSTMCellVariant, GRUCellVariant, RNNCellVariant
 
 use_cuda = True
 if torch.cuda.is_available() and use_cuda:
@@ -86,7 +86,7 @@ class AC_Net(nn.Module):
                         self.hx.append(None) ##
                         self.cx.append(None) ##
                     elif htype == 'rnn':
-                        self.hidden.append(LayerNormRNNCell(input_d, output_d))  # Use ReLU to ensure non-negativity
+                        self.hidden.append(RNNCellVariant(input_d, output_d))  # Use ReLU to ensure non-negativity
                         self.cell_out.append(None)
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
@@ -112,7 +112,7 @@ class AC_Net(nn.Module):
                         self.hx.append(None)
                         self.cx.append(None)
                     elif htype == 'rnn':
-                        self.hidden.append(LayerNormRNNCell(input_d, output_d))  # Use ReLU to ensure non-negativity
+                        self.hidden.append(RNNCellVariant(input_d, output_d))  # Use ReLU to ensure non-negativity
                         self.cell_out.append(None)
                         self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                         self.cx.append(None)
@@ -195,7 +195,7 @@ class AC_Net(nn.Module):
                     x = layer(x, hx_copy)
                     self.hx[i] = x.clone()
                     del hx_copy
-            elif isinstance(layer, LayerNormRNNCell):
+            elif isinstance(layer, RNNCellVariant):
                 if lesion_idx is None:
                     if self.dropout_type == 2:
                         x = self.dropout(x)  # dropout on input to RNN. will affect RNN
@@ -238,7 +238,7 @@ class AC_Net(nn.Module):
                 self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cx.append(None)
                 self.cell_out.append(None)##
-            elif isinstance(layer, LayerNormRNNCell):
+            elif isinstance(layer, RNNCellVariant):
                 self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
                 self.cx.append(None)
                 self.cell_out.append(None)
