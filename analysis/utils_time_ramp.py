@@ -586,8 +586,9 @@ def skaggs_temporal_information(resp, ramping_bool, title, save_dir, n_shuff=100
             slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
             lin_reg = slope * t + intercept
             lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
-            tuning_curve = lin_subtracted_tuning_curve
-        I_result[i_neuron] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
+            I_result[i_neuron] = np.sum(lin_subtracted_tuning_curve * (p_t * np.log2(lin_subtracted_tuning_curve / np.mean(lin_subtracted_tuning_curve))))
+        else:
+            I_result[i_neuron] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
 
         I_surrogate = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
