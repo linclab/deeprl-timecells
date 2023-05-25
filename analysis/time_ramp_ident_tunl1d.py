@@ -10,9 +10,9 @@ import argparse
 
 
 parser = argparse.ArgumentParser(description="Head-fixed 1D TUNL task simulation")
-parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og',help="main data directory")
+parser.add_argument("--main_dir",type=str,default='/network/scratch/l/lindongy/timecell/data_collecting/nonneg_rnn/tunl1d_og',help="main data directory")
 parser.add_argument("--data_dir",type=str,default='mem_40_lstm_256_0.0001_p0.25_2',help="directory in which .npz is saved")
-parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/tunl1d_og', help="main directory in which agent-specific directory will be created")
+parser.add_argument("--main_save_dir", type=str, default='/network/scratch/l/lindongy/timecell/data_analysis/nonneg_rnn/tunl1d_og', help="main directory in which agent-specific directory will be created")
 parser.add_argument("--seed", type=int, help="seed to analyse")
 parser.add_argument("--episode", type=int, help="ckpt episode to analyse")
 parser.add_argument("--normalize", type=bool, default=True, help="normalize each unit's response by its maximum and minimum")
@@ -60,13 +60,14 @@ if normalize:
     delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
 
 
-# # Select units with large enough variation in its activation
-# big_var_neurons = []
-# for i_neuron in range(512):
-#     if np.ptp(np.concatenate(delay_resp_hx[:, :, i_neuron])) > 0.0000001:
-#         big_var_neurons.append(i_neuron)
-# delay_resp = delay_resp_hx[:, 2:, [x for x in range(512) if x in big_var_neurons]]
-# delay_loc = delay_loc[:, 2:, :]
+# Select units with large enough variation in its activation
+big_var_neurons = []
+for i_neuron in range(n_neurons):
+    if np.ptp(np.concatenate(delay_resp[:, :, i_neuron])) > 0:
+        big_var_neurons.append(i_neuron)
+delay_resp = delay_resp[:, :, [x for x in range(n_neurons) if x in big_var_neurons]]
+print(f"{len(big_var_neurons)}/{n_neurons} neurons are active neurons")
+n_neurons = len(big_var_neurons)
 
 # separate left and right trials
 left_stim_resp = delay_resp[stim == 0]
@@ -89,13 +90,35 @@ incorrect_resp = delay_resp[binary_nonmatch == 0]
 # tuning_curve_dim_reduction(delay_resp, mode='tsne', save_dir=save_dir, title=f'{seed}_{epi}_all')
 # breakpoint()
 
-# Identifying ramping cells
+# Calculate trial-reliability score
+trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_vs_shuffle_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
+trial_reliable_cell_num_l = np.where(trial_reliable_cell_bool_l)[0]
+trial_reliability_score_result_r, trial_reliability_score_threshold_result_r = trial_reliability_vs_shuffle_score(right_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
+trial_reliable_cell_bool_r = trial_reliability_score_result_r >= trial_reliability_score_threshold_result_r
+trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
+trial_reliable_cell_bool = np.logical_or(trial_reliable_cell_bool_l, trial_reliable_cell_bool_r)
+trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
+np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results.npz'),
+                    trial_reliability_score_result_l=trial_reliability_score_result_l, trial_reliability_score_threshold_result_l=trial_reliability_score_threshold_result_l,
+                    trial_reliable_cell_bool_l=trial_reliable_cell_bool_l, trial_reliable_cell_num_l=trial_reliable_cell_num_l,
+                    trial_reliability_score_result_r=trial_reliability_score_result_r, trial_reliability_score_threshold_result_r=trial_reliability_score_threshold_result_r,
+                    trial_reliable_cell_bool_r=trial_reliable_cell_bool_r,trial_reliable_cell_num_r=trial_reliable_cell_num_r,
+                    trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
+print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
+
+
 p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left')
 ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
 cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
 p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_right')
 ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
 cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
+
+
+# Identify ramping cells:intersection of high trial reliability and significant ramping, separately for left and right trials
+ramp_cell_bool_l = np.logical_and(trial_reliable_cell_bool_l, ramp_cell_bool_l)
+ramp_cell_bool_r = np.logical_and(trial_reliable_cell_bool_r, ramp_cell_bool_r)
 ramp_cell_bool = np.logical_or(ramp_cell_bool_l, ramp_cell_bool_r)
 cell_nums_ramp = np.where(ramp_cell_bool)[0]
 np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_ramp_ident_results.npz'),
@@ -121,21 +144,6 @@ print(f"{len(cell_nums_ramp)}/{n_neurons} ramping cells")
 #                     seq_cell_bool=seq_cell_bool, cell_nums_seq=cell_nums_seq)
 # print(f"{len(cell_nums_seq)}/{n_neurons} significant RB cells")
 
-trial_reliability_score_result_l, trial_reliability_score_threshold_result_l = trial_reliability_vs_shuffle_score(left_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
-trial_reliable_cell_bool_l = trial_reliability_score_result_l >= trial_reliability_score_threshold_result_l
-trial_reliable_cell_num_l = np.where(trial_reliable_cell_bool_l)[0]
-trial_reliability_score_result_r, trial_reliability_score_threshold_result_r = trial_reliability_vs_shuffle_score(right_stim_resp, split='odd-even', percentile=percentile, n_shuff=n_shuffle)
-trial_reliable_cell_bool_r = trial_reliability_score_result_r >= trial_reliability_score_threshold_result_r
-trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
-trial_reliable_cell_bool = np.logical_or(trial_reliable_cell_bool_l, trial_reliable_cell_bool_r)
-trial_reliable_cell_num = np.where(trial_reliable_cell_bool)[0]
-np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_trial_reliability_results.npz'),
-                    trial_reliability_score_result_l=trial_reliability_score_result_l, trial_reliability_score_threshold_result_l=trial_reliability_score_threshold_result_l,
-                    trial_reliable_cell_bool_l=trial_reliable_cell_bool_l, trial_reliable_cell_num_l=trial_reliable_cell_num_l,
-                    trial_reliability_score_result_r=trial_reliability_score_result_r, trial_reliability_score_threshold_result_r=trial_reliability_score_threshold_result_r,
-                    trial_reliable_cell_bool_r=trial_reliable_cell_bool_r,trial_reliable_cell_num_r=trial_reliable_cell_num_r,
-                    trial_reliable_cell_bool=trial_reliable_cell_bool, trial_reliable_cell_num=trial_reliable_cell_num)
-print(f"{len(trial_reliable_cell_num)}/{n_neurons} trial-reliable cells")
 
 # Identify high-temporal-info (~time) cells
 I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, ramp_cell_bool_l, title=f'{seed}_{epi}_{n_shuffle}_{percentile}_left', save_dir=save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)  # takes 8 hours to do 1000 shuffles for 256 neurons
@@ -154,10 +162,13 @@ np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile
                     high_temporal_info_cell_bool=high_temporal_info_cell_bool, high_temporal_info_cell_nums=high_temporal_info_cell_nums)
 print(f"{len(high_temporal_info_cell_nums)}/{n_neurons} high temporal-information cells")
 
-# Identify time cells: combination of RB and trial reliability
-time_cell_nums_l = np.intersect1d(high_temporal_info_cell_nums_l, trial_reliable_cell_num_l)
-time_cell_nums_r = np.intersect1d(high_temporal_info_cell_nums_r, trial_reliable_cell_num_r)
-time_cell_nums = np.intersect1d(time_cell_nums_l, time_cell_nums_r)
+# Identify time cells: intersection of high temporal information and trial reliability, separately for left and right trials
+time_cell_bool_l = np.logical_and(high_temporal_info_cell_bool_l, trial_reliable_cell_bool_l)
+time_cell_bool_r = np.logical_and(high_temporal_info_cell_bool_r, trial_reliable_cell_bool_r)
+time_cell_bool = np.logical_or(time_cell_bool_l, time_cell_bool_r)
+time_cell_nums_l = np.where(time_cell_bool_l)[0]
+time_cell_nums_r = np.where(time_cell_bool_r)[0]
+time_cell_nums = np.where(time_cell_bool)[0]
 np.savez_compressed(os.path.join(save_dir,f'{seed}_{epi}_{n_shuffle}_{percentile}_time_cell_results.npz'),
                     time_cell_nums_l=time_cell_nums_l, time_cell_nums_r=time_cell_nums_r, time_cell_nums=time_cell_nums)
 print(f"{len(time_cell_nums)}/{n_neurons} time cells")
