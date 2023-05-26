@@ -209,6 +209,10 @@ def trial_reliability_vs_shuffle_score(resp, split='odd-even', percentile=95, n_
     trial_reliability_score_result = np.zeros(n_neurons)  # pearson corr coeff between the trial averaged response in the two trial splits
     trial_reliability_score_threshold_result = np.zeros(n_neurons)
     for i_neuron in tqdm(range(n_neurons)):
+        if np.ptp(np.concatenate(resp[:, :, i_neuron])) == 0:
+            trial_reliability_score_result[i_neuron] = np.nan
+            trial_reliability_score_threshold_result[i_neuron] = np.nan
+            continue
         if split == 'random':
             split_1_idx = np.random.choice(n_total_episodes, n_total_episodes//2, replace=False)
             ind = np.zeros(n_total_episodes, dtype=bool)
@@ -223,6 +227,7 @@ def trial_reliability_vs_shuffle_score(resp, split='odd-even', percentile=95, n_
         resp_1 = resp[split_1_idx, :, i_neuron]  # (n_total_episodes/2, len_delay)
         resp_2 = resp[split_2_idx, :, i_neuron]
         trial_reliability_score_result[i_neuron], pval = stats.pearsonr(np.mean(resp_1, axis=0), np.mean(resp_2, axis=0))
+        # if mean of resp_1 or resp_2 is constant, then the cell wouldn't be a time cell or ramping cell, so it's safe to let reliability be NaN
 
         shuffled_score = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
@@ -586,14 +591,23 @@ def skaggs_temporal_information(resp, ramping_bool, title, save_dir, n_shuff=100
             slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
             lin_reg = slope * t + intercept
             lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
+            lin_subtracted_tuning_curve -= np.min(lin_subtracted_tuning_curve)
+            lin_subtracted_tuning_curve += 1e-8
             I_result[i_neuron] = np.sum(lin_subtracted_tuning_curve * (p_t * np.log2(lin_subtracted_tuning_curve / np.mean(lin_subtracted_tuning_curve))))
         else:
+            tuning_curve -= np.min(tuning_curve)
+            tuning_curve += 1e-8
             I_result[i_neuron] = np.sum(tuning_curve * (p_t * np.log2(tuning_curve / np.mean(tuning_curve))))
 
         I_surrogate = np.zeros(n_shuff)
         for i_shuff in range(n_shuff):
-            shuffled_resp = shuffle_activity_single_neuron(resp[:, :, i_neuron])
+            if ramping_bool[i_neuron]:
+                shuffled_resp = shuffle_activity_single_neuron(np.tile(lin_subtracted_tuning_curve, (n_total_episodes,1)))
+            else:
+                shuffled_resp = shuffle_activity_single_neuron(resp[:, :, i_neuron])
             shuffled_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
+            shuffled_tuning_curve -= np.min(shuffled_tuning_curve)
+            shuffled_tuning_curve += 1e-8
             I_surrogate[i_shuff] = np.sum(shuffled_tuning_curve * (p_t * np.log2(shuffled_tuning_curve / np.mean(shuffled_tuning_curve))))
         I_threshold_result[i_neuron] = np.percentile(I_surrogate, percentile)
 
@@ -618,7 +632,6 @@ def skaggs_temporal_information(resp, ramping_bool, title, save_dir, n_shuff=100
                 pass
 
     return I_result, I_threshold_result
-
 
 def trial_consistency_across_durations(stim, stim1_resp, stim2_resp, type='absolute'):
     stim_set = np.sort(np.unique(stim))
