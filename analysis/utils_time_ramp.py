@@ -153,20 +153,24 @@ def ridge_to_background(resp, ramping_bool, percentile=95, n_shuff=1000, plot=Fa
             slope, intercept, r, p, std_err = stats.linregress(t, tuning_curve)
             lin_reg = slope * t + intercept
             lin_subtracted_tuning_curve = tuning_curve - (slope * t + intercept)
+            lin_subtracted_tuning_curve -= np.min(lin_subtracted_tuning_curve)
             RB_result[i_neuron] = np.max(lin_subtracted_tuning_curve) / np.mean(lin_subtracted_tuning_curve)
             shuffled_RB = np.zeros(n_shuff)
-            lin_subtracted_resp = resp[:, :, i_neuron] - np.tile(lin_reg, (n_total_episodes, 1))
+            # lin_subtracted_resp = resp[:, :, i_neuron] - np.tile(lin_reg, (n_total_episodes, 1))
             for i_shuff in range(n_shuff):
-                shuffled_resp = shuffle_activity_single_neuron(lin_subtracted_resp)
+                shuffled_resp = shuffle_activity_single_neuron(np.tile(lin_subtracted_tuning_curve, (n_total_episodes, 1)))
                 new_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
+                new_tuning_curve -= np.min(new_tuning_curve)
                 shuffled_RB[i_shuff] = np.max(new_tuning_curve) / np.mean(new_tuning_curve)
             z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
         else:
+            tuning_curve -= np.min(tuning_curve)
             RB_result[i_neuron] = np.max(tuning_curve) / np.mean(tuning_curve)
             shuffled_RB = np.zeros(n_shuff)
             for i_shuff in range(n_shuff):
                 shuffled_resp = shuffle_activity_single_neuron(resp[:, :, i_neuron])
                 new_tuning_curve = calculate_tuning_curves_single_neuron(shuffled_resp)
+                new_tuning_curve -= np.min(new_tuning_curve)
                 shuffled_RB[i_shuff] = np.max(new_tuning_curve) / np.mean(new_tuning_curve)
             z_RB_threshold_result[i_neuron] = np.percentile(shuffled_RB, percentile)
 
