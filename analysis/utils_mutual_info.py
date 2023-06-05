@@ -464,7 +464,9 @@ def decode_location_different_population(delay_resp, delay_loc, mutual_info, shu
 def convert_loc_to_idx(delay_loc):
     return np.squeeze((delay_loc[:,:,0]-1) * 7 + delay_loc[:,:,1]-1)
 
-
+# =====================================================
+# Functions used to calculate time x position mutual information
+# =====================================================
 
 def construct_ratemap_occupancy(delay_resp, delay_loc, randomize=None, shuffle=False):
     n_episode, len_delay, n_neurons = np.shape(delay_resp)
@@ -477,7 +479,7 @@ def construct_ratemap_occupancy(delay_resp, delay_loc, randomize=None, shuffle=F
 
     ratemap = np.zeros((len_delay, n_positions, n_neurons))
     occupancy = np.empty((len_delay, n_positions))
-    recoded_delay_loc = convert_loc_to_idx(delay_loc)
+    recoded_delay_loc = convert_loc_to_idx(delay_loc)  # (n_episode, len_delay)
     time_axis, pos_axis = randomize_dimension(delay_resp, recoded_delay_loc, randomize)
     for t in range(len_delay):
         for p in range(n_positions):
@@ -497,8 +499,8 @@ def randomize_dimension(delay_resp, delay_loc, dim=None):
     n_positions = len(unique_pos)
 
     if dim == 'time': #randomize time
-        pos_axis = np.transpose(np.repeat(np.expand_dims(unique_pos, axis=1), len_delay, axis=1))
-        time_axis = np.empty((len_delay, n_positions))
+        pos_axis = np.transpose(np.repeat(np.expand_dims(unique_pos, axis=1), len_delay, axis=1))  # each location has 1/16 chance of being selected
+        time_axis = np.empty((len_delay, n_positions))  # 40 x 16, to fill
         for i in range(n_positions):
             pos = unique_pos[i]
             #find the distribution of time step at the particular location
@@ -506,8 +508,8 @@ def randomize_dimension(delay_resp, delay_loc, dim=None):
             time_axis[:,i] = np.random.choice(len_delay, size=(len_delay,), p=time_dist)
 
     elif dim == 'pos': #randomize location
-        time_axis = np.squeeze(np.repeat(np.expand_dims(np.arange(len_delay), axis=1), n_positions, axis=1))
-        pos_axis = np.empty((len_delay, n_positions))
+        time_axis = np.squeeze(np.repeat(np.expand_dims(np.arange(len_delay), axis=1), n_positions, axis=1))  # each time has 1/40 chance of being selected
+        pos_axis = np.empty((len_delay, n_positions)) # 40 x 16, to fill
         for i in range(len_delay):
             pos_dist = [list(delay_loc[:,i]).count(pos) for pos in unique_pos]
             pos_dist = pos_dist / np.sum(pos_dist)
@@ -520,24 +522,10 @@ def randomize_dimension(delay_resp, delay_loc, dim=None):
     return (time_axis, pos_axis)
 
 
-
-def mutual_info(ratemap, occupancy):
-    occu_flat = np.ndarray.flatten(occupancy)
-    n_neurons = np.shape(ratemap)[-1]
-    I = np.empty((n_neurons,))
-    for i_neuron in range(n_neurons):
-        rate_flat = np.ndarray.flatten(ratemap[:,:,i_neuron])
-        avg_rate = np.nansum(rate_flat * occu_flat)
-        nonzero = rate_flat > 0
-        I[i_neuron] = np.nansum(rate_flat[nonzero] * np.log2(rate_flat[nonzero] / avg_rate) * occu_flat[nonzero])
-    return I
-
-
-
-
 def informativeness(delay_resp, delay_loc, randomize=None, shuffle=None):
     ratemap, occupancy = construct_ratemap_occupancy(delay_resp, delay_loc, randomize=randomize, shuffle=shuffle)
     return mutual_info(ratemap, occupancy)
+
 
 
 def joint_encoding_info(delay_resp, delay_loc, save_dir, variables="place+time", analysis=None, recalculate=False):
@@ -613,6 +601,143 @@ def plot_joint_encoding_information(save_dir, title, logInfo=False, save=False):
         plt.show()
 
 
+# Calculate mutual information for time and position
+def mutual_info(ratemap, occupancy):
+    occu_flat = np.ndarray.flatten(occupancy)
+    n_neurons = np.shape(ratemap)[-1]
+    I = np.empty((n_neurons,))
+    for i_neuron in range(n_neurons):
+        rate_flat = np.ndarray.flatten(ratemap[:,:,i_neuron])
+        avg_rate = np.nansum(rate_flat * occu_flat)
+        nonzero = rate_flat > 0
+        I[i_neuron] = np.nansum(rate_flat[nonzero] * np.log2(rate_flat[nonzero] / avg_rate) * occu_flat[nonzero])
+    return I
+
+
+# =====================================================
+# Functions used to calculate time x stimulus mutual information
+# =====================================================
+
+def randomize_dimension_time_stimulus(delay_resp, stim, dim=None):
+    len_delay = np.shape(delay_resp)[1]
+    n_episodes = np.shape(delay_resp)[0]
+
+    if dim == 'time': #randomize time
+        stim_axis = np.transpose(np.repeat(np.expand_dims(np.array([0,1]), axis=1), len_delay, axis=1))  # 40x2
+        time_axis = np.empty((len_delay, 2)) # 40x2
+        for s in range(2):
+            #find the distribution of time step for each stimulus
+            # breakpoint()
+            time_axis[:,s] = np.random.choice(len_delay, size=(len_delay,))
+
+    elif dim == 'stim': #randomize stimulus
+        time_axis = np.squeeze(np.repeat(np.expand_dims(np.arange(len_delay), axis=1), 2, axis=1))
+        stim_axis = np.empty((len_delay, 2))
+        for t in range(len_delay):
+            # breakpoint()
+            #find the distribution of stimulus for each time step
+            stim_dist = np.empty((2,))
+            stim_dist[0] = np.sum(stim==0) / n_episodes
+            stim_dist[1] = np.sum(stim==1) / n_episodes
+            stim_axis[t,:] = np.random.choice(2, size=(1,2), p=stim_dist)
+
+    else: #no need to randomize
+        time_axis = np.squeeze(np.repeat(np.expand_dims(np.arange(len_delay), axis=1), 2, axis=1))
+        stim_axis = np.transpose(np.repeat(np.expand_dims(np.arange(2), axis=1), len_delay, axis=1))
+
+    return (time_axis, stim_axis)
+
+
+def construct_time_stimulus_ratemap_occupancy(delay_resp, stim, randomize=None, shuffle=False):
+    n_episode, len_delay, n_neurons = np.shape(delay_resp)
+
+    delay_resp = (delay_resp - np.min(delay_resp, axis=(0,1),
+                                      keepdims=True)) / np.ptp(delay_resp, axis=(0,1), keepdims=True)
+    if shuffle:
+        delay_resp = shuffle_activity(delay_resp)
+
+    ratemap = np.zeros((len_delay, 2, n_neurons))
+    occupancy = np.empty((len_delay, 2))
+    time_axis, stim_axis = randomize_dimension_time_stimulus(delay_resp, stim, dim=randomize)
+
+    for t in range(len_delay):
+        for s in range(2): # 0: left, 1: right
+            if randomize == None:
+                occupancy[t,s] = np.sum(stim==s)
+                ratemap[t,s,:] = np.sum(delay_resp[stim==s, t, :], axis=0) / occupancy[t,s]
+            else :
+                occupancy[t,s] = np.sum(stim==stim_axis[t,s])
+                ratemap[t,s,:] = np.sum(delay_resp[stim==stim_axis[t,s], int(time_axis[t,s]), :], axis=0) / occupancy[t,s]
+
+        occupancy = occupancy / np.sum(occupancy)
+        #print("Sum of occupancy: ", np.sum(occupancy))
+    return (ratemap, occupancy)
+
+def informativeness_time_stimulus(delay_resp, stim, randomize=None, shuffle=None):
+    ratemap, occupancy = construct_time_stimulus_ratemap_occupancy(delay_resp, stim, randomize=randomize, shuffle=shuffle)
+    return mutual_info(ratemap, occupancy)
+
+
+def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, logInfo=False, save=False):
+
+    n_neurons = np.shape(delay_resp)[-1]
+    I_unsfl_unrmd = informativeness_time_stimulus(delay_resp, stim)
+    I_unsfl_stimrmd = informativeness_time_stimulus(delay_resp, stim, randomize='stim')
+    I_unsfl_timermd = informativeness_time_stimulus(delay_resp, stim, randomize='time')
+    I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = np.empty((n_neurons, 100)), np.empty((n_neurons, 100)), np.empty((n_neurons, 100))
+
+    for i in range(100):
+        I_sfl_unrmd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, shuffle=True))
+        I_sfl_stimrmd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, randomize='stim', shuffle=True))
+        I_sfl_timermd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, randomize='pos', shuffle=True))
+
+    sig_cells = np.squeeze(I_unsfl_unrmd) > (np.nanmean(I_sfl_unrmd,axis=1) + 2 * np.nanstd(I_sfl_unrmd,axis=1))
+    I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells]
+    I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells]
+    np.savez_compressed(os.path.join(save_dir, 'time_stimulus_joint_encoding.npz'), I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_stimrmd=I_unsfl_stimrmd,
+                        I_unsfl_timermd=I_unsfl_timermd, I_sfl_unrmd=I_sfl_unrmd, I_sfl_stimrmd=I_sfl_stimrmd, I_sfl_timermd=I_sfl_timermd)
+    if logInfo:
+        unrmd, stimrmd, timermd = np.log(I_unsfl_unrmd), np.log(I_unsfl_stimrmd), np.log(I_unsfl_timermd)
+    else:
+        unrmd, stimrmd, timermd = I_unsfl_unrmd ,I_unsfl_stimrmd, I_unsfl_timermd
+    n_neurons = np.shape(timermd)[0]
+    print(n_neurons)
+    info = np.transpose([unrmd, timermd, stimrmd])
+
+    stats = cbook.boxplot_stats(info, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
+    for i in range(len(stats)):
+        stats[i]['whislo'] = np.min(info[:,i], axis=0)
+        stats[i]['whishi'] = np.max(info[:,i], axis=0)
+
+    fig, axs = plt.subplots(1,1)
+    fig.suptitle(title)
+    for i in range(n_neurons):
+        plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
+
+    props = dict(color='indigo', linewidth=1.5)
+    axs.bxp(stats, showfliers=False, boxprops=props,
+            capprops=props, whiskerprops=props, medianprops=props)
+    # Run t-test on unrmd, stimrmd, timermd pairwise, and print p-values
+    from scipy.stats import ttest_ind as stats_ttest_ind
+    print("Unrmd vs. Stimrmd: ", stats_ttest_ind(unrmd, stimrmd))
+    print("Unrmd vs. Timermd: ", stats_ttest_ind(unrmd, timermd))
+    print("Stimrmd vs. Timermd: ", stats_ttest_ind(stimrmd, timermd))
+    # If t-test result is significant, add a star to the plot
+    # if stats_ttest_ind(unrmd, stimrmd)[1] < 0.05:
+    #     plt.text(2, 0.1, "*", fontsize=20, horizontalalignment='center')
+    # if stats_ttest_ind(unrmd, timermd)[1] < 0.05:
+    #     plt.text(1.5, 0.5, "*", fontsize=20, horizontalalignment='center')
+    # if stats_ttest_ind(stimrmd, timermd)[1] < 0.05:
+    #     plt.text(2.5, 0.5, "*", fontsize=20, horizontalalignment='center')
+    if logInfo:
+        plt.ylabel("log(mutual information)", fontsize=19)
+    else:
+        plt.ylabel("Mutual information", fontsize=19)
+    if save:
+        plt.savefig(os.path.join(save_dir, f'time_stimulus_joint_encoding_info_{title}.svg'))
+    else:
+        plt.show()
+
 
 def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_data=False):
     '''
@@ -654,106 +779,6 @@ def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_da
 
 
 
-
-
-def calculate_time_stimulus_mutual_info(resp, stim):
-
-    """
-    calculate the shannon mutual information carried by each neuron's activity about time and stimulus.
-    :param resp: (n_trials, len_delay, n_neurons)
-    :param stim: (n_trials,)
-    :return: mutual_info (n_neurons,)
-    """
-    n_neurons = resp.shape[-1]
-    len_delay = resp.shape[1]
-    n_total_trials = resp.shape[0]
-    MI_arr = np.zeros(n_neurons)
-    for i_neuron in range(n_neurons):
-        # Calculate the probability of each trial type and time point
-        p_trial_A = p_trial_B = p_time = np.zeros(len_delay)
-        for t in range(len_delay):
-            p_trial_A[t] = np.sum(resp[stim==0, t]) / np.sum(stim==0)*len_delay
-            p_trial_B[t] = np.sum(resp[stim==1, t]) / np.sum(stim==1)*len_delay
-            p_time[t] = np.sum(resp[:, t]) / n_total_trials*len_delay
-        # Calculate the entropy of trial type and time
-        H_trial = entropy([0.5, 0.5], base=2)
-        H_time = entropy(p_time, base=2)
-
-        # Calculate the joint entropy of trial type and time
-        p_joint = np.zeros((2, len_delay))
-        p_joint[0, :] = p_trial_A
-        p_joint[1, :] = p_trial_B
-        H_joint = entropy(p_joint.reshape(80), base=2)
-        '''
-        # Calculate the conditional entropy of firing rate given trial type and time
-        H_cond = 0
-        for i in range(2):  # trial_type, a
-            for j in range(len_delay):  # t
-                breakpoint()
-                p_fr_given_t_and_a = np.sum(resp[stim==i, j]) / np.sum(p_joint[i, j])
-                H_cond += p_joint[i, j] * entropy([p_fr_given_t_and_a, 1-p_fr_given_t_and_a])
-        '''
-        # Calculate the mutual information
-        #breakpoint()
-        MI_arr[i_neuron] = H_trial + H_time - H_joint
-        # print("Mutual information:", MI)
-    return MI_arr
-
-
-def shuffle_trial(resp):
-    """
-    shuffle trial axis
-    :param resp: (n_trials, len_delay, n_neurons)
-    :return: shuffled_resp
-    """
-    shuffled_resp = resp
-    np.random.shuffle(shuffled_resp)
-    return shuffled_resp
-
-
-def shuffle_time(resp):
-    """
-    shuffle time axis
-    :param resp: (n_trials, len_delay, n_neurons)
-    :return: shuffled_resp
-    """
-    shuffled_resp = np.moveaxis(resp, 1, 0)
-    np.random.shuffle(shuffled_resp)
-    return np.moveaxis(shuffled_resp, 0, 1)
-
-
-def plot_mutual_info_vs_shuffled(resp, stim, title, save_dir, logInfo=False):
-    MI = calculate_time_stimulus_mutual_info(resp, stim)
-    time_shuffled_resp = shuffle_time(resp)
-    MI_time_shuffled = calculate_time_stimulus_mutual_info(time_shuffled_resp, stim)
-    trial_shuffled_resp = shuffle_trial(resp)
-    MI_trial_shuffled = calculate_time_stimulus_mutual_info(trial_shuffled_resp, stim)
-    #breakpoint()
-    if logInfo:
-        unrmd, timermd, trialrmd = np.log(MI), np.log(MI_time_shuffled), np.log(MI_trial_shuffled)
-    else:
-        unrmd, timermd, trialrmd = MI, MI_time_shuffled, MI_trial_shuffled
-    n_neurons = len(unrmd)
-    info = np.transpose([unrmd, timermd, trialrmd])
-
-    stats = cbook.boxplot_stats(info, labels=['Unshuffled', 'Time shuffled', 'Trial-type shuffled'], bootstrap=10000)
-    for i in range(len(stats)):
-        stats[i]['whislo'] = np.min(info[:,i], axis=0)
-        stats[i]['whishi'] = np.max(info[:,i], axis=0)
-
-    fig, axs = plt.subplots(1,1)
-    fig.suptitle(title)
-    for i in range(n_neurons):
-        plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
-
-    props = dict(color='indigo', linewidth=1.5)
-    axs.bxp(stats, showfliers=False, boxprops=props,
-            capprops=props, whiskerprops=props, medianprops=props)
-    if logInfo:
-        plt.ylabel("log(mutual information)", fontsize=19)
-    else:
-        plt.ylabel("Mutual information", fontsize=19)
-    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_{title}{"_logInfo" if logInfo else ""}.svg'))
 
 
 
