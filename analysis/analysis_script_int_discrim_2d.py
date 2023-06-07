@@ -81,17 +81,21 @@ plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_typ
 
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
-    reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
-    stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
-
-    reshape_resp = np.reshape(stim2_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
-    stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
-
-    reshape_resp = np.reshape(delay_resp, (n_total_episodes*20, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
-    delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
+    # normalize each unit's response by its maximum and minimum, ignoring the 0s beyond stimulus length as indicated in stim
+    for i_neuron in range(n_neurons):
+        # swap 0's in stim1_resp and stim2_resp with nan
+        stim1_resp[:, :, i_neuron][stim1_resp[:, :, i_neuron] == 0] = np.nan
+        stim2_resp[:, :, i_neuron][stim2_resp[:, :, i_neuron] == 0] = np.nan
+        # normalize across stim1_resp, stim2_resp, and delay_resp
+        min_act = np.nanmin(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
+        max_act = np.nanmax(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
+        stim1_resp[:, :, i_neuron] = (stim1_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+        stim2_resp[:, :, i_neuron] = (stim2_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+        delay_resp[:, :, i_neuron] = (delay_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+        # swap nan's back to 0's
+        stim1_resp[:, :, i_neuron][np.isnan(stim1_resp[:, :, i_neuron])] = 0
+        stim2_resp[:, :, i_neuron][np.isnan(stim2_resp[:, :, i_neuron])] = 0
+        delay_resp[:, :, i_neuron][np.isnan(delay_resp[:, :, i_neuron])] = 0
 
 last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
 

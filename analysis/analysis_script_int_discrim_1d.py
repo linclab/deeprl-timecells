@@ -73,8 +73,8 @@ stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity o
 stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
 delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
 n_total_episodes = np.shape(stim)[0]
-plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix')
-plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve')
+plot_performance(stim, action_hist, title=env_title, save_dir=save_dir, fig_type='matrix', save=True)
+plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_type='curve', save=True)
 
 # Select units with large enough variation in its activation
 # big_var_neurons = []
@@ -87,20 +87,31 @@ plot_performance(stim, action_hist,  title=env_title, save_dir=save_dir, fig_typ
 
 normalize = True if argsdict['normalize'] == True or argsdict['normalize'] == 'True' else False
 if normalize:
-    reshape_resp = np.reshape(stim1_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
-    stim1_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
+    # normalize each unit's response by its maximum and minimum, ignoring the 0s beyond stimulus length as indicated in stim
+    for i_neuron in range(n_neurons):
+        # swap 0's in stim1_resp and stim2_resp with nan
+        stim1_resp[:, :, i_neuron][stim1_resp[:, :, i_neuron] == 0] = np.nan
+        stim2_resp[:, :, i_neuron][stim2_resp[:, :, i_neuron] == 0] = np.nan
+        # normalize across stim1_resp, stim2_resp, and delay_resp
+        min_act = np.nanmin(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
+        max_act = np.nanmax(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
+        stim1_resp[:, :, i_neuron] = (stim1_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+        stim2_resp[:, :, i_neuron] = (stim2_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+        delay_resp[:, :, i_neuron] = (delay_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+        # swap nan's back to 0's
+        stim1_resp[:, :, i_neuron][np.isnan(stim1_resp[:, :, i_neuron])] = 0
+        stim2_resp[:, :, i_neuron][np.isnan(stim2_resp[:, :, i_neuron])] = 0
+        delay_resp[:, :, i_neuron][np.isnan(delay_resp[:, :, i_neuron])] = 0
 
-    reshape_resp = np.reshape(stim2_resp, (n_total_episodes*40, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
-    stim2_resp = np.reshape(reshape_resp, (n_total_episodes, 40, n_neurons))
-
-    reshape_resp = np.reshape(delay_resp, (n_total_episodes*20, n_neurons))
-    reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
-    delay_resp = np.reshape(reshape_resp, (n_total_episodes, 20, n_neurons))
 
 last_step_resp = stim2_resp[np.arange(n_total_episodes), stim[:,1]-1, :]
 
+from utils_mutual_info import joint_encoding_information_time_stimulus
+stim_set = np.sort(np.unique(stim))
+for stim_len in stim_set:
+    binary_stim = np.concatenate((np.zeros(np.sum(stim[:, 0] == stim_len)), np.ones(np.sum(stim[:, 1] == stim_len))))
+    resp_for_stim_len = np.concatenate((stim1_resp[stim[:, 0] == stim_len, :stim_len, :], stim2_resp[stim[:, 1] == stim_len, :stim_len, :]), axis=0)
+    joint_encoding_information_time_stimulus(resp_for_stim_len, binary_stim, save_dir,title=f'{seed}_{epi}_{n_shuffle}_{percentile}_stim{stim_len}', logInfo=False, save=True)
 
 # Plot cell activities in all combinations of stimulus length
 
