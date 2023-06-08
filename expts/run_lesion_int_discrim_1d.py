@@ -129,7 +129,8 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
         # calculate KL divergence between original policy pi and new policy pi'
         kl_divergence = 0
         for pi, pi_p in zip(pi_record, pi_prime_record):
-            kl_divergence += F.kl_div(pi_p, pi, reduction='batchmean')
+            #calculate the kl divergence between the two policies
+            kl_divergence += torch.sum(pi * torch.log(pi / pi_p))
         kl_divergence /= len(pi_record)
         kl_div.append(kl_divergence.item())
         # print('KL divergence:', kl_divergence.item())
@@ -283,46 +284,46 @@ if __name__ == '__main__':
 
     fig, ax1 = plt.subplots()
     fig.suptitle(f'{env_title}_{ckpt_name}')
-    ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), color='gray', label='Random lesion')
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[0, :, :], axis=-1), color='gray', label=f'Random {"lesion" if argsdict["expt_type"] == "lesion" else "silencing"}')
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[0, :, :], axis=-1)-np.std(postlesion_perf_array[0, :, :], axis=-1),
                      np.mean(postlesion_perf_array[0, :, :], axis=-1)+np.std(postlesion_perf_array[0, :, :], axis=-1), color='lightgray', alpha=0.2)
-    ax1.plot(n_lesion, np.mean(postlesion_perf_array[1, :, :], axis=-1), color='royalblue', label='Ramping cell lesion')
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[1, :, :], axis=-1), color='royalblue', label=f'Ramping cell {"lesion" if argsdict["expt_type"] == "lesion" else "silencing"}')
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[1, :, :], axis=-1)-np.std(postlesion_perf_array[1, :, :], axis=-1),
                      np.mean(postlesion_perf_array[1, :, :], axis=-1)+np.std(postlesion_perf_array[1, :, :], axis=-1), color='lightsteelblue', alpha=0.2)
-    ax1.plot(n_lesion, np.mean(postlesion_perf_array[2, :, :], axis=-1), color='magenta', label='Time cell lesion')
+    ax1.plot(n_lesion, np.mean(postlesion_perf_array[2, :, :], axis=-1), color='magenta', label=f'Time cell {"lesion" if argsdict["expt_type"] == "lesion" else "silencing"}')
     ax1.fill_between(n_lesion,
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)-np.std(postlesion_perf_array[2, :, :], axis=-1),
                      np.mean(postlesion_perf_array[2, :, :], axis=-1)+np.std(postlesion_perf_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
     ax1.hlines(y=0.5, xmin=0, xmax=1, transform=ax1.get_yaxis_transform(), linestyles='dashed', colors='gray')
-    ax1.set_xlabel('Number of neurons lesioned')
-    ax1.set_ylabel('Fraction Nonmatch')
+    ax1.set_xlabel(f'Number of neurons {"lesioned" if argsdict["expt_type"] == "lesion" else "silenced"}')
+    ax1.set_ylabel('% Correct')
     ax1.set_ylim(0,1)
     ax1.legend()
     #plt.show()
-    fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_performance_results.png'))
+    fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_performance_results.svg'))
 
     if argsdict["expt_type"] == "rehydration":
         fig, ax2 = plt.subplots()
         fig.suptitle(f'{env_title}_{ckpt_name}')
-        ax2.plot(n_lesion, np.mean(mean_kl_div_array[0, :, :], axis=-1), color='gray', label='Random lesion')
+        ax2.plot(n_lesion, np.mean(mean_kl_div_array[0, :, :], axis=-1), color='gray', label=f'Random {"lesion" if argsdict["expt_type"] == "lesion" else "silencing"}')
         ax2.fill_between(n_lesion,
                          np.mean(mean_kl_div_array[0, :, :], axis=-1)-np.std(mean_kl_div_array[0, :, :], axis=-1),
                          np.mean(mean_kl_div_array[0, :, :], axis=-1)+np.std(mean_kl_div_array[0, :, :], axis=-1), color='lightgray', alpha=0.2)
-        ax2.plot(n_lesion, np.mean(mean_kl_div_array[1, :, :], axis=-1), color='royalblue', label='Ramping cell lesion')
+        ax2.plot(n_lesion, np.mean(mean_kl_div_array[1, :, :], axis=-1), color='royalblue', label=f'Ramping cell {"lesion" if argsdict["expt_type"] == "lesion" else "silencing"}')
         ax2.fill_between(n_lesion,
                          np.mean(mean_kl_div_array[1, :, :], axis=-1)-np.std(mean_kl_div_array[1, :, :], axis=-1),
                          np.mean(mean_kl_div_array[1, :, :], axis=-1)+np.std(mean_kl_div_array[1, :, :], axis=-1), color='lightsteelblue', alpha=0.2)
-        ax2.plot(n_lesion, np.mean(mean_kl_div_array[2, :, :], axis=-1), color='magenta', label='Time cell lesion')
+        ax2.plot(n_lesion, np.mean(mean_kl_div_array[2, :, :], axis=-1), color='magenta', label=f'Time cell {"lesion" if argsdict["expt_type"] == "lesion" else "silencing"}')
         ax2.fill_between(n_lesion,
                          np.mean(mean_kl_div_array[2, :, :], axis=-1)-np.std(mean_kl_div_array[2, :, :], axis=-1),
                          np.mean(mean_kl_div_array[2, :, :], axis=-1)+np.std(mean_kl_div_array[2, :, :], axis=-1), color='thistle', alpha=0.2)
-        ax2.set_xlabel('Number of neurons lesioned')
+        ax2.set_xlabel('Number of neurons silenced')
         ax2.set_ylabel('KL divergence between $\pi$ and $\pi_{new}$')
         ax2.legend()
         #plt.show()
-        fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_kl_div_results.png'))
+        fig.savefig(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_kl_div_results.svg'))
 
     np.savez_compressed(os.path.join(save_dir, f'epi{n_total_episodes}_shuff{num_shuffle}_idx{lesion_idx_start}_{lesion_idx_step}_{n_neurons if lesion_idx_end is None else lesion_idx_end}_{argsdict["expt_type"]}_results.npz'),
                         random_index_dict=random_index_dict, n_lesion=n_lesion, postlesion_perf=postlesion_perf_array, mean_kl_div=mean_kl_div_array)
