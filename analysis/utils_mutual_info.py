@@ -651,23 +651,23 @@ def randomize_dimension_time_stimulus(delay_resp, stim, dim=None):
 def construct_time_stimulus_ratemap_occupancy(delay_resp, stim, randomize=None, shuffle=False):
     n_episode, len_delay, n_neurons = np.shape(delay_resp)
 
-    delay_resp = (delay_resp - np.min(delay_resp, axis=(0,1),
+    norm_delay_resp = (delay_resp - np.min(delay_resp, axis=(0,1),
                                       keepdims=True)) / np.ptp(delay_resp, axis=(0,1), keepdims=True)
     if shuffle:
-        delay_resp = shuffle_activity(delay_resp)
+        norm_delay_resp = shuffle_activity(norm_delay_resp)
 
     ratemap = np.zeros((len_delay, 2, n_neurons))
     occupancy = np.empty((len_delay, 2))
-    time_axis, stim_axis = randomize_dimension_time_stimulus(delay_resp, stim, dim=randomize)
+    time_axis, stim_axis = randomize_dimension_time_stimulus(norm_delay_resp, stim, dim=randomize)
 
     for t in range(len_delay):
         for s in range(2): # 0: left, 1: right
             if randomize == None:
                 occupancy[t,s] = np.sum(stim==s)
-                ratemap[t,s,:] = np.sum(delay_resp[stim==s, t, :], axis=0) / occupancy[t,s]
+                ratemap[t,s,:] = np.sum(norm_delay_resp[stim==s, t, :], axis=0) / occupancy[t,s]
             else :
                 occupancy[t,s] = np.sum(stim==stim_axis[t,s])
-                ratemap[t,s,:] = np.sum(delay_resp[stim==stim_axis[t,s], int(time_axis[t,s]), :], axis=0) / occupancy[t,s]
+                ratemap[t,s,:] = np.sum(norm_delay_resp[stim==stim_axis[t,s], int(time_axis[t,s]), :], axis=0) / occupancy[t,s]
 
         occupancy = occupancy / np.sum(occupancy)
         #print("Sum of occupancy: ", np.sum(occupancy))
@@ -692,8 +692,8 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
         I_sfl_timermd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, randomize='pos', shuffle=True))
 
     sig_cells = np.squeeze(I_unsfl_unrmd) > (np.nanmean(I_sfl_unrmd,axis=1) + 2 * np.nanstd(I_sfl_unrmd,axis=1))
-    I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells]
-    I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells]
+    # I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells]
+    # I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells]
     np.savez_compressed(os.path.join(save_dir, 'time_stimulus_joint_encoding.npz'), I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_stimrmd=I_unsfl_stimrmd,
                         I_unsfl_timermd=I_unsfl_timermd, I_sfl_unrmd=I_sfl_unrmd, I_sfl_stimrmd=I_sfl_stimrmd, I_sfl_timermd=I_sfl_timermd)
     if logInfo:
@@ -701,8 +701,8 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
     else:
         unrmd, stimrmd, timermd = I_unsfl_unrmd ,I_unsfl_stimrmd, I_unsfl_timermd
     n_neurons = np.shape(timermd)[0]
-    print(n_neurons)
-    info = np.transpose([unrmd, timermd, stimrmd])
+    print(f"Number of sig_cells: {len(sig_cells)}")
+    info = np.transpose([unrmd, timermd, stimrmd])  # n_neurons x 3
 
     stats = cbook.boxplot_stats(info, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
     for i in range(len(stats)):
@@ -712,27 +712,25 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
     fig, axs = plt.subplots(1,1)
     fig.suptitle(title)
     for i in range(n_neurons):
-        plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
+        if sig_cells[i]:
+            plt.plot([1, 2, 3], info[i,:], color="red", lw=1)
+        else:
+            plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
 
     props = dict(color='indigo', linewidth=1.5)
     axs.bxp(stats, showfliers=False, boxprops=props,
             capprops=props, whiskerprops=props, medianprops=props)
-    # Run t-test on unrmd, stimrmd, timermd pairwise, and print p-values
-    from scipy.stats import ttest_ind as stats_ttest_ind
-    print("Unrmd vs. Stimrmd: ", stats_ttest_ind(unrmd, stimrmd))
-    print("Unrmd vs. Timermd: ", stats_ttest_ind(unrmd, timermd))
-    print("Stimrmd vs. Timermd: ", stats_ttest_ind(stimrmd, timermd))
-    # If t-test result is significant, add a star to the plot
-    # if stats_ttest_ind(unrmd, stimrmd)[1] < 0.05:
-    #     plt.text(2, 0.1, "*", fontsize=20, horizontalalignment='center')
-    # if stats_ttest_ind(unrmd, timermd)[1] < 0.05:
-    #     plt.text(1.5, 0.5, "*", fontsize=20, horizontalalignment='center')
-    # if stats_ttest_ind(stimrmd, timermd)[1] < 0.05:
-    #     plt.text(2.5, 0.5, "*", fontsize=20, horizontalalignment='center')
+    # Run nonparametric test on unrmd, stimrmd, timermd pairwise, and print p-values
+    from scipy.stats import kruskal
+    print("Kruskal-Wallis test p-values:")
+    print("Unrmd vs. Stimrmd: ", kruskal(unrmd, stimrmd)[1])
+    print("Unrmd vs. Timermd: ", kruskal(unrmd, timermd)[1])
+    print("Stimrmd vs. Timermd: ", kruskal(stimrmd, timermd)[1])
+
     if logInfo:
-        plt.ylabel("log(mutual information)", fontsize=19)
+        plt.ylabel("log(mutual information) (bits)", fontsize=19)
     else:
-        plt.ylabel("Mutual information", fontsize=19)
+        plt.ylabel("Mutual information (bits)", fontsize=19)
     if save:
         plt.savefig(os.path.join(save_dir, f'time_stimulus_joint_encoding_info_{title}.svg'))
     else:
