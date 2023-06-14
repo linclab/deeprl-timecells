@@ -578,6 +578,12 @@ def plot_joint_encoding_information(save_dir, title, logInfo=False, save=False):
     print(n_neurons)
     info = np.transpose([unrmd, timermd, posrmd])
 
+    from scipy.stats import kruskal
+    print("Kruskal-Wallis test p-values:")
+    print("Unrmd vs. Posrmd: ", kruskal(unrmd, posrmd)[1])
+    print("Unrmd vs. Timermd: ", kruskal(unrmd, timermd)[1])
+    print("Posrmd vs. Timermd: ", kruskal(posrmd, timermd)[1])
+
     stats = cbook.boxplot_stats(info, labels=['Loc x Time', r'$Loc x R_Time$', r'$Time x R_Loc$'], bootstrap=10000)
     for i in range(len(stats)):
         stats[i]['whislo'] = np.min(info[:,i], axis=0)
@@ -692,10 +698,10 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
         I_sfl_timermd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, randomize='pos', shuffle=True))
 
     sig_cells = np.squeeze(I_unsfl_unrmd) > (np.nanmean(I_sfl_unrmd,axis=1) + 2 * np.nanstd(I_sfl_unrmd,axis=1))
-    # I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells]
-    # I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells]
-    np.savez_compressed(os.path.join(save_dir, 'time_stimulus_joint_encoding.npz'), I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_stimrmd=I_unsfl_stimrmd,
-                        I_unsfl_timermd=I_unsfl_timermd, I_sfl_unrmd=I_sfl_unrmd, I_sfl_stimrmd=I_sfl_stimrmd, I_sfl_timermd=I_sfl_timermd)
+    I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells]
+    I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells]
+    #np.savez_compressed(os.path.join(save_dir, 'time_stimulus_joint_encoding.npz'), I_unsfl_unrmd=I_unsfl_unrmd, I_unsfl_stimrmd=I_unsfl_stimrmd,
+    #                    I_unsfl_timermd=I_unsfl_timermd, I_sfl_unrmd=I_sfl_unrmd, I_sfl_stimrmd=I_sfl_stimrmd, I_sfl_timermd=I_sfl_timermd)
     if logInfo:
         unrmd, stimrmd, timermd = np.log(I_unsfl_unrmd), np.log(I_unsfl_stimrmd), np.log(I_unsfl_timermd)
     else:
@@ -712,10 +718,10 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
     fig, axs = plt.subplots(1,1)
     fig.suptitle(title)
     for i in range(n_neurons):
-        if sig_cells[i]:
-            plt.plot([1, 2, 3], info[i,:], color="red", lw=1)
-        else:
-            plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
+        #if sig_cells[i]:
+        #    plt.plot([1, 2, 3], info[i,:], color="red", lw=1)
+        #else:
+        plt.plot([1, 2, 3], info[i,:], color="gray", lw=1)
 
     props = dict(color='indigo', linewidth=1.5)
     axs.bxp(stats, showfliers=False, boxprops=props,
@@ -735,6 +741,7 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
         plt.savefig(os.path.join(save_dir, f'time_stimulus_joint_encoding_info_{title}.svg'))
     else:
         plt.show()
+    return info
 
 
 def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_data=False):

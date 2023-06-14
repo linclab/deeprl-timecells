@@ -278,7 +278,7 @@ def time_decode_lin_reg(delay_resp, len_delay, n_neurons, bin_size, title, save_
         plt.savefig(os.path.join(save_dir, f'decode_time_linreg_{title}.svg'))
     else:
         plt.show()
-
+    return t_test, t_test_pred
 
 def single_cell_visualization(total_resp, binary_stim, cell_nums, type, save_dir):
     len_delay = np.shape(total_resp)[1]
