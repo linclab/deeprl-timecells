@@ -97,7 +97,7 @@ net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
 # Load existing model
 if load_model_path=='None':
-    ckpt_name = 'untrained_agent'  # placeholder ckptname in case we want to save data in the end
+    ckpt_name = f'seed_{seed}_untrained_agent'  # placeholder ckptname in case we want to save data in the end
 else:
     ckpt_name = load_model_path.replace('/', '_')
     pt_name = load_model_path.split('/')[1]  # seed_3_epi199999.pt
