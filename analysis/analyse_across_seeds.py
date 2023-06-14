@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cbook as cbook
 import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+from scipy.stats import kruskal
 from analysis.utils_analysis import sort_resp, plot_sorted_averaged_resp, single_cell_visualization, time_decode_lin_reg
 from analysis.utils_time_ramp import lin_reg_ramping, skaggs_temporal_information, trial_reliability_vs_shuffle_score
 from analysis.utils_mutual_info import joint_encoding_information_time_stimulus
@@ -42,7 +43,6 @@ def plot_mutual_information_across_seeds(info_dict):
     print("Plot mutual information across seeds...")
     info_arr = np.vstack(info_dict.values())
     n_total_neurons = np.shape(info_arr)[0]
-    breakpoint()
     stats = cbook.boxplot_stats(info_arr, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
     for i in range(len(stats)):
         stats[i]['whislo'] = np.min(info_arr[:,i], axis=0)
@@ -55,7 +55,40 @@ def plot_mutual_information_across_seeds(info_dict):
     axs.bxp(stats, showfliers=False, boxprops=props,
             capprops=props, whiskerprops=props, medianprops=props)
     plt.ylabel("Mutual information (bits)", fontsize=19)
+    #Run nonparametric test on unrmd, stimrmd, timermd pairwise, and print p-values
+    print(f"Pooled_{len(info_dict)}seeds: Kruskal-Wallis test p-values:")
+    unrmd, timermd, stimrmd = info_arr[:,0], info_arr[:,1], info_arr[:,2]
+    print("Unrmd vs. Stimrmd: ", kruskal(unrmd, stimrmd)[1])
+    print("Unrmd vs. Timermd: ", kruskal(unrmd, timermd)[1])
+    print("Stimrmd vs. Timermd: ", kruskal(stimrmd, timermd)[1])
     plt.savefig(os.path.join(save_dir, f'joint_encoding_info_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'))
+
+
+def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
+    time_cell_counts = []
+    ramping_cell_counts = []
+    both_cell_counts = []
+    neither_cell_counts = []
+    for each_seed in time_cell_ids.keys():
+        time_cell_counts.append(len(time_cell_ids[each_seed]['total']))
+        ramping_cell_counts.append(len(ramping_cell_ids[each_seed]['total']))
+        both_cell_counts.append(len(np.intersect1d(time_cell_ids[each_seed]['total'], ramping_cell_ids[each_seed]['total'])))
+        not_time_cell = np.setdiff1d(np.arange(n_neurons), time_cell_ids[each_seed]['total'])
+        not_ramping_cell = np.setdiff1d(np.arange(n_neurons), ramping_cell_ids[each_seed]['total'])
+        neither_cell_counts.append(len(np.intersect1d(not_time_cell, not_ramping_cell)))
+    # convert to numpy array
+    time_cell_counts = np.array(time_cell_counts)
+    ramping_cell_counts = np.array(ramping_cell_counts)
+    both_cell_counts = np.array(both_cell_counts)
+    neither_cell_counts = np.array(neither_cell_counts)
+    # plot as bar plot with error bar
+    fig, ax = plt.subplots()
+    ax.bar(x=np.arange(4), height=[np.mean(time_cell_counts), np.mean(ramping_cell_counts), np.mean(both_cell_counts), np.mean(neither_cell_counts)], yerr=[np.std(time_cell_counts), np.std(ramping_cell_counts), np.std(both_cell_counts), np.std(neither_cell_counts)])
+    ax.set_xticks(np.arange(4))
+    ax.set_xticklabels(['Time cells', 'Ramping cells', 'Both', 'Neither'])
+    ax.set_title(f'Cell type count across {len(time_cell_ids)} seeds')
+    ax.axhline(y=n_neurons, linestyle='--', color='k')
+    plt.savefig(os.path.join(save_dir, f'cell_type_count_{len(time_cell_ids)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'))
 
 
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/mem_40_lstm_128_0.0001'
@@ -165,6 +198,8 @@ else:
             plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay)
             # plot mutual information
             plot_mutual_information_across_seeds(info_dict)
+            # plot counts of time and ramping cells
+            plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
     # Save results
     print("Save results..")
     np.save(os.path.join(save_dir, f't_test_dict_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), t_test_dict)
