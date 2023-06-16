@@ -19,12 +19,16 @@ utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=0)
+parser.add_argument('--untrained', type=bool, default=False, help='whether to use untrained model')
 args = parser.parse_args()
 each_seed = args.seed
-
+untrained = args.untrained
 
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
-save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d'
+if untrained:
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d_untrained'
+else:
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d'
 n_neurons = 128
 n_shuffle = 100
 percentile = 99
@@ -35,7 +39,10 @@ if not os.path.exists(seed_save_dir):
     os.makedirs(seed_save_dir)
 # load the data
 print("load the data...")
-data = np.load(os.path.join(data_dir, f'lstm_128_1e-05_seed_{each_seed}_epi149999.pt_data.npz'), allow_pickle=True)
+if untrained:
+    data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_data.npz'), allow_pickle=True)
+else:
+    data = np.load(os.path.join(data_dir, f'lstm_128_1e-05_seed_{each_seed}_epi149999.pt_data.npz'), allow_pickle=True)
 action_hist = data["action_hist"]
 correct_trials = data["correct_trial"]
 stim = data["stim"]
@@ -43,6 +50,22 @@ stim1_resp = data["stim1_resp_hx"]  # Note: this could also be linear activity o
 stim2_resp = data["stim2_resp_hx"]  # Note: this could also be linear activity of Feedforward network
 delay_resp = data["delay_resp_hx"]  # Note: this could also be linear activity of Feedforward network
 n_total_episodes = np.shape(stim)[0]
+
+# Normalize the delay response based on the maximum response of each neuron
+for i_neuron in range(n_neurons):
+    # swap 0's in stim1_resp and stim2_resp with nan
+    stim1_resp[:, :, i_neuron][stim1_resp[:, :, i_neuron] == 0] = np.nan
+    stim2_resp[:, :, i_neuron][stim2_resp[:, :, i_neuron] == 0] = np.nan
+    # normalize across stim1_resp, stim2_resp, and delay_resp
+    min_act = np.nanmin(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
+    max_act = np.nanmax(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
+    stim1_resp[:, :, i_neuron] = (stim1_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+    stim2_resp[:, :, i_neuron] = (stim2_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+    delay_resp[:, :, i_neuron] = (delay_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
+    # swap nan's back to 0's
+    stim1_resp[:, :, i_neuron][np.isnan(stim1_resp[:, :, i_neuron])] = 0
+    stim2_resp[:, :, i_neuron][np.isnan(stim2_resp[:, :, i_neuron])] = 0
+    delay_resp[:, :, i_neuron][np.isnan(delay_resp[:, :, i_neuron])] = 0
 
 print("mutual information analysis...")
 info_dict_seed = {}
@@ -69,22 +92,6 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
 # Visualize single cell response
 print("visualizing single cell response...")
 single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir=seed_save_dir)
-
-# Normalize the delay response based on the maximum response of each neuron
-for i_neuron in range(n_neurons):
-    # swap 0's in stim1_resp and stim2_resp with nan
-    stim1_resp[:, :, i_neuron][stim1_resp[:, :, i_neuron] == 0] = np.nan
-    stim2_resp[:, :, i_neuron][stim2_resp[:, :, i_neuron] == 0] = np.nan
-    # normalize across stim1_resp, stim2_resp, and delay_resp
-    min_act = np.nanmin(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
-    max_act = np.nanmax(np.concatenate((stim1_resp[:, :, i_neuron], stim2_resp[:, :, i_neuron], delay_resp[:, :, i_neuron]), axis=1))
-    stim1_resp[:, :, i_neuron] = (stim1_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
-    stim2_resp[:, :, i_neuron] = (stim2_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
-    delay_resp[:, :, i_neuron] = (delay_resp[:, :, i_neuron] - min_act) / (max_act - min_act)
-    # swap nan's back to 0's
-    stim1_resp[:, :, i_neuron][np.isnan(stim1_resp[:, :, i_neuron])] = 0
-    stim2_resp[:, :, i_neuron][np.isnan(stim2_resp[:, :, i_neuron])] = 0
-    delay_resp[:, :, i_neuron][np.isnan(delay_resp[:, :, i_neuron])] = 0
 
 
 time_cell_ids_seed = {}
