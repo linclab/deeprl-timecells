@@ -196,12 +196,12 @@ class TunlEnv_nomem(object):
                 self.observation = array([[1, 1, 0, 0]])  # enters initiation
                 self.done = False
         elif np.all(self.observation == array([[0, 0, 1, 1]])):  # choice phase
-            if action == 1 or action == 2:  # poke L or R
+            if action == 1:  # poke L
                 self.reward = 1
                 self.done = True
             else:
                 self.reward = 0
-                self.done = False
+                self.done = True
         return self.observation, self.reward, self.done
 
     def reset(self):

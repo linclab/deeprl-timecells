@@ -97,7 +97,7 @@ net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
 # Load existing model
 if load_model_path=='None':
-    ckpt_name = f'seed_{seed}_untrained_agent'  # placeholder ckptname in case we want to save data in the end
+    ckpt_name = f'seed_{seed}_untrained_agent_weight_frozen'  # placeholder ckptname in case we want to save data in the end
 else:
     ckpt_name = load_model_path.replace('/', '_')
     pt_name = load_model_path.split('/')[1]  # seed_3_epi199999.pt
@@ -109,10 +109,10 @@ else:
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
     net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
 
-
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
 first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
+#nomem_perf = np.zeros(n_total_episodes, dtype=np.int8)
 if record_data:
     delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
@@ -146,27 +146,35 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         act_record.append(act)
     first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
     nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
+    #nomem_perf[i_episode] = reward
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-    p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+        # for untrained agent, freeze weight
+        del net.rewards[:]
+        del net.saved_actions[:]
+    else:
+        p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
             print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            #print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         else:
             print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            #print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
             if load_model_path != 'None':
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}.pt')
             else:
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
-
+#binned_reward = bin_rewards(nomem_perf, window_size=window_size)
 
 fig, ax1 = plt.subplots()
 fig.suptitle(f'{env_title} TUNL')
 ax1.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
+#ax1.plot(np.arange(n_total_episodes), binned_reward, label=net_title)
 ax1.set_xlabel('Episode')
-ax1.set_ylabel('Fraction Nonmatch')
+ax1.set_ylabel('% Correct')
 ax1.set_ylim(0,1)
 ax1.legend()
 #plt.show()
@@ -176,10 +184,13 @@ if save_performance_fig:
 # save data
 if record_data:
     np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, delay_resp=delay_resp)
+    #np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, nomem_perf=nomem_perf, delay_resp=delay_resp)
 else:
     np.savez_compressed(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action)
+    #np.savez_compressed(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action, nomem_perf=nomem_perf)
 
 del stim, nonmatch_perc, first_action, net, env, optimizer
+#del stim, nonmatch_perc, nomem_perf, first_action, net, env, optimizer
 if record_data:
     del delay_resp
 
