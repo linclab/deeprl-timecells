@@ -26,7 +26,7 @@ untrained = args.untrained
 
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
 if untrained:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d_untrained'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d_untrained_weight_frozen'
 else:
     save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d'
 n_neurons = 128
@@ -36,11 +36,11 @@ percentile = 99
 print(f'====================== Analyzing seed {each_seed} ...======================================')
 seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
 if not os.path.exists(seed_save_dir):
-    os.makedirs(seed_save_dir)
+    os.makedirs(seed_save_dir, exist_ok=True)
 # load the data
 print("load the data...")
 if untrained:
-    data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_data.npz'), allow_pickle=True)
+    data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_weight_frozen_data.npz'), allow_pickle=True)
 else:
     data = np.load(os.path.join(data_dir, f'lstm_128_1e-05_seed_{each_seed}_epi149999.pt_data.npz'), allow_pickle=True)
 action_hist = data["action_hist"]
@@ -93,7 +93,7 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,
 print("visualizing single cell response...")
 single_cell_temporal_tuning(stim, stim1_resp, stim2_resp, save_dir=seed_save_dir)
 
-
+print("Identifying time cell and ramping cell...")
 time_cell_ids_seed = {}
 ramping_cell_ids_seed = {}
 for (resp, stimulus, label) in zip([stim1_resp,stim2_resp], [stim[:,0],stim[:,1]], ['stimulus_1', 'stimulus_2']):
@@ -115,12 +115,10 @@ for (resp, stimulus, label) in zip([stim1_resp,stim2_resp], [stim[:,0],stim[:,1]
 time_cell_ids_seed['total'] = np.union1d(time_cell_ids_seed['stimulus_1'], time_cell_ids_seed['stimulus_2'])
 ramping_cell_ids_seed['total'] = np.union1d(ramping_cell_ids_seed['stimulus_1'], ramping_cell_ids_seed['stimulus_2'])
 
-
-
 # save all the dicts as npy
 np.save(os.path.join(seed_save_dir, 'info_dict_seed.npy'), info_dict_seed)
 np.save(os.path.join(seed_save_dir, 't_test_dict_seed.npy'), t_test_dict_seed)
 np.save(os.path.join(seed_save_dir, 't_test_pred_dict_seed.npy'), t_test_pred_dict_seed)
 np.save(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), time_cell_ids_seed)
 np.save(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), ramping_cell_ids_seed)
-
+print("analysis complete")

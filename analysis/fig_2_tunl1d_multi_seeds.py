@@ -5,14 +5,13 @@ import matplotlib.pyplot as plt
 import matplotlib.cbook as cbook
 import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
-from analysis.utils_analysis import time_decode_lin_reg, sort_resp, plot_sorted_averaged_resp
-from analysis.utils_int_discrim import single_cell_temporal_tuning
-from analysis.utils_mutual_info import joint_encoding_information_time_stimulus
-from analysis.utils_time_ramp import ridge_to_background_varying_duration, lin_reg_ramping_varying_duration, \
-    trial_reliability_vs_shuffle_score_varying_duration
 from scipy.stats import kruskal
+from analysis.utils_analysis import sort_resp, plot_sorted_averaged_resp, single_cell_visualization, time_decode_lin_reg
+from analysis.utils_time_ramp import lin_reg_ramping, skaggs_temporal_information, trial_reliability_vs_shuffle_score
+from analysis.utils_mutual_info import joint_encoding_information_time_stimulus
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
+
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -20,15 +19,11 @@ parser.add_argument('--untrained', type=bool, default=False, help='whether to us
 args = parser.parse_args()
 untrained = args.untrained
 
-def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, label):
+
+def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay):
     print("Plot time decoding across seeds...")
-    len_delay = 20 if label == 'delay' else 40
-    t_test_arr = t_test_pred_arr = np.zeros((len(t_test_dict), len_delay*400))
-    for i, seed in enumerate(list(t_test_dict.keys())):
-        t_test_arr[i,:] = np.array(list(t_test_dict[seed][label]))
-        t_test_pred_arr[i,:] = np.array(list(t_test_pred_dict[seed][label]))
-    t_test_arr = t_test_arr.flatten()
-    t_test_pred_arr = t_test_pred_arr.flatten()
+    t_test_arr = np.array(list(t_test_dict.values())).flatten()
+    t_test_pred_arr = np.array(list(t_test_pred_dict.values())).flatten()
     mean_pred = np.zeros(len_delay)
     std_pred = np.zeros(len_delay)
     for t_elapsed in range(len_delay):
@@ -45,23 +40,16 @@ def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, label):
     ax.set_xticklabels(['0', str(len_delay)])
     ax.set_yticks([0, len_delay])
     ax.set_yticklabels(['0', str(len_delay)])
-    ax.set_title(f'Time decoding during {label} pooled across {len(t_test_dict)} seeds')
+    ax.set_title(f'Time decoding pooled across {len(t_test_dict)} seeds')
     ax.set_xlim((np.min(t_test_pred_arr),41))
     ax.set_ylim((np.min(t_test_pred_arr),np.max(t_test_pred_arr)))
-    fig.savefig(os.path.join(save_dir, f'{label}_time_decoding_pooled_{len(t_test_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'), dpi=300)
-    fig.savefig(os.path.join(save_dir, f'{label}_time_decoding_pooled_{len(t_test_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'), dpi=300)
+    fig.savefig(os.path.join(save_dir, f'time_decoding_pooled_{len(t_test_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'), dpi=300)
+    fig.savefig(os.path.join(save_dir, f'time_decoding_pooled_{len(t_test_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'), dpi=300)
 
 
 def plot_mutual_information_across_seeds(info_dict):
-    # info_dict[seed][stim_len] = n_sig_neurons x 3
     print("Plot mutual information across seeds...")
-    info_arr = []
-    for seed in info_dict.keys():
-        for stim_len in info_dict[seed].keys():
-            if len(info_dict[seed][stim_len])==0:
-                continue
-            info_arr.append(info_dict[seed][stim_len])
-    info_arr = np.vstack(info_arr)
+    info_arr = np.vstack(info_dict.values())
     n_total_neurons = np.shape(info_arr)[0]
     stats = cbook.boxplot_stats(info_arr, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
     for i in range(len(stats)):
@@ -113,23 +101,22 @@ def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
     plt.savefig(os.path.join(save_dir, f'cell_type_count_{len(time_cell_ids)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
-data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
+data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/mem_40_lstm_128_0.0001'
 seed_list = []
 for file in os.listdir(data_dir):
-    if re.match(f'lstm_128_1e-05_seed_\d+_epi149999.pt_data.npz', file):
-        seed_list.append(int(file.split('_')[4]))
+    if re.match(f'mem_40_lstm_128_0.0001_seed_\d+_epi199999.pt_data.npz', file):
+        seed_list.append(int(file.split('_')[6]))
 seed_list = sorted(seed_list)
-n_neurons = 128
-n_shuffle = 100
-percentile = 99
 n_total_episodes = 5000
+len_delay = 40
+n_neurons = 128
+n_shuffle = 10
+percentile = 99
 
 if untrained:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d_untrained_weight_frozen'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d_untrained_weight_frozen'
 else:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d'
-os.makedirs(save_dir, exist_ok=True)
-load = False
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d'
 
 ramping_cell_ids = {}
 time_cell_ids = {}
@@ -137,27 +124,26 @@ t_test_dict = {}
 t_test_pred_dict = {}
 info_dict = {}
 for i_seed, each_seed in enumerate(seed_list):
-    # load each seed's dicts from seed_save_dir
+    print(f'====================== Analyzing seed {each_seed} ...======================================')
     seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
+    # load data
     if os.path.exists(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 't_test_dict_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir,  't_test_pred_dict_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'info_dict_seed.npy')):
-        ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
+            os.path.exists(os.path.join(seed_save_dir, 't_test_seed.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir,  't_test_pred_seed.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir, 'info_seed.npy')):
+        t_test_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_seed.npy'), allow_pickle=True).item()
+        t_test_pred_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_pred_seed.npy'), allow_pickle=True).item()
+        info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'info_seed.npy'), allow_pickle=True).item()
         time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
-        t_test_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_dict_seed.npy'), allow_pickle=True).item()
-        t_test_pred_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_pred_dict_seed.npy'), allow_pickle=True).item()
-        info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'info_dict_seed.npy'), allow_pickle=True).item()
+        ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
 
 plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
 
 plot_mutual_information_across_seeds(info_dict)
 
-for label in ['stimulus_1', 'stimulus_2', 'delay']:
-    plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, label)
+plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay=len_delay)
 
-# Save results
 print("Save results..")
 np.save(os.path.join(save_dir, f't_test_dict_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), t_test_dict)
 np.save(os.path.join(save_dir, f't_test_pred_dict_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), t_test_pred_dict)
@@ -165,9 +151,3 @@ np.save(os.path.join(save_dir, f'info_dict_{n_total_episodes}_{n_shuffle}_{perce
 np.save(os.path.join(save_dir, f'time_cell_ids_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), time_cell_ids)
 np.save(os.path.join(save_dir, f'ramping_cell_ids_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), ramping_cell_ids)
 print("Done!")
-
-
-
-
-
-
