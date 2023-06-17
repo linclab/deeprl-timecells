@@ -262,6 +262,7 @@ def plot_performance(stim, action_hist, title, save_dir, fig_type="matrix", save
             plt.savefig(os.path.join(save_dir, f'{title}_performance_curve.svg'))
         else:
             plt.show()
+        return acc_stim1_longer, acc_stim2_longer
 
 
 def plot_time_cell_sorted_same_order(stim, stim1_resp, stim2_resp, save_dir, save=False):
