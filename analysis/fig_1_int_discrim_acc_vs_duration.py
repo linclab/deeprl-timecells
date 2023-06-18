@@ -3,12 +3,11 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
-
-from analysis.utils_int_discrim import plot_performance
-
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
+from analysis.utils_int_discrim import plot_performance
+
 
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
 save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d'
@@ -19,8 +18,10 @@ for file_name in os.listdir(data_dir):
     if 'lstm_128_1e-05_seed' in file_name:
         pt = re.search('lstm_128_1e-05_seed_(\d+)_epi149999.pt_data.npz', file_name)
         seed = int(pt[1])
+        if seed == 102 or seed == 189:
+            continue
         good_seeds.append(seed)
-print(f'Found good seed {seed} in {file_name}')
+print(f'Found {len(good_seeds)} good seeds: {good_seeds}')
 
 acc_stim1_longer_arr = np.zeros((len(good_seeds), 6))  # [5, 10, 15, 20, 25, 30]
 acc_stim2_longer_arr = np.zeros((len(good_seeds), 6))  # [5, 10, 15, 20, 25, 30]
@@ -52,3 +53,5 @@ ax.set_xlabel("Difference in stimulus duration")
 ax.set_ylabel("Accuracy")
 ax.set_title("Task performance")
 ax.legend(frameon=False)
+plt.show()
+plt.savefig(os.path.join(save_dir, 'acc_vs_duration.svg'))
