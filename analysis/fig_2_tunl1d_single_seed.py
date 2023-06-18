@@ -6,8 +6,10 @@ import matplotlib.cbook as cbook
 import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from scipy.stats import kruskal
-from analysis.utils_analysis import sort_resp, plot_sorted_averaged_resp, single_cell_visualization, time_decode_lin_reg
-from analysis.utils_time_ramp import lin_reg_ramping, skaggs_temporal_information, trial_reliability_vs_shuffle_score
+from analysis.utils_analysis import sort_resp, plot_sorted_averaged_resp, single_cell_visualization, \
+    time_decode_lin_reg, plot_decode_sample_from_single_time, decode_sample_from_single_time
+from analysis.utils_time_ramp import lin_reg_ramping, skaggs_temporal_information, trial_reliability_vs_shuffle_score, \
+    plot_r_tuning_curves
 from analysis.utils_mutual_info import joint_encoding_information_time_stimulus
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
@@ -22,15 +24,10 @@ each_seed = args.seed
 untrained = args.untrained
 
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/mem_40_lstm_128_0.0001'
-seed_list = []
-for file in os.listdir(data_dir):
-    if re.match(f'mem_40_lstm_128_0.0001_seed_\d+_epi199999.pt_data.npz', file):
-        seed_list.append(int(file.split('_')[6]))
-seed_list = sorted(seed_list)
 n_total_episodes = 5000
 len_delay = 40
 n_neurons = 128
-n_shuffle = 10
+n_shuffle = 100
 percentile = 99
 
 if untrained:
@@ -59,14 +56,28 @@ else:
 stim = data['stim']
 first_action = data['first_action']
 delay_resp = data['delay_resp']
-left_stim_resp = delay_resp[stim == 0]
-right_stim_resp = delay_resp[stim == 1]
 
 # Normalize the delay response based on the maximum response of each neuron
 reshape_resp = np.reshape(delay_resp, (n_total_episodes*len_delay, n_neurons))
 reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
 delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
+left_stim_resp = delay_resp[stim == 0]
+right_stim_resp = delay_resp[stim == 1]
 
+print("r anaylsis...")
+r_arr = plot_r_tuning_curves(left_stim_resp, right_stim_resp, 'left', 'right', save_dir=save_dir)
+# save the r_arr
+np.save(os.path.join(seed_save_dir, 'r_arr.npy'), r_arr)
+
+
+# decode stimulus
+print("decode stimulus...")
+accuracies, accuracies_shuff = decode_sample_from_single_time(delay_resp, stim, n_fold=5)
+np.save(os.path.join(seed_save_dir, 'accuracies.npy'), accuracies)
+np.save(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), accuracies_shuff)
+
+
+'''
 # Sort and plot the response
 print("Sort and plot the response...")
 cell_nums, sorted_resp = sort_resp(delay_resp, norm=True)
@@ -83,7 +94,7 @@ t_test_seed, t_test_pred_seed = time_decode_lin_reg(delay_resp, len_delay, n_neu
 # Mutual Information
 print("Mutual Information...")
 info_seed = joint_encoding_information_time_stimulus(delay_resp, stim, save_dir=seed_save_dir,title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', logInfo=False, save=True)
-
+'''
 time_cell_ids_seed = {}
 ramping_cell_ids_seed = {}
 
@@ -124,9 +135,9 @@ time_cell_ids_seed['total'] = np.union1d(time_cell_ids_seed['left'], time_cell_i
 
 # save the results
 print("Save the results...")
-np.save(os.path.join(seed_save_dir, 't_test_seed.npy'), t_test_seed)
-np.save(os.path.join(seed_save_dir, 't_test_pred_seed.npy'), t_test_pred_seed)
-np.save(os.path.join(seed_save_dir, 'info_seed.npy'), info_seed)
+# np.save(os.path.join(seed_save_dir, 't_test_seed.npy'), t_test_seed)
+# np.save(os.path.join(seed_save_dir, 't_test_pred_seed.npy'), t_test_pred_seed)
+# np.save(os.path.join(seed_save_dir, 'info_seed.npy'), info_seed)
 np.save(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), time_cell_ids_seed)
 np.save(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), ramping_cell_ids_seed)
 print("analysis complete")

@@ -69,8 +69,8 @@ def plot_mutual_information_across_seeds(info_dict):
         stats[i]['whishi'] = np.max(info_arr[:,i], axis=0)
     fig, axs = plt.subplots(1,1)
     fig.suptitle(f'Mutual Information pooled across {len(info_dict)} seeds')
-    for i in range(n_total_neurons):
-        plt.plot([1, 2, 3], info_arr[i,:], color="gray", lw=1)
+    # for i in range(n_total_neurons):
+    #     plt.plot([1, 2, 3], info_arr[i,:], color="gray", lw=1)
     props = dict(color='indigo', linewidth=1.5)
     axs.bxp(stats, showfliers=False, boxprops=props,
             capprops=props, whiskerprops=props, medianprops=props)
@@ -81,8 +81,8 @@ def plot_mutual_information_across_seeds(info_dict):
     print("Unrmd vs. Stimrmd: ", kruskal(unrmd, stimrmd)[1])
     print("Unrmd vs. Timermd: ", kruskal(unrmd, timermd)[1])
     print("Stimrmd vs. Timermd: ", kruskal(stimrmd, timermd)[1])
-    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'))
-    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
+    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_noline_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'))
+    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_noline_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
 def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
@@ -113,6 +113,20 @@ def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
     plt.savefig(os.path.join(save_dir, f'cell_type_count_{len(time_cell_ids)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
+def plot_r_across_seeds(r_dict):
+    print("Plot r across seeds...")
+    r_list = []
+    for each_seed in r_dict.keys():
+        r_list.append(r_dict[each_seed])
+    r_list = np.concatenate(r_list)
+    plt.figure()
+    plt.hist(r_list, range=(-1,1), bins=50)
+    plt.xlabel(f"r(stimulus 1, stimulus 2)")
+    plt.ylabel("Fraction")
+    plt.savefig(os.path.join(save_dir, f"stim1_stim2_r_hist.svg"))
+    plt.savefig(os.path.join(save_dir, f"stim1_stim2_r_hist.png"))
+
+
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
 seed_list = []
 for file in os.listdir(data_dir):
@@ -136,6 +150,7 @@ time_cell_ids = {}
 t_test_dict = {}
 t_test_pred_dict = {}
 info_dict = {}
+r_dict = {}
 for i_seed, each_seed in enumerate(seed_list):
     # load each seed's dicts from seed_save_dir
     seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
@@ -143,27 +158,25 @@ for i_seed, each_seed in enumerate(seed_list):
             os.path.exists(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 't_test_dict_seed.npy')) and \
             os.path.exists(os.path.join(seed_save_dir,  't_test_pred_dict_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'info_dict_seed.npy')):
+            os.path.exists(os.path.join(seed_save_dir, 'info_dict_seed.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir, 'r_dict_seed.npy')):
         ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
         time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
         t_test_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_dict_seed.npy'), allow_pickle=True).item()
         t_test_pred_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_pred_dict_seed.npy'), allow_pickle=True).item()
         info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'info_dict_seed.npy'), allow_pickle=True).item()
+        r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npy'), allow_pickle=True)
 
-plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
+# plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
+
+plot_r_across_seeds(r_dict)
 
 plot_mutual_information_across_seeds(info_dict)
 
-for label in ['stimulus_1', 'stimulus_2', 'delay']:
-    plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, label)
+# for label in ['stimulus_1', 'stimulus_2', 'delay']:
+#     plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, label)
 
-# Save results
-print("Save results..")
-np.save(os.path.join(save_dir, f't_test_dict_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), t_test_dict)
-np.save(os.path.join(save_dir, f't_test_pred_dict_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), t_test_pred_dict)
-np.save(os.path.join(save_dir, f'info_dict_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), info_dict)
-np.save(os.path.join(save_dir, f'time_cell_ids_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), time_cell_ids)
-np.save(os.path.join(save_dir, f'ramping_cell_ids_{n_total_episodes}_{n_shuffle}_{percentile}.npy'), ramping_cell_ids)
+
 print("Done!")
 
 

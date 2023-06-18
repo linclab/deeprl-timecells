@@ -497,6 +497,7 @@ def plot_r_tuning_curves(resp_1, resp_2, label_1, label_2, save_dir, varying_dur
     plt.xlabel(f"r({label_1}, {label_2})")
     plt.ylabel("Fraction")
     plt.savefig(os.path.join(save_dir, f"{label_1}_{label_2}_r_hist.svg"))
+    return r_arr
 
 
 def plot_field_width_vs_peak_time(resp, save_dir, title):
