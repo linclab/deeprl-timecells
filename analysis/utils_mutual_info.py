@@ -696,7 +696,6 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
         I_sfl_unrmd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, shuffle=True))
         I_sfl_stimrmd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, randomize='stim', shuffle=True))
         I_sfl_timermd[:,i] = np.squeeze(informativeness_time_stimulus(delay_resp, stim, randomize='pos', shuffle=True))
-
     sig_cells = np.squeeze(I_unsfl_unrmd) > (np.nanmean(I_sfl_unrmd,axis=1) + 2 * np.nanstd(I_sfl_unrmd,axis=1))
     I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells]
     I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells]
@@ -707,7 +706,9 @@ def joint_encoding_information_time_stimulus(delay_resp, stim, save_dir, title, 
     else:
         unrmd, stimrmd, timermd = I_unsfl_unrmd ,I_unsfl_stimrmd, I_unsfl_timermd
     n_neurons = np.shape(timermd)[0]
-    print(f"Number of sig_cells: {len(sig_cells)}")
+    print(f"Number of sig_cells: {sum(sig_cells)}")
+    if sum(sig_cells)==0:
+        return None
     info = np.transpose([unrmd, timermd, stimrmd])  # n_neurons x 3
 
     stats = cbook.boxplot_stats(info, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
