@@ -159,7 +159,8 @@ if __name__ == '__main__':
     parser.add_argument("--lesion_idx_step", type=int, default=5, help="step of lesion index")
     parser.add_argument("--expt_type", type=str, default='lesion', help='lesion or rehydration')
     parser.add_argument("--n_ramp_time_shuffle", type=int, default=100, help="Number of shuffles used for identifying ramping and time cells")
-    parser.add_argument("--ramp_time_percentile", type=float, default=99.9, help="Percentile at which ramping and time cells are identified")
+    parser.add_argument("--ramp_time_percentile", type=float, default=99, help="Percentile at which ramping and time cells are identified")
+    parser.add_argument("--lesion_side", type=str, default='total', help="Which side to lesion. Options: 'total', 'left', 'right'")
     args = parser.parse_args()
     argsdict = args.__dict__
     print(argsdict)
@@ -175,19 +176,28 @@ if __name__ == '__main__':
     lesion_idx_end = argsdict['lesion_idx_end']
     n_ramp_time_shuffle = argsdict['n_ramp_time_shuffle']
     ramp_time_percentile = argsdict['ramp_time_percentile']
+    lesion_side = argsdict['lesion_side']
 
-    # Load_model_path: mem_40_lstm_256_0.0001/seed_1_epi999999.pt, relative to training/tunl1d_og
+    # Load_model_path: mem_40_lstm_128_0.0001/seed_1_epi999999.pt, relative to training/tunl1d_og
     config_dir = load_model_path.split('/')[0]
     pt_name = load_model_path.split('/')[1]
     pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
     seed = int(pt[1])
     epi = int(pt[2])
-    main_dir = '/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_results/tunl1d'
-    data_analysis_dir = os.path.join(main_dir, config_dir)
-    ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_ramp_ident_results.npz'), allow_pickle=True)
-    time_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_time_cell_results.npz'), allow_pickle=True)
-    cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
-    cell_nums_time = time_ident_results['time_cell_nums']
+    # main_dir = '/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/analysis_results/tunl1d'
+    # data_analysis_dir = os.path.join(main_dir, config_dir)
+    # ramp_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_ramp_ident_results.npz'), allow_pickle=True)
+    # time_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_time_cell_results.npz'), allow_pickle=True)
+    # cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
+    # cell_nums_time = time_ident_results['time_cell_nums']
+    data_dir = f'network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d/seed_{seed}'
+    if not os.path.exists(os.path.join(data_dir, f'ramping_cell_ids_seed.npy')) or not os.path.exists(os.path.join(data_dir, f'time_cell_ids_seed.npy')):
+        print(f"No ramping or time cell ids found for seed {seed}, exiting...")
+        sys.exit()
+    cell_nums_ramp = np.load(os.path.join(data_dir, f'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
+    cell_nums_ramp = cell_nums_ramp[lesion_side]
+    cell_nums_time = np.load(os.path.join(data_dir, f'time_cell_ids_seed.npy'), allow_pickle=True).item()
+    cell_nums_time = cell_nums_time[lesion_side]
 
     # Load existing model
     ckpt_name = load_model_path.replace('/', '_').replace('.pt', '_pt')  # 'mem_40_lstm_256_0.0001_seed_1_epi999999_pt'
@@ -214,7 +224,8 @@ if __name__ == '__main__':
 
     # Make directory in /lesion to save data and model
     agent_str = f"{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}"
-    save_dir = os.path.join(main_dir, config_dir, agent_str, argsdict['expt_type'])
+    main_dir = f'network/scratch/l/lindongy/timecell/figures/lesion/tunl1d'
+    save_dir = os.path.join(main_dir, config_dir, agent_str, argsdict['expt_type'], lesion_side)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
     print(f'Saving to {save_dir}')
@@ -222,9 +233,9 @@ if __name__ == '__main__':
     # Setting up cuda and seeds
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    torch.manual_seed(2023)
+    np.random.seed(2023)
+    random.seed(2023)
 
     if lesion_idx_end is not None:  # specified lesion_idx_end
         n_lesion = np.arange(start=lesion_idx_start, stop=lesion_idx_end, step=lesion_idx_step)
@@ -247,7 +258,7 @@ if __name__ == '__main__':
                 else:
                     net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
                 optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-                net.load_state_dict(torch.load(os.path.join('/home/mila/l/lindongy/linclab_folder/linclab_users/deeprl-timecell/agents/tunl1d_og', load_model_path)))
+                net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
                 net.eval()
 
                 lesion_index = random_index_dict[lesion_type][i_shuffle][:num_lesion].astype(int)
