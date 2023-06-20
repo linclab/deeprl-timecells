@@ -37,7 +37,7 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
     first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
     delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
-    for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
+    for i_episode in range(n_total_episodes):  # one episode = one sample
         done = False
         env.reset()
         episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
@@ -85,7 +85,7 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
     nonmatch_perc_prime = np.zeros(n_total_episodes, dtype=np.int8)
     first_action_prime = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
     kl_div = []
-    for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
+    for i_episode in range(n_total_episodes):  # one episode = one sample
         done = False
         env.reset()
         episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
@@ -190,7 +190,7 @@ if __name__ == '__main__':
     # time_ident_results = np.load(os.path.join(data_analysis_dir,f'{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}_time_cell_results.npz'), allow_pickle=True)
     # cell_nums_ramp = ramp_ident_results['cell_nums_ramp']
     # cell_nums_time = time_ident_results['time_cell_nums']
-    data_dir = f'network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d/seed_{seed}'
+    data_dir = f'/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d/seed_{seed}'
     if not os.path.exists(os.path.join(data_dir, f'ramping_cell_ids_seed.npy')) or not os.path.exists(os.path.join(data_dir, f'time_cell_ids_seed.npy')):
         print(f"No ramping or time cell ids found for seed {seed}, exiting...")
         sys.exit()
@@ -224,7 +224,7 @@ if __name__ == '__main__':
 
     # Make directory in /lesion to save data and model
     agent_str = f"{seed}_{epi}_{n_ramp_time_shuffle}_{ramp_time_percentile}"
-    main_dir = f'network/scratch/l/lindongy/timecell/figures/lesion/tunl1d'
+    main_dir = f'/network/scratch/l/lindongy/timecell/figures/lesion/tunl1d'
     save_dir = os.path.join(main_dir, config_dir, agent_str, argsdict['expt_type'], lesion_side)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
@@ -248,8 +248,11 @@ if __name__ == '__main__':
     random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_time)
 
     for i_lesion_type, lesion_type in enumerate(['random', 'ramp', 'time']):
+        print(f'Lesion type: {lesion_type}')
         for i_num_lesion, num_lesion in enumerate(n_lesion):
-            for i_shuffle in tqdm(range(num_shuffle)):
+            print(f'Number of lesion: {num_lesion}')
+            for i_shuffle in range(num_shuffle):
+                print(f'Shuffle {i_shuffle}')
                 gc.collect()
                 torch.cuda.empty_cache()
                 env = TunlEnv(len_delay, seed=seed)

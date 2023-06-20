@@ -37,7 +37,7 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, title, 
     stim2_resp = np.zeros((n_total_episodes, 40, n_neurons), dtype=np.float32)
     delay_resp = np.zeros((n_total_episodes, 20, n_neurons), dtype=np.float32)
 
-    for i_episode in tqdm(range(n_total_episodes)):
+    for i_episode in range(n_total_episodes):
         done = False
         env.reset()
         net.reinit_hid()
@@ -90,7 +90,7 @@ def rehydration_experiment(env, net, n_total_episodes, lesion_idx):
     stim = np.zeros((n_total_episodes, 2), dtype=np.int8)
     kl_div = []
 
-    for i_episode in tqdm(range(n_total_episodes)):
+    for i_episode in range(n_total_episodes):
         done = False
         env.reset()
         net.reinit_hid()
@@ -199,7 +199,7 @@ if __name__ == '__main__':
     # cell_bools_time = np.logical_or(cell_bools_time[0], cell_bools_time[1])  # time cell for either stim_1 or stim_2
     # cell_nums_ramp = np.where(cell_bools_ramp)[0]
     # cell_nums_time = np.where(cell_bools_time)[0]
-    data_dir = f'network/scratch/l/lindongy/timecell/figures/fig_2/timing1d/seed_{seed}'
+    data_dir = f'/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d/seed_{seed}'
     if not os.path.exists(os.path.join(data_dir, f'ramping_cell_ids_seed.npy')) or not os.path.exists(os.path.join(data_dir, f'time_cell_ids_seed.npy')):
         print(f"No ramping or time cell ids found for seed {seed}, exiting...")
         sys.exit()
@@ -254,8 +254,11 @@ if __name__ == '__main__':
     random_index_dict = generate_random_index(num_shuffle, n_neurons, cell_nums_ramp, cell_nums_time)
 
     for i_lesion_type, lesion_type in enumerate(['random', 'ramp', 'time']):
+        print(f'Lesion type: {lesion_type}')
         for i_num_lesion, num_lesion in enumerate(n_lesion):
-            for i_shuffle in tqdm(range(num_shuffle)):
+            print(f'Lesion number: {num_lesion}')
+            for i_shuffle in range(num_shuffle):
+                print(f'Shuffle number: {i_shuffle}')
                 gc.collect()
                 torch.cuda.empty_cache()
                 env = IntervalDiscrimination(seed=seed)
