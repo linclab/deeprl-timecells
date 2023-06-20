@@ -24,18 +24,11 @@ print(f'Experiment: {expt}; Experiment type: {expt_type}; Lesion side: {lesion_s
 if expt == 'timing':
     main_dir = '/network/scratch/l/lindongy/timecell/figures/lesion/timing1d/lstm_128_1e-05'
 elif expt == 'tunl1d':
-    main_dir = '/network/scratch/l/lindongy/timecell/figures/lesion/tunl1d_og/mem_40_lstm_128_0.0001'
+    main_dir = '/network/scratch/l/lindongy/timecell/figures/lesion/tunl1d/mem_40_lstm_128_0.0001'
 elif expt == 'tunl1dnomem':
     main_dir = '/network/scratch/l/lindongy/timecell/figures/lesion/tunl1d_nomem/nomem_40_lstm_128_5e-05'
 else:
     raise ValueError("expt must be timing, tunl1d, or tunl1dnomem")
-
-# Loop through directories to grep seeds
-seeds = []
-for dir in os.listdir(main_dir):
-    if os.path.isdir(os.path.join(main_dir, dir)):
-        seeds.append(dir)
-seeds = sorted(seeds)
 
 # intialize arrays
 postlesion_perf_random = []
@@ -46,10 +39,14 @@ if expt_type == 'rehydration':
     mean_kl_div_ramp = []
     mean_kl_div_time = []
 
+total_seeds = 0
 # Loop through seeds
-for i, seed in enumerate(seeds):
-    agent_str = f'{seed}_149999_100_99.0'
-    results_dir = os.path.join(main_dir, agent_str, expt_type, lesion_side)
+for dir in os.listdir(main_dir):
+    if os.path.isdir(os.path.join(main_dir, dir)):
+        total_seeds += 1
+    else:
+        continue
+    results_dir = os.path.join(main_dir, dir, expt_type, lesion_side)
     if expt_type == 'lesion':
         if os.path.exists(os.path.join(results_dir, 'epi100_shuff50_idx5_5_128_lesion_results.npz')):
             results = np.load(os.path.join(results_dir, 'epi100_shuff50_idx5_5_128_lesion_results.npz'), allow_pickle=True)
@@ -72,15 +69,15 @@ for i, seed in enumerate(seeds):
         mean_kl_div_time.append(results['mean_kl_div'][2])
 
 num_good_seeds = len(postlesion_perf_random)
-print(f'Total number of seeds: {len(seeds)}; number of good seeds: {num_good_seeds}')
+print(f'Total number of seeds: {total_seeds}; number of good seeds: {num_good_seeds}')
 
-postlesion_perf_time = np.vstack(postlesion_perf_time)  # (num_good_seeds*50, 25)
-postlesion_perf_ramp = np.vstack(postlesion_perf_ramp)
-postlesion_perf_random = np.vstack(postlesion_perf_random)
+postlesion_perf_time = np.hstack(postlesion_perf_time).T  # (num_good_seeds*50, 25)
+postlesion_perf_ramp = np.hstack(postlesion_perf_ramp).T
+postlesion_perf_random = np.hstack(postlesion_perf_random).T
 if expt_type == 'rehydration':
-    mean_kl_div_time = np.vstack(mean_kl_div_time)
-    mean_kl_div_ramp = np.vstack(mean_kl_div_ramp)
-    mean_kl_div_random = np.vstack(mean_kl_div_random)
+    mean_kl_div_time = np.hstack(mean_kl_div_time).T
+    mean_kl_div_ramp = np.hstack(mean_kl_div_ramp).T
+    mean_kl_div_random = np.hstack(mean_kl_div_random).T
 
 n_lesion = np.arange(5, 128, 5)
 
@@ -119,7 +116,7 @@ ax1.set_xlabel(f'Number of neurons {"lesioned" if expt_type  == "lesion" else "s
 ax1.set_ylabel('% Correct')
 ax1.set_ylim(0,1)
 ax1.legend()
-ax1.title(f"pooled across {num_good_seeds} seeds")
+ax1.set_title(f"pooled across {num_good_seeds} seeds")
 #plt.show()
 fig.savefig(os.path.join(save_dir, f'{expt}_{expt_type}_{lesion_side}.svg'))
 fig.savefig(os.path.join(save_dir, f'{expt}_{expt_type}_{lesion_side}.png'))
@@ -143,7 +140,7 @@ if expt_type  == "rehydration":
     ax1.set_xlabel(f'Number of neurons {"lesioned" if expt_type  == "lesion" else "silenced"}')
     ax1.set_ylabel('KL divergence between $\pi$ and $\pi_{new}$')
     ax1.legend()
-    ax1.title(f"pooled across {num_good_seeds} seeds")
+    ax1.set_title(f"pooled across {num_good_seeds} seeds")
     #plt.show()
     fig.savefig(os.path.join(save_dir, f'{expt}_{expt_type}_{lesion_side}_kl.svg'))
     fig.savefig(os.path.join(save_dir, f'{expt}_{expt_type}_{lesion_side}_kl.png'))
