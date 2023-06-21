@@ -216,7 +216,7 @@ class Tunl(object):
 
 
 class Tunl_nomem(object):
-    def __init__(self, len_delay, len_edge, rwd, step_rwd, poke_rwd, rng_seed=1234):
+    def __init__(self, len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, rng_seed=1234):
         """
         :param len_delay: int
         :param len_edge: odd int -- length of long edge in triangle (minimum = 5)
@@ -279,6 +279,7 @@ class Tunl_nomem(object):
         self.rwd = rwd
         self.step_rwd = step_rwd
         self.poke_rwd = poke_rwd
+        self.inc_rwd = inc_rwd
         self.indelay = False
         self.delay_t = 0  # time since delay
         self.sample = "undefined"
@@ -338,7 +339,7 @@ class Tunl_nomem(object):
                         self.indelay = True
                         self.reward = self.poke_rwd
                         self.nav_reward += self.reward
-                    elif self.sample == "R" or self.sample == "L":  # poked either match or nonmatch
+                    elif self.sample == "R" or self.sample == "L":  # Choose L is correct regardless of sample
                         self.reward = self.rwd
                         self.done = True
                 elif self.current_loc == self.right_loc:  # currently at the right touchscreen
@@ -349,8 +350,8 @@ class Tunl_nomem(object):
                         self.indelay = True
                         self.reward = self.poke_rwd
                         self.nav_reward += self.reward
-                    elif self.sample == "L" or self.sample == "R":  # poked correctly at nonmatch location
-                        self.reward = self.rwd
+                    elif self.sample == "L" or self.sample == "R":  # Choose R is incorrect regardless of sample
+                        self.reward = self.inc_rwd
                         self.done = True
             else:
                 if not self.indelay:

@@ -108,7 +108,7 @@ torch.manual_seed(argsdict["seed"])
 np.random.seed(argsdict["seed"])
 
 
-env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, step_rwd, poke_rwd, seed)
+env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed)
 
 rfsize = 2
 padding = 0
@@ -171,6 +171,7 @@ epi_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.float16)
 choice = np.zeros((n_total_episodes, 2), dtype=np.int8)  # record the location when done
 ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
+nomem_perf = np.zeros(n_total_episodes, dtype=np.float16)
 if record_data:
     delay_loc = np.zeros((n_total_episodes, len_delay, 2), dtype=np.int16)  # location during delay
     delay_resp_hx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # hidden states during delay
@@ -199,14 +200,17 @@ for i_episode in tqdm(range(n_total_episodes)):
         net.rewards.append(reward)
     choice[i_episode] = env.current_loc
     if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
-        nonmatch_perc[i_episode] = 1
+        nonmatch_perc[i_episode] = 1  # check
+    nomem_perf[i_episode] = 1 if reward == rwd else 0  # Touch L to get reward
     epi_nav_reward[i_episode] = env.nav_reward
     p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
-            print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            # print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         else:
-            print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            # print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
             if load_model_path != 'None':
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}.pt')
@@ -214,6 +218,7 @@ for i_episode in tqdm(range(n_total_episodes)):
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 avg_nav_rewards = bin_rewards(epi_nav_reward, window_size)
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size)
+binned_nomem_perf = bin_rewards(nomem_perf, window_size)
 
 
 fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex='all', figsize=(6, 6))
@@ -224,9 +229,11 @@ ax1.set_xlabel('Episode')
 ax1.set_ylabel('Navigation reward')
 ax1.legend()
 
-ax2.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
+# ax2.plot(np.arange(n_total_episodes), binned_nonmatch_perc, label=net_title)
+ax2.plot(np.arange(n_total_episodes), binned_nomem_perf, label=net_title)
 ax2.set_xlabel('Episode')
-ax2.set_ylabel('Fraction Nonmatch')
+# ax2.set_ylabel('Fraction Nonmatch')
+ax2.set_ylabel('% correct')
 ax2.set_ylim(0,1)
 ax2.legend()
 if save_performance_fig:
