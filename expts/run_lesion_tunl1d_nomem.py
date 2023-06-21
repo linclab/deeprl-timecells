@@ -74,7 +74,7 @@ def lesion_experiment(env, net, optimizer, n_total_episodes, lesion_idx, save_di
             os.mkdir(net_and_data_dir)
         #torch.save(net.state_dict(), os.path.join(net_and_data_dir, f'postlesion_{title}.pt'))
         np.savez_compressed(os.path.join(net_and_data_dir, f'lesion_{title}_data.npz'), stim=stim, first_action=first_action, delay_resp=delay_resp)
-    del stim, first_action, delay_resp, nomem_perf
+    del stim, first_action, delay_resp
     return np.mean(nomem_perf)
 
 
