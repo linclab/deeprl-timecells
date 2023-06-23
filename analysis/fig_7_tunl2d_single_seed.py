@@ -65,6 +65,14 @@ ideal_nav_rwds = data['ideal_nav_rwds']
 delay_resp = delay_resp_hx
 # Normalize the delay response based on the maximum response of each neuron
 reshape_resp = np.reshape(delay_resp, (n_total_episodes*len_delay, n_neurons))
+# remove neurons with ptp==0
+ptp = np.ptp(reshape_resp, axis=0, keepdims=True)
+zero_ptp_neurons = np.unique(np.where(ptp == 0)[1])
+reshape_resp = np.delete(reshape_resp, zero_ptp_neurons, axis=1)
+n_neurons = np.shape(reshape_resp)[1]
+print(f'Zero ptp neurons: {zero_ptp_neurons}. Number of neurons after removing zero ptp neurons: {n_neurons}')
+
+# normalize the response
 reshape_resp = (reshape_resp - np.min(reshape_resp, axis=0, keepdims=True)) / np.ptp(reshape_resp, axis=0, keepdims=True)
 delay_resp = np.reshape(reshape_resp, (n_total_episodes, len_delay, n_neurons))
 left_stim_resp = delay_resp[np.all(stim == [1, 1], axis=1)]
@@ -80,19 +88,18 @@ mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_oc
 mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
 
 print("Plot splitter cells... SAVE AUTOMATICALLY")
-plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=save_dir, n_neurons=n_neurons, normalize_ratemaps=True)
+plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=save_dir, normalize_ratemaps=True)
 
+print("identify splitter cells...")
 delay_loc_idx = convert_loc_to_idx(delay_loc)
 # Identify splitter cells
-splitter_cell_ids = identify_splitter_cells_ANOVA(delay_resp, delay_loc_idx, binary_stim)
-
+splitter_cell_ids, anova_results = identify_splitter_cells_ANOVA(delay_resp, delay_loc_idx, binary_stim)
+print("splitter cells: ", splitter_cell_ids)
+np.save(os.path.join(seed_save_dir, 'splitter_cell_ids.npy'), splitter_cell_ids)
+np.save(os.path.join(seed_save_dir, 'anova_results.npy'), anova_results)
 
 # SxTxL Mutual information analysis
-
-
-
-
-
+print("SxTxL Mutual information analysis...")
 
 
 

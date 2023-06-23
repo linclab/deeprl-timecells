@@ -710,13 +710,14 @@ def identify_splitter_cells_ANOVA(neural_activity, location, trial_type):
 
     # Flatten the arrays for ANOVA analysis
     neural_activity_flat = neural_activity.reshape(-1, n_neurons)
-    location_flat = np.repeat(location, n_timesteps, axis=1).reshape(-1)
-    trial_type_flat = np.repeat(trial_type, n_timesteps).reshape(-1)
-
-    # Create the design matrix
-    design_matrix = np.column_stack((trial_type_flat, np.arange(n_timesteps), location_flat))
+    location_flat = location.reshape(-1)
+    trial_type_flat = np.repeat(trial_type, n_timesteps, axis=0).reshape(-1)
 
     splitter_cells = []
+    anova_results = {
+        'trial_type_pval': [],
+        'interaction_pval': []
+    }
 
     for neuron_idx in range(n_neurons):
         # Perform ANOVA analysis
@@ -732,7 +733,9 @@ def identify_splitter_cells_ANOVA(neural_activity, location, trial_type):
 
         if trial_type_pval < 0.05 or interaction_pval < 0.05:
             splitter_cells.append(neuron_idx)
+        anova_results['trial_type_pval'].append(trial_type_pval)
+        anova_results['interaction_pval'].append(interaction_pval)
 
-    return np.array(splitter_cells)
+    return np.array(splitter_cells), anova_results
 
 
