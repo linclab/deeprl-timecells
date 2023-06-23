@@ -149,7 +149,7 @@ net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 
 # Load existing model
 if load_model_path=='None':
-    ckpt_name = f'seed_{seed}_untrained_agent'  # placeholder ckptname in case we want to save data in the end
+    ckpt_name = f'seed_{seed}_untrained_agent_weight_frozen'  # placeholder ckptname in case we want to save data in the end
 else:
     ckpt_name = load_model_path.replace('/', '_')
     pt_name = load_model_path.split('/')[1]  # seed_3_epi199999.pt
@@ -203,7 +203,11 @@ for i_episode in tqdm(range(n_total_episodes)):
         nonmatch_perc[i_episode] = 1  # check
     nomem_perf[i_episode] = 1 if reward == rwd else 0  # Touch L to get reward
     epi_nav_reward[i_episode] = env.nav_reward
-    p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+    if record_data and load_model_path == 'None':
+        del net.rewards[:]
+        del net.saved_actions[:]
+    else:
+        p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
             # print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
