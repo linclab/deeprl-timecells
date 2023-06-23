@@ -263,51 +263,11 @@ def set_background(ratemap):
         ratemap[:, nanrow[i], nancol[i]] = nan
     return ratemap
 
-'''    
-def plot_place_cells(mutual_info, ratemap, stimulus=None, number=200):
-    idx = np.squeeze(np.isfinite(mutual_info))
-    #mutual_info = np.squeeze(mutual_info[idx])
-    ratemap = ratemap[idx, :, :]
-    ratemap = set_background(ratemap)
-
-    #n_plot_neurons = np.floor(np.shape(mutual_info)[0] * percentile)
-    #order = np.argsort(mutual_info * (-1))
-    order = np.arange(200)
-
-    for i in range(number):
-        plt.figure(frameon=False)
-        if stimulus != None:
-            plt.imshow(np.squeeze(ratemap[i,:,:]), cmap='jet')
-        else:
-            plt.imshow(np.squeeze(ratemap[order[i],:,:]), cmap='jet')
-        plt.colorbar()
-        #plt.show()
-        if stimulus=='left':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.svg')
-        elif stimulus=='right':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.svg')
-        else:
-            plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.svg')
-'''
-
-def plot_place_cells(resp, loc, stimulus, num_units=400):
-    ratemap, occupancy = construct_ratemap(resp, loc)
-    print(np.shape(ratemap))
-    ratemap = set_background(ratemap)
-    for i in range(num_units):
-        fig, ax = plt.subplots()
-        ax.imshow(np.squeeze(ratemap[i,:,:]), cmap='jet')
-        ax.axis("off")
-        if stimulus=='left':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/left_stimuli/{i}.svg')
-        elif stimulus=='right':
-            plt.savefig(os.getcwd() + f'/figures/place_cells/right_stimuli/{i}.svg')
-        else:
-            plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.svg')
 
 
-def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_info_right, ratemap_right, save_dir, n_neurons, normalize_ratemaps=True):
-    idx = np.squeeze(np.logical_and(np.isfinite(mutual_info_left), np.isfinite(mutual_info_right)))
+def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_info_right, ratemap_right, save_dir, normalize_ratemaps=True):
+    idx = np.where(np.squeeze(np.logical_and(np.isfinite(mutual_info_left), np.isfinite(mutual_info_right))))[0]
+    print(f"{len(idx)} neurons with finite mutual info: {idx}")
     mutual_info_left = np.squeeze(mutual_info_left[idx])
     ratemap_left = ratemap_left[idx, :, :]
     ratemap_left = set_background(ratemap_left)
@@ -328,17 +288,17 @@ def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_i
         os.mkdir(os.path.join(save_dir, "place_cells", "left_stimuli"))
         os.mkdir(os.path.join(save_dir, "place_cells", "right_stimuli"))
 
-    for i in range(n_neurons):
+    for ratemap_idx, neuron_idx in enumerate(idx):
         plt.figure()
-        plt.imshow(np.squeeze(ratemap_left[i,:,:]), cmap='jet')
+        plt.imshow(np.squeeze(ratemap_left[ratemap_idx,:,:]), cmap='jet')
         plt.colorbar()
-        plt.savefig(os.path.join(save_dir, "place_cells", "left_stimuli", f'{i}.svg'))
+        plt.savefig(os.path.join(save_dir, "place_cells", "left_stimuli", f'{neuron_idx}.svg'))
 
         plt.figure()
-        plt.imshow(np.squeeze(ratemap_right[i,:,:]), cmap='jet')
+        plt.imshow(np.squeeze(ratemap_right[ratemap_idx,:,:]), cmap='jet')
         plt.colorbar()
-        plt.savefig(os.path.join(save_dir, "place_cells", "right_stimuli", f'{i}.svg'))
-
+        plt.savefig(os.path.join(save_dir, "place_cells", "right_stimuli", f'{neuron_idx}.svg'))
+        plt.close('all')
 
 
 def plot_mutual_info_distribution(mutual_info, save_dir, title, color='cadetblue', compare=False, shuffled_mutual_info=None, save=False):
