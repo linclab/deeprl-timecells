@@ -210,7 +210,7 @@ def construct_ratemap(delay_resp, delay_loc, norm=False, shuffle=False):  # TODO
             idx = np.all(np.hstack((np.expand_dims(delay_loc_flatten[:,0]==x+1,1),
                                     np.expand_dims(delay_loc_flatten[:,1]==y+1,1))), axis=1)  # which timesteps has the agent been here
             if np.sum(idx)>0:
-                ratemap[:,x,y] = np.mean(delay_resp_aggregate[idx, :], axis=0)  # mean activity at this timestep
+                ratemap[:,x,y] = np.mean(delay_resp_aggregate[idx, :], axis=0)  # mean activity at this timestep. already normalized by occupancy
                 spatial_occupancy[x,y] = np.sum(idx) / (n_episodes*n_steps)  # occupancy percentage
 
     return (ratemap, spatial_occupancy)
@@ -306,7 +306,7 @@ def plot_place_cells(resp, loc, stimulus, num_units=400):
             plt.savefig(os.getcwd() + f'/figures/place_cells/all/{i}.svg')
 
 
-def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_info_right, ratemap_right, save_dir, percentile=0.2):
+def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_info_right, ratemap_right, save_dir, n_neurons, normalize_ratemaps=True):
     idx = np.squeeze(np.logical_and(np.isfinite(mutual_info_left), np.isfinite(mutual_info_right)))
     mutual_info_left = np.squeeze(mutual_info_left[idx])
     ratemap_left = ratemap_left[idx, :, :]
@@ -316,17 +316,21 @@ def plot_stimulus_selective_place_cells(mutual_info_left, ratemap_left, mutual_i
     ratemap_right = ratemap_right[idx, :, :]
     ratemap_right = set_background(ratemap_right)
 
-    n_plot_neurons = int(np.floor(np.shape(mutual_info_left)[0] * percentile))  # TODO: check what these are
-    order = np.argsort((mutual_info_left+mutual_info_right) * (-1))
+    if normalize_ratemaps:  # normalize ratemaps to be between 0 and 1
+        ratemap_left = (ratemap_left - np.nanmin(ratemap_left)) / (np.nanmax(ratemap_left) - np.nanmin(ratemap_left))
+        ratemap_right = (ratemap_right - np.nanmin(ratemap_right)) / (np.nanmax(ratemap_right) - np.nanmin(ratemap_right))
+
+    # n_plot_neurons = int(np.floor(np.shape(mutual_info_left)[0] * percentile))
+    # order = np.argsort((mutual_info_left+mutual_info_right) * (-1))
 
     if not os.path.exists(os.path.join(save_dir, "place_cells")):
         os.mkdir(os.path.join(save_dir, "place_cells"))
         os.mkdir(os.path.join(save_dir, "place_cells", "left_stimuli"))
         os.mkdir(os.path.join(save_dir, "place_cells", "right_stimuli"))
 
-    for i in range(200):
+    for i in range(n_neurons):
         plt.figure()
-        plt.imshow(np.squeeze(ratemap_left[i,:,:]), cmap='jet')  # TODO: cbar=0-1, where 0 is lowest on ratemap. 1 is highest. Step1: Normalize ratemap.
+        plt.imshow(np.squeeze(ratemap_left[i,:,:]), cmap='jet')
         plt.colorbar()
         plt.savefig(os.path.join(save_dir, "place_cells", "left_stimuli", f'{i}.svg'))
 
@@ -781,6 +785,7 @@ def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_da
         plt.savefig(os.path.join(save_dir, 'decode_sample_from_trajectory.svg'))
     else:
         plt.show()
+    return accuracy
 
 
 

@@ -12,6 +12,8 @@ from matplotlib_venn import venn2
 import umap
 import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
@@ -685,3 +687,52 @@ def sort_resp(total_resp, norm=True):
     assert len(sorted_matrix) == n_neurons
 
     return cell_nums, sorted_matrix
+
+
+def identify_splitter_cells_ANOVA(neural_activity, location, trial_type):
+    '''
+    Identify splitter cells using ANOVA analysis
+
+    # Example usage, 100 trials, 10 time steps, 50 neurons, 16 possible locations, 2 possible trial types
+    neural_activity = np.random.rand(100, 10, 50)  # Example neural activity array
+    location = np.random.randint(0, 16, (100, 10))  # Example location array
+    trial_type = np.random.randint(0, 2, (100))     # Example trial type array
+
+    splitter_cells = identify_splitter_cells(neural_activity, location, trial_type)
+    print("Splitter cells:", splitter_cells)
+
+    :param neural_activity: neural activity at each time step (ndarray, n_trials by n_timesteps by n_neurons)
+    :param location: location at each time step (ndarray, n_trials by n_timesteps)
+    :param trial_type: one-hot trial type of each episode (ndarray, n_trials).
+    :return: splitter_cells: an array of indices of splitter cells
+    '''
+    n_trials, n_timesteps, n_neurons = neural_activity.shape
+
+    # Flatten the arrays for ANOVA analysis
+    neural_activity_flat = neural_activity.reshape(-1, n_neurons)
+    location_flat = np.repeat(location, n_timesteps, axis=1).reshape(-1)
+    trial_type_flat = np.repeat(trial_type, n_timesteps).reshape(-1)
+
+    # Create the design matrix
+    design_matrix = np.column_stack((trial_type_flat, np.arange(n_timesteps), location_flat))
+
+    splitter_cells = []
+
+    for neuron_idx in range(n_neurons):
+        # Perform ANOVA analysis
+        formula = f'neural_activity_flat[:, {neuron_idx}] ~ C(trial_type_flat) + C(location_flat) + C(trial_type_flat):C(location_flat)'
+        model = ols(formula, data={'neural_activity_flat': neural_activity_flat,
+                                   'trial_type_flat': trial_type_flat,
+                                   'location_flat': location_flat}).fit()
+        anova_table = sm.stats.anova_lm(model, typ=2)
+
+        # Check if trial type or the interaction term is significant
+        trial_type_pval = anova_table.loc['C(trial_type_flat)', 'PR(>F)']
+        interaction_pval = anova_table.loc['C(trial_type_flat):C(location_flat)', 'PR(>F)']
+
+        if trial_type_pval < 0.05 or interaction_pval < 0.05:
+            splitter_cells.append(neuron_idx)
+
+    return np.array(splitter_cells)
+
+
