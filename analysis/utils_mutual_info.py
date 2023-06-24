@@ -598,7 +598,7 @@ def randomize_dimension_time_stimulus(delay_resp, stim, dim=None):
         for s in range(2):
             #find the distribution of time step for each stimulus
             # breakpoint()
-            time_axis[:,s] = np.random.choice(len_delay, size=(len_delay,))
+            time_axis[:,s] = np.random.choice(len_delay, size=(len_delay,), replace=False)
 
     elif dim == 'stim': #randomize stimulus
         time_axis = np.squeeze(np.repeat(np.expand_dims(np.arange(len_delay), axis=1), 2, axis=1))
@@ -639,8 +639,8 @@ def construct_time_stimulus_ratemap_occupancy(delay_resp, stim, randomize=None, 
                 occupancy[t,s] = np.sum(stim==stim_axis[t,s])
                 ratemap[t,s,:] = np.sum(norm_delay_resp[stim==stim_axis[t,s], int(time_axis[t,s]), :], axis=0) / occupancy[t,s]
 
-        occupancy = occupancy / np.sum(occupancy)
-        #print("Sum of occupancy: ", np.sum(occupancy))
+    occupancy = occupancy / np.sum(occupancy)
+    #print("Sum of occupancy: ", np.sum(occupancy))
     return (ratemap, occupancy)
 
 def informativeness_time_stimulus(delay_resp, stim, randomize=None, shuffle=None):
@@ -747,9 +747,138 @@ def decode_sample_from_trajectory(delay_loc, stim, save_dir, save=False, load_da
         plt.show()
     return accuracy
 
+#====== stimulus x time x location ======
+def randomize_dimension_time_stimulus_location(delay_resp,  binary_stim, delay_loc_idx, dim=None):
+    '''
+    # TODO ensure delay_loc_idx is converted to idx, stim is binary
+    Randomize the order of the time, stimulus, and location dimensions
+    delay_loc_idx: 5000 x 40
+    binary_tim: 5000
+
+    '''
+    unique_pos = np.unique(delay_loc_idx)
+    n_positions = len(unique_pos)
+
+    # return: 40 x 2 x 16
+    time_axis = np.repeat(np.expand_dims(np.repeat(np.expand_dims(np.arange(40), axis=1), 2, axis=1), axis=2), n_positions, axis=2)
+    stim_axis = np.repeat(np.expand_dims(np.repeat(np.expand_dims(np.arange(2), axis=0), 40, axis=0), axis=2), n_positions, axis=2)
+    location_axis = np.repeat(np.expand_dims(np.repeat(np.expand_dims(unique_pos, axis=0), 40, axis=0), axis=1), 2, axis=1)
+
+    if dim == 'time':
+        time_axis = np.empty((40, 2, n_positions))
+        # for each stimulus-location pair, calculate probability distribution of time given current stimulus and location
+        for s in range(2):
+            for l in range(n_positions):
+                pos = unique_pos[l]
+                time_dist = np.sum((delay_loc_idx==pos & binary_stim==s)*1, axis=0) / np.sum((delay_loc_idx==pos & binary_stim==s)*1)
+                time_axis[:,s,l] = np.random.choice(np.arange(40), size=40, p=time_dist)
+
+    elif dim == 'stim':
+        stim_axis = np.empty((40, 2, n_positions))
+        # for each time-location pair, calculate probability distribution of stimulus given current time and location
+        for t in range(40):
+            for l in range(n_positions):
+                stim_dist = np.empty((2,))
+                stim_dist[0] = np.sum(binary_stim==0) / len(binary_stim)
+                stim_dist[1] = np.sum(binary_stim==1) / len(binary_stim)
+                stim_axis[t,:,l] = np.random.choice(np.arange(2), size=2, p=stim_dist)
+
+    elif dim == 'location':
+        location_axis = np.empty((40, 2, n_positions))
+        # for each time-stimulus pair, calculate probability distribution of location given current time and stimulus
+        for t in range(40):
+            for s in range(2):
+                loc_dist = [list(delay_loc_idx[:,t]).count(pos) for pos in unique_pos]
+                loc_dist = loc_dist / np.sum(loc_dist)
+                location_axis[t,s,:] = np.random.choice(unique_pos, size=n_positions, p=loc_dist)
+
+    return time_axis, stim_axis, location_axis
+
+
+def construct_time_stimulus_location_ratemap_occupancy(delay_resp, delay_loc_idx,  binary_stim, randomize=None, shuffle=False):
+    n_episode, len_delay, n_neurons = np.shape(delay_resp)
+
+    norm_delay_resp = (delay_resp - np.min(delay_resp, axis=(0,1),
+                                           keepdims=True)) / np.ptp(delay_resp, axis=(0,1), keepdims=True)
+    if shuffle:
+        norm_delay_resp = shuffle_activity(norm_delay_resp)
+
+    ratemap = np.zeros((len_delay, 2, 16, n_neurons))  # 16 is the number of locations
+    occupancy = np.zeros((len_delay, 2, 16))
+    time_axis, stim_axis, location_axis = randomize_dimension_time_stimulus_location(norm_delay_resp,  binary_stim, delay_loc_idx, dim=randomize)
+    for t in range(len_delay):
+        for s in range(2):
+            for l in range(16):
+                if randomize==None:
+                    occupancy[t,s,l] = np.sum(binary_stim==s, delay_loc_idx==l)
+                    ratemap[t,s,l, :] = np.sum(norm_delay_resp[binary_stim==s, delay_loc_idx==l, :], axis=(0,1)) / occupancy[t,s,l]
+                else:
+                    occupancy[t,s,l] = np.sum(binary_stim==stim_axis[t,s,l], delay_loc_idx==location_axis[t,s,l])
+                    ratemap[t,s,l, :] = np.sum(norm_delay_resp[binary_stim==stim_axis[t,s,l], delay_loc_idx==location_axis[t,s,l], :], axis=(0,1)) / occupancy[t,s,l]
+    occupancy = occupancy / np.sum(occupancy)
+    print("Sum of occupancy: ", np.sum(occupancy))  # should be 1
+    return (ratemap, occupancy)
 
 
 
+def informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize=None, shuffle=None):
+    ratemap, occupancy = construct_time_stimulus_location_ratemap_occupancy(delay_resp, delay_loc_idx, binary_stim, randomize=randomize, shuffle=shuffle)
+    return mutual_info(ratemap, occupancy)
+
+
+def joint_encoding_information_time_stimulus_location(delay_resp, delay_loc_idx, binary_stim, save_dir, title, logInfo=False, save=False):
+    n_neurons = np.shape(delay_resp)[-1]
+    I_unsfl_unrmd = informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx)
+    I_unsfl_stimrmd = informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize='stim')
+    I_unsfl_locrmd = informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize='location')
+    I_unsfl_timermd = informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize='time')
+    I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd, I_sfl_locrmd = np.empty((n_neurons, 100)), np.empty((n_neurons, 100)), np.empty((n_neurons, 100)), np.empty((n_neurons, 100))
+    for i in range(100):
+        I_sfl_unrmd[:,i] = np.squeeze(informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, shuffle=True))
+        I_sfl_stimrmd[:,i] = np.squeeze(informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize='stim', shuffle=True))
+        I_sfl_locrmd[:,i] = np.squeeze(informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize='location', shuffle=True))
+        I_sfl_timermd[:,i] = np.squeeze(informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize='time', shuffle=True))
+    sig_cells = np.squeeze(I_unsfl_unrmd) > (np.nanmean(I_sfl_unrmd,axis=1) + 2 * np.nanstd(I_sfl_unrmd,axis=1))
+    print("Number of significant cells: ", np.sum(sig_cells))
+    I_unsfl_unrmd, I_unsfl_stimrmd, I_unsfl_timermd, I_unsfl_locrmd = I_unsfl_unrmd[sig_cells], I_unsfl_stimrmd[sig_cells], I_unsfl_timermd[sig_cells], I_unsfl_locrmd[sig_cells]
+    I_sfl_unrmd, I_sfl_stimrmd, I_sfl_timermd, I_sfl_locrmd = I_sfl_unrmd[sig_cells], I_sfl_stimrmd[sig_cells], I_sfl_timermd[sig_cells], I_sfl_locrmd[sig_cells]
+
+    if logInfo:
+        unrmd, stimrmd, timermd, locrmd = np.log(I_unsfl_unrmd), np.log(I_unsfl_stimrmd), np.log(I_unsfl_timermd), np.log(I_unsfl_locrmd)
+    else:
+        unrmd, stimrmd, timermd, locrmd = I_unsfl_unrmd ,I_unsfl_stimrmd, I_unsfl_timermd, I_unsfl_locrmd
+    n_neurons = np.shape(timermd)[0]
+    if sum(sig_cells)==0:
+        return None
+    info = np.transpose([unrmd, timermd, stimrmd, locrmd])
+    stats = cbook.boxplot_stats(info, labels=['Unrmd', 'Timermd', 'Stimrmd', 'Locrmd'], bootstrap=10000)
+    for i in range(len(stats)):
+        stats[i]['whislo'] = np.min(info[:,i], axis=0)
+        stats[i]['whishi'] = np.max(info[:,i], axis=0)
+
+    fig, axs = plt.subplots(1,1)
+    fig.suptitle(title)
+    props = dict(color='indigo', linewidth=1.5)
+    axs.bxp(stats, showfliers=False, boxprops=props,
+            capprops=props, whiskerprops=props, medianprops=props)
+    from scipy.stats import kruskal
+    print("Kruskal-Wallis test p-values:")
+    print("Unrmd vs Timermd: ", kruskal(unrmd, timermd)[1])
+    print("Unrmd vs Stimrmd: ", kruskal(unrmd, stimrmd)[1])
+    print("Unrmd vs Locrmd: ", kruskal(unrmd, locrmd)[1])
+    print("Timermd vs Stimrmd: ", kruskal(timermd, stimrmd)[1])
+    print("Timermd vs Locrmd: ", kruskal(timermd, locrmd)[1])
+    print("Stimrmd vs Locrmd: ", kruskal(stimrmd, locrmd)[1])
+
+    if logInfo:
+        plt.ylabel("log(mutual information) (bits)", fontsize=19)
+    else:
+        plt.ylabel("Mutual information (bits)", fontsize=19)
+    if save:
+        plt.savefig(os.path.join(save_dir, f'time_stimulus_location_joint_encoding_info_{title}.svg'))
+    else:
+        plt.show()
+    return info
 
 
 

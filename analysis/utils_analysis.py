@@ -739,3 +739,27 @@ def identify_splitter_cells_ANOVA(neural_activity, location, trial_type):
     return np.array(splitter_cells), anova_results
 
 
+def calculate_discriminability(neuron_left_ratemap, neuron_right_ratemap):
+    # Kinsky et al., 2020 Nature Comms
+    left_ratemap_flat = neuron_left_ratemap.flatten()
+    right_ratemap_flat = neuron_right_ratemap.flatten()
+    return np.sum(np.abs(left_ratemap_flat - right_ratemap_flat)) / np.sum(left_ratemap_flat + right_ratemap_flat)
+
+
+def identify_splitter_cells_discriminability(left_ratemap_all, right_ratemap_all, n_shuffles=100, percentile=95):
+    n_neurons = left_ratemap_all.shape[0]
+    splitter_cells = []
+    discriminability_arr = []
+    for i_neuron in range(n_neurons):
+        left_ratemap = left_ratemap_all[i_neuron]
+        right_ratemap = right_ratemap_all[i_neuron]
+        discriminability = calculate_discriminability(left_ratemap, right_ratemap)
+        discriminability_arr.append(discriminability)
+        # if discriminability is higher than 95 percentile of shuffled distribution, then it's a splitter cell
+        shuffled_discriminability = []
+        for i_shuffle in range(n_shuffles):
+            shuffled_discriminability.append(calculate_discriminability(np.random.permutation(left_ratemap), np.random.permutation(right_ratemap)))
+        shuffled_discriminability = np.array(shuffled_discriminability)
+        if discriminability > np.percentile(shuffled_discriminability, percentile):
+            splitter_cells.append(i_neuron)
+    return np.array(splitter_cells), discriminability_arr

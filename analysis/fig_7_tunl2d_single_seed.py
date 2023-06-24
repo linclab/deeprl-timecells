@@ -8,13 +8,13 @@ sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from scipy.stats import kruskal
 from analysis.utils_analysis import sort_resp, plot_sorted_averaged_resp, single_cell_visualization, \
     time_decode_lin_reg, plot_decode_sample_from_single_time, decode_sample_from_single_time, plot_sorted_in_same_order, \
-    identify_splitter_cells_ANOVA
+    identify_splitter_cells_ANOVA, identify_splitter_cells_discriminability
 from analysis.utils_time_ramp import lin_reg_ramping, skaggs_temporal_information, trial_reliability_vs_shuffle_score, \
     plot_r_tuning_curves
 from analysis.utils_mutual_info import joint_encoding_information_time_stimulus, construct_ratemap, \
     calculate_mutual_information, calculate_shuffled_mutual_information, plot_mutual_info_distribution, \
     joint_encoding_info, plot_joint_encoding_information, plot_stimulus_selective_place_cells, \
-    decode_sample_from_trajectory, convert_loc_to_idx
+    decode_sample_from_trajectory, convert_loc_to_idx, joint_encoding_information_time_stimulus_location
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 
@@ -88,23 +88,30 @@ mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_oc
 mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
 
 print("Plot splitter cells... SAVE AUTOMATICALLY")
-plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=save_dir, normalize_ratemaps=True)
+plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=seed_save_dir, normalize_ratemaps=True)
 
-print("identify splitter cells...")
+print("identify splitter cells with ANOVA...")
 delay_loc_idx = convert_loc_to_idx(delay_loc)
 # Identify splitter cells
-splitter_cell_ids, anova_results = identify_splitter_cells_ANOVA(delay_resp, delay_loc_idx, binary_stim)
-print("splitter cells: ", splitter_cell_ids)
-np.save(os.path.join(seed_save_dir, 'splitter_cell_ids.npy'), splitter_cell_ids)
+splitter_cell_ids_ANOVA, anova_results = identify_splitter_cells_ANOVA(delay_resp, delay_loc_idx, binary_stim)
+print("splitter cells with ANOVA: ", splitter_cell_ids_ANOVA)
+np.save(os.path.join(seed_save_dir, 'splitter_cell_ids_ANOVA.npy'), splitter_cell_ids_ANOVA)
 np.save(os.path.join(seed_save_dir, 'anova_results.npy'), anova_results)
+
+print("identify splitter cells with discriminability...")
+splitter_cell_ids_dis, discriminability_results = identify_splitter_cells_discriminability(ratemap_left_sti, ratemap_right_sti, n_shuffles=100, percentile=95)
+print("splitter cells with discriminability: ", splitter_cell_ids_dis)
+np.save(os.path.join(seed_save_dir, 'splitter_cell_ids_dis.npy'), splitter_cell_ids_dis)
+np.save(os.path.join(seed_save_dir, 'discriminability_results.npy'), discriminability_results)
 
 # SxTxL Mutual information analysis
 print("SxTxL Mutual information analysis...")
-
+stl_info = joint_encoding_information_time_stimulus_location(delay_resp, delay_loc_idx, binary_stim, save_dir=seed_save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', save=True)
+np.save(os.path.join(seed_save_dir, 'stl_mutual_info.npy'), stl_info)
 
 
 print("r anaylsis...")
-r_arr = plot_r_tuning_curves(left_stim_resp, right_stim_resp, 'left', 'right', save_dir=save_dir)
+r_arr = plot_r_tuning_curves(left_stim_resp, right_stim_resp, 'left', 'right', save_dir=seed_save_dir)
 np.savez(os.path.join(seed_save_dir, 'r_arr.npz'), r_arr=r_arr)
 
 # decode stimulus
@@ -117,7 +124,7 @@ np.save(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), accuracies_shuff)
 print("Sort and plot the response...")
 cell_nums, sorted_resp = sort_resp(delay_resp, norm=True)
 plot_sorted_averaged_resp(cell_nums, sorted_resp, title='tiling_resp', remove_nan=True, save_dir=seed_save_dir, save=True)
-plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_title="all_cells", len_delay=len_delay, n_neurons=n_neurons, save_dir=save_dir, save=True)
+plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_title="all_cells", len_delay=len_delay, n_neurons=n_neurons, save_dir=seed_save_dir, save=True)
 
 # visualize single unit response
 print("visualize single unit response...")
@@ -142,10 +149,10 @@ trial_reliable_cell_num_r = np.where(trial_reliable_cell_bool_r)[0]
 
 # Identify ramping cells
 print("Identify ramping cells...")
-p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left')
+p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=seed_save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left')
 ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
 cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
-p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right')
+p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=seed_save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right')
 ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
 cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
 ramping_cell_ids_seed['left'] = np.intersect1d(cell_nums_ramp_l, trial_reliable_cell_num_l)
@@ -155,10 +162,10 @@ ramping_cell_ids_seed['total'] = np.union1d(ramping_cell_ids_seed['left'], rampi
 
 # Identify time cells
 print("Identify time cells...")
-I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, ramp_cell_bool_l, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left', save_dir=save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)  # takes 8 hours to do 1000 shuffles for 256 neurons
+I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, ramp_cell_bool_l, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left', save_dir=seed_save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)  # takes 8 hours to do 1000 shuffles for 256 neurons
 high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
 high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
-I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, ramp_cell_bool_r, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right', save_dir=save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)
+I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, ramp_cell_bool_r, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right', save_dir=seed_save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)
 high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
 high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
 time_cell_ids_seed['left'] = np.intersect1d(high_temporal_info_cell_nums_l, trial_reliable_cell_num_l)
@@ -176,14 +183,17 @@ ratemap, spatial_occupancy = construct_ratemap(delay_resp, delay_loc)
 mutual_info = calculate_mutual_information(ratemap, spatial_occupancy)
 shuffled_mutual_info = calculate_shuffled_mutual_information(delay_resp, delay_loc, n_total_episodes)
 
-plot_mutual_info_distribution(mutual_info, title='all_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info, save_dir=save_dir, save=True)
+plot_mutual_info_distribution(mutual_info, title='all_cells', compare=True, shuffled_mutual_info=shuffled_mutual_info, save_dir=seed_save_dir, save=True)
 
-joint_encoding_info(delay_resp, delay_loc, save_dir=save_dir, recalculate=True)  # saved joint_encoding.npz to save_dir
-plot_joint_encoding_information(save_dir=save_dir, title='all_cells', save=True)
+joint_encoding_info(delay_resp, delay_loc, save_dir=seed_save_dir, recalculate=True)  # saved joint_encoding.npz to save_dir
+plot_joint_encoding_information(save_dir=seed_save_dir, title='all_cells', save=True)
 
+# Mutual Information
+print("Mutual Information...")
+info_seed = joint_encoding_information_time_stimulus(delay_resp, stim, save_dir=seed_save_dir,title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', logInfo=False, save=True)
 
 print("decode sample from trajectory...")
-trajectory_stim_decoding_accuracy = decode_sample_from_trajectory(delay_loc, stim, save_dir=save_dir, save=True)
+trajectory_stim_decoding_accuracy = decode_sample_from_trajectory(delay_loc, stim, save_dir=seed_save_dir, save=True)
 np.save(os.path.join(save_dir, 'trajectory_stim_decoding_accuracy.npy'), trajectory_stim_decoding_accuracy)
 
 print("analysis complete")
