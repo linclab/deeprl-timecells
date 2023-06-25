@@ -67,6 +67,7 @@ def plot_ST_mutual_information_across_seeds(info_dict):
 
 
 def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
+    print("Plot count time and ramping cells...")
     time_cell_counts = []
     ramping_cell_counts = []
     both_cell_counts = []
@@ -109,6 +110,7 @@ def plot_r_across_seeds(r_dict):
 
 
 def plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, pick_one=False):
+    print("Plot stim decoding accuracy across seeds...")
     accuracy_arr = []
     accuracy_shuff_arr = []
     for each_seed in accuracies_dict.keys():
@@ -133,6 +135,7 @@ def plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_d
 
 
 def plot_stl_mutual_information_across_seeds(stl_mutual_info_dict):
+    print("Plot StimxTimexLoc mutual information across seeds...")
     mutual_info_arr = []
     for each_seed in stl_mutual_info_dict.keys():
         if stl_mutual_info_dict[each_seed].shape[-1] != 4:
@@ -168,6 +171,7 @@ def plot_stl_mutual_information_across_seeds(stl_mutual_info_dict):
 
 
 def plot_sl_mutual_information_across_seeds(sl_mutual_info_dict):
+    print("Plot StimxLoc mutual information across seeds...")
     mutual_info_arr = []
     for each_seed in sl_mutual_info_dict.keys():
         info_row = []
