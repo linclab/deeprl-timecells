@@ -7,6 +7,7 @@ from sklearn.manifold import TSNE
 import torch
 import numpy as np
 import utils_linclab_plot
+from tqdm import tqdm
 import os
 from matplotlib_venn import venn2
 import umap
@@ -719,7 +720,7 @@ def identify_splitter_cells_ANOVA(neural_activity, location, trial_type):
         'interaction_pval': []
     }
 
-    for neuron_idx in range(n_neurons):
+    for neuron_idx in tqdm(range(n_neurons)):
         # Perform ANOVA analysis
         formula = f'neural_activity_flat[:, {neuron_idx}] ~ C(trial_type_flat) + C(location_flat) + C(trial_type_flat):C(location_flat)'
         model = ols(formula, data={'neural_activity_flat': neural_activity_flat,
@@ -738,28 +739,36 @@ def identify_splitter_cells_ANOVA(neural_activity, location, trial_type):
 
     return np.array(splitter_cells), anova_results
 
-
-def calculate_discriminability(neuron_left_ratemap, neuron_right_ratemap):
+def calculate_discriminability(left_ratemap_flat, right_ratemap_flat):
     # Kinsky et al., 2020 Nature Comms
-    left_ratemap_flat = neuron_left_ratemap.flatten()
-    right_ratemap_flat = neuron_right_ratemap.flatten()
     return np.sum(np.abs(left_ratemap_flat - right_ratemap_flat)) / np.sum(left_ratemap_flat + right_ratemap_flat)
 
 
 def identify_splitter_cells_discriminability(left_ratemap_all, right_ratemap_all, n_shuffles=100, percentile=95):
+    mask = np.zeros((4,7))
+    mask[0] = 1
+    mask[1, 1:6] = 1
+    mask[2, 2:5] = 1
+    mask[3, 3] = 1
     n_neurons = left_ratemap_all.shape[0]
     splitter_cells = []
     discriminability_arr = []
     for i_neuron in range(n_neurons):
         left_ratemap = left_ratemap_all[i_neuron]
         right_ratemap = right_ratemap_all[i_neuron]
-        discriminability = calculate_discriminability(left_ratemap, right_ratemap)
+        left_ratemap_flat = left_ratemap.flatten()
+        right_ratemap_flat = right_ratemap.flatten()
+        left_ratemap_flat = left_ratemap_flat[mask.flatten()!=0]
+        right_ratemap_flat = right_ratemap_flat[mask.flatten()!=0]
+        discriminability = calculate_discriminability(left_ratemap_flat, right_ratemap_flat)
         discriminability_arr.append(discriminability)
         # if discriminability is higher than 95 percentile of shuffled distribution, then it's a splitter cell
         shuffled_discriminability = []
         for i_shuffle in range(n_shuffles):
-            shuffled_discriminability.append(calculate_discriminability(np.random.permutation(left_ratemap), np.random.permutation(right_ratemap)))
+            shuffled_discriminability.append(calculate_discriminability(np.random.permutation(left_ratemap_flat), np.random.permutation(right_ratemap_flat)))
         shuffled_discriminability = np.array(shuffled_discriminability)
         if discriminability > np.percentile(shuffled_discriminability, percentile):
             splitter_cells.append(i_neuron)
     return np.array(splitter_cells), discriminability_arr
+
+

@@ -572,12 +572,15 @@ def plot_joint_encoding_information(save_dir, title, logInfo=False, save=False):
 
 
 # Calculate mutual information for time and position
-def mutual_info(ratemap, occupancy):
+def mutual_info(ratemap, occupancy, stl=False):
     occu_flat = np.ndarray.flatten(occupancy)
     n_neurons = np.shape(ratemap)[-1]
     I = np.empty((n_neurons,))
     for i_neuron in range(n_neurons):
-        rate_flat = np.ndarray.flatten(ratemap[:,:,i_neuron])
+        if stl: # SxTxL
+            rate_flat = np.ndarray.flatten(ratemap[:,:,:,i_neuron])
+        else:
+            rate_flat = np.ndarray.flatten(ratemap[:,:,i_neuron])
         avg_rate = np.nansum(rate_flat * occu_flat)
         nonzero = rate_flat > 0
         I[i_neuron] = np.nansum(rate_flat[nonzero] * np.log2(rate_flat[nonzero] / avg_rate) * occu_flat[nonzero])
@@ -770,7 +773,8 @@ def randomize_dimension_time_stimulus_location(delay_resp,  binary_stim, delay_l
         for s in range(2):
             for l in range(n_positions):
                 pos = unique_pos[l]
-                time_dist = np.sum((delay_loc_idx==pos & binary_stim==s)*1, axis=0) / np.sum((delay_loc_idx==pos & binary_stim==s)*1)
+                bool_arr = ((delay_loc_idx==pos)*1) * (np.expand_dims(binary_stim==s, axis=1))*1
+                time_dist = np.sum(bool_arr, axis=0) / np.sum(bool_arr)
                 time_axis[:,s,l] = np.random.choice(np.arange(40), size=40, p=time_dist)
 
     elif dim == 'stim':
@@ -810,20 +814,22 @@ def construct_time_stimulus_location_ratemap_occupancy(delay_resp, delay_loc_idx
         for s in range(2):
             for l in range(16):
                 if randomize==None:
-                    occupancy[t,s,l] = np.sum(binary_stim==s, delay_loc_idx==l)
-                    ratemap[t,s,l, :] = np.sum(norm_delay_resp[binary_stim==s, delay_loc_idx==l, :], axis=(0,1)) / occupancy[t,s,l]
+                    occupancy[t,s,l] = np.sum(delay_loc_idx[binary_stim==s]==l)
+                    bool_arr = np.expand_dims(binary_stim==s, axis=1) * (delay_loc_idx==l)
+                    ratemap[t,s,l, :] = np.sum(norm_delay_resp[bool_arr, :], axis=0) / occupancy[t,s,l]
                 else:
-                    occupancy[t,s,l] = np.sum(binary_stim==stim_axis[t,s,l], delay_loc_idx==location_axis[t,s,l])
-                    ratemap[t,s,l, :] = np.sum(norm_delay_resp[binary_stim==stim_axis[t,s,l], delay_loc_idx==location_axis[t,s,l], :], axis=(0,1)) / occupancy[t,s,l]
+                    occupancy[t,s,l] = np.sum(delay_loc_idx[binary_stim==stim_axis[t,s,l]]==location_axis[t,s,l])
+                    bool_arr = np.expand_dims(binary_stim==stim_axis[t,s,l], axis=1) * (delay_loc_idx==location_axis[t,s,l])
+                    ratemap[t,s,l, :] = np.sum(norm_delay_resp[bool_arr, :], axis=0) / occupancy[t,s,l]
     occupancy = occupancy / np.sum(occupancy)
-    print("Sum of occupancy: ", np.sum(occupancy))  # should be 1
+    #print("Sum of occupancy: ", np.sum(occupancy))  # should be 1
     return (ratemap, occupancy)
 
 
 
 def informativeness_time_stimulus_location(delay_resp, binary_stim, delay_loc_idx, randomize=None, shuffle=None):
     ratemap, occupancy = construct_time_stimulus_location_ratemap_occupancy(delay_resp, delay_loc_idx, binary_stim, randomize=randomize, shuffle=shuffle)
-    return mutual_info(ratemap, occupancy)
+    return mutual_info(ratemap, occupancy, stl=True)
 
 
 def joint_encoding_information_time_stimulus_location(delay_resp, delay_loc_idx, binary_stim, save_dir, title, logInfo=False, save=False):

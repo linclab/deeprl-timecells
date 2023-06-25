@@ -86,13 +86,12 @@ ratemap_left_sti, spatial_occupancy_left_sti = construct_ratemap(left_stim_resp,
 ratemap_right_sti, spatial_occupancy_right_sti = construct_ratemap(right_stim_resp, right_stim_loc)
 mutual_info_left_sti = calculate_mutual_information(ratemap_left_sti, spatial_occupancy_left_sti)
 mutual_info_right_sti = calculate_mutual_information(ratemap_right_sti, spatial_occupancy_right_sti)
+delay_loc_idx = convert_loc_to_idx(delay_loc)
 
 print("Plot splitter cells... SAVE AUTOMATICALLY")
 plot_stimulus_selective_place_cells(mutual_info_left_sti, ratemap_left_sti, mutual_info_right_sti, ratemap_right_sti, save_dir=seed_save_dir, normalize_ratemaps=True)
 
 print("identify splitter cells with ANOVA...")
-delay_loc_idx = convert_loc_to_idx(delay_loc)
-# Identify splitter cells
 splitter_cell_ids_ANOVA, anova_results = identify_splitter_cells_ANOVA(delay_resp, delay_loc_idx, binary_stim)
 print("splitter cells with ANOVA: ", splitter_cell_ids_ANOVA)
 np.save(os.path.join(seed_save_dir, 'splitter_cell_ids_ANOVA.npy'), splitter_cell_ids_ANOVA)
@@ -109,14 +108,13 @@ print("SxTxL Mutual information analysis...")
 stl_info = joint_encoding_information_time_stimulus_location(delay_resp, delay_loc_idx, binary_stim, save_dir=seed_save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', save=True)
 np.save(os.path.join(seed_save_dir, 'stl_mutual_info.npy'), stl_info)
 
-
 print("r anaylsis...")
 r_arr = plot_r_tuning_curves(left_stim_resp, right_stim_resp, 'left', 'right', save_dir=seed_save_dir)
 np.savez(os.path.join(seed_save_dir, 'r_arr.npz'), r_arr=r_arr)
 
 # decode stimulus
 print("decode stimulus...")
-accuracies, accuracies_shuff = decode_sample_from_single_time(delay_resp, stim, n_fold=5)
+accuracies, accuracies_shuff = decode_sample_from_single_time(delay_resp, binary_stim, n_fold=5)
 np.save(os.path.join(seed_save_dir, 'accuracies.npy'), accuracies)
 np.save(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), accuracies_shuff)
 
@@ -128,7 +126,7 @@ plot_sorted_in_same_order(left_stim_resp, right_stim_resp, 'Left', 'Right', big_
 
 # visualize single unit response
 print("visualize single unit response...")
-single_cell_visualization(delay_resp, stim, cell_nums, type='all', save_dir=seed_save_dir)  # temporal tuning
+single_cell_visualization(delay_resp, binary_stim, cell_nums, type='all', save_dir=seed_save_dir)  # temporal tuning
 
 # Decode time
 print("Decode time...")
@@ -190,7 +188,7 @@ plot_joint_encoding_information(save_dir=seed_save_dir, title='all_cells', save=
 
 # Mutual Information
 print("Mutual Information...")
-info_seed = joint_encoding_information_time_stimulus(delay_resp, stim, save_dir=seed_save_dir,title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', logInfo=False, save=True)
+info_seed = joint_encoding_information_time_stimulus(delay_resp, binary_stim, save_dir=seed_save_dir,title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', logInfo=False, save=True)
 
 print("decode sample from trajectory...")
 trajectory_stim_decoding_accuracy = decode_sample_from_trajectory(delay_loc, stim, save_dir=seed_save_dir, save=True)
