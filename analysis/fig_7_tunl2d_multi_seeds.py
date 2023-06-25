@@ -41,7 +41,7 @@ def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay):
 
 
 def plot_ST_mutual_information_across_seeds(info_dict):
-    print("Plot mutual information across seeds...")
+    print("Plot StimxTime mutual information across seeds...")
     info_arr = np.vstack(info_dict.values())
     n_total_neurons = np.shape(info_arr)[0]
     stats = cbook.boxplot_stats(info_arr, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
@@ -62,8 +62,8 @@ def plot_ST_mutual_information_across_seeds(info_dict):
     print("Unrmd vs. Stimrmd: ", kruskal(unrmd, stimrmd)[1])
     print("Unrmd vs. Timermd: ", kruskal(unrmd, timermd)[1])
     print("Stimrmd vs. Timermd: ", kruskal(stimrmd, timermd)[1])
-    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_noloine_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'))
-    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_noline_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
+    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.svg'))
+    plt.savefig(os.path.join(save_dir, f'joint_encoding_info_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
 def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
@@ -206,6 +206,20 @@ def plot_sl_mutual_information_across_seeds(sl_mutual_info_dict):
     plt.savefig(os.path.join(save_dir, f'SL_joint_encoding_info_pooled_{len(stl_mutual_info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
+def plot_trajectory_decoding_across_seeds(trajectory_decoding_accuracy_dict):
+    print("Plot trajectory decoding accuracy across seeds...")
+    accuracy = np.vstack([trajectory_decoding_accuracy_dict.values()]) # (n_seeds*10, 8)
+    mean_acc = np.mean(accuracy, axis=0)
+    std_acc = np.std(accuracy, axis=0)
+    X = [0,5,10,15,20,25,30,35]
+    plt.plot(X, mean_acc, linewidth=3, color='Coral')
+    plt.fill_between(X, mean_acc+std_acc, mean_acc-std_acc, color='Coral', alpha=0.2)
+    plt.xlabel('Time')
+    plt.ylabel('Accuracy')
+    plt.title("Decode from 5 steps' trajectory")
+    plt.savefig(os.path.join(save_dir, 'decode_sample_from_trajectory.svg'))
+    plt.savefig(os.path.join(save_dir, 'decode_sample_from_trajectory.png'))
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--untrained', type=bool, default=False, help='whether to use untrained model')
@@ -260,6 +274,8 @@ splitter_cell_nums_ANOVA = []
 splitter_cell_nums_dis = []
 stl_mutual_info_dict = {}
 sl_mutual_info_dict = {}
+st_info_dict = {}
+trajectory_decoding_accuracy_dict = {}
 
 for i_seed, each_seed in enumerate(seed_list):
     print(f'====================== Analyzing seed {each_seed} ...======================================')
@@ -275,7 +291,9 @@ for i_seed, each_seed in enumerate(seed_list):
             os.path.exists(os.path.join(seed_save_dir, 'accuracies_shuff.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 'stl_mutual_info.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 'joint_encoding.npz')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'r_arr.npz')):
+            os.path.exists(os.path.join(seed_save_dir, 'st_info_seed.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir, 'trajectory_stim_decoding_accuracy.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir, 'r_arr.npy')):
         print("Loading existing data...")
         ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
         time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
@@ -286,8 +304,11 @@ for i_seed, each_seed in enumerate(seed_list):
         accuracies_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'accuracies.npy'), allow_pickle=True)
         accuracies_shuff_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), allow_pickle=True)
         stl_mutual_info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'stl_mutual_info.npy'), allow_pickle=True)
-        r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npz'), allow_pickle=True)
+        r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npy'), allow_pickle=True)
         sl_mutual_info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'joint_encoding.npz'))
+        st_info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'st_info_seed.npy'), allow_pickle=True)
+        trajectory_decoding_accuracy_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'trajectory_stim_decoding_accuracy.npy'), allow_pickle=True)
+
 
 
 plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
@@ -303,8 +324,10 @@ plot_sl_mutual_information_across_seeds(sl_mutual_info_dict)
 
 plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay=len_delay)
 
-#plot_ST_mutual_information_across_seeds(info_dict)  # To-run after saving info_dict
-#plot_trajectory_decoding_across_seeds(trajectory_decoding_accuracy_dict)
+plot_ST_mutual_information_across_seeds(st_info_dict)  # To-run after saving info_dict
+
+plot_trajectory_decoding_across_seeds(trajectory_decoding_accuracy_dict)
+
 print(f"Average number of splitter cells (ANOVA): {np.mean(splitter_cell_nums_ANOVA)}, std: {np.std(splitter_cell_nums_ANOVA)}")
 print(f"Average number of splitter cells (dis): {np.mean(splitter_cell_nums_dis)}, std: {np.std(splitter_cell_nums_dis)}")
 

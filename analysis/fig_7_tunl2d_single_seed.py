@@ -110,7 +110,7 @@ np.save(os.path.join(seed_save_dir, 'stl_mutual_info.npy'), stl_info)
 
 print("r anaylsis...")
 r_arr = plot_r_tuning_curves(left_stim_resp, right_stim_resp, 'left', 'right', save_dir=seed_save_dir)
-np.savez(os.path.join(seed_save_dir, 'r_arr.npz'), r_arr=r_arr)
+np.save(os.path.join(seed_save_dir, 'r_arr.npy'), r_arr=r_arr)
 
 # decode stimulus
 print("decode stimulus...")
