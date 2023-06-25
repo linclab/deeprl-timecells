@@ -50,7 +50,7 @@ if not os.path.exists(seed_save_dir):
 # load the data
 print("load the data...")
 if untrained:
-    data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_data.npz'), allow_pickle=True)
+    data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_weight_frozen_data.npz'), allow_pickle=True)
 else:
     data = np.load(os.path.join(data_dir, f'mem_40_lstm_256_5e-06_seed_{each_seed}_epi79999.pt_data.npz'), allow_pickle=True)
 # ['stim', 'choice', 'ct', 'delay_loc', 'delay_resp_hx', 'delay_resp_cx', 'epi_nav_reward', 'ideal_nav_rwds']
@@ -189,10 +189,11 @@ plot_joint_encoding_information(save_dir=seed_save_dir, title='all_cells', save=
 # Mutual Information
 print("Mutual Information...")
 info_seed = joint_encoding_information_time_stimulus(delay_resp, binary_stim, save_dir=seed_save_dir,title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', logInfo=False, save=True)
+np.save(os.path.join(seed_save_dir, 'st_info_seed.npy'), info_seed)
 
 print("decode sample from trajectory...")
 trajectory_stim_decoding_accuracy = decode_sample_from_trajectory(delay_loc, stim, save_dir=seed_save_dir, save=True)
-np.save(os.path.join(save_dir, 'trajectory_stim_decoding_accuracy.npy'), trajectory_stim_decoding_accuracy)
+np.save(os.path.join(seed_save_dir, 'trajectory_stim_decoding_accuracy.npy'), trajectory_stim_decoding_accuracy)
 
 print("analysis complete")
 
