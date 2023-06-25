@@ -170,12 +170,13 @@ def plot_stl_mutual_information_across_seeds(stl_mutual_info_dict):
 def plot_sl_mutual_information_across_seeds(sl_mutual_info_dict):
     mutual_info_arr = []
     for each_seed in sl_mutual_info_dict.keys():
-        info_row = np.zeros(3)
+        info_row = []
         I = sl_mutual_info_dict[each_seed]
         unrmd, posrmd, timermd = I['I_unsfl_unrmd'], I['I_unsfl_posrmd'], I['I_unsfl_timermd']
-        info_row[0] = unrmd
-        info_row[1] = posrmd
-        info_row[2] = timermd
+        info_row.append(unrmd)
+        info_row.append(posrmd)
+        info_row.append(timermd)
+        info_row = np.vstack(info_row).T
         mutual_info_arr.append(info_row)
     mutual_info_arr = np.vstack(mutual_info_arr)
     n_total_neurons = mutual_info_arr.shape[0]
@@ -208,6 +209,7 @@ parser.add_argument('--nomem', type=bool, default=False, help='whether env was N
 args = parser.parse_args()
 untrained = args.untrained
 nomem = args.nomem
+print(f'untrained: {untrained}, nomem: {nomem}')
 
 if nomem:
     data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl2d/nomem_40_lstm_256_5e-06'
@@ -269,10 +271,10 @@ for i_seed, each_seed in enumerate(seed_list):
             os.path.exists(os.path.join(seed_save_dir, 'accuracies_shuff.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 'stl_mutual_info.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 'joint_encoding.npz')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'r_arr.npy')):
+            os.path.exists(os.path.join(seed_save_dir, 'r_arr.npz')):
         print("Loading existing data...")
-        ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy')).item()
-        time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy')).item()
+        ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
+        time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
         splitter_cell_nums_ANOVA.append(len(np.load(os.path.join(seed_save_dir, 'splitter_cell_ids_ANOVA.npy'), allow_pickle=True)))
         splitter_cell_nums_dis.append(len(np.load(os.path.join(seed_save_dir, 'splitter_cell_ids_dis.npy'), allow_pickle=True)))
         t_test_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_seed.npy'), allow_pickle=True)
@@ -280,8 +282,8 @@ for i_seed, each_seed in enumerate(seed_list):
         accuracies_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'accuracies.npy'), allow_pickle=True)
         accuracies_shuff_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), allow_pickle=True)
         stl_mutual_info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'stl_mutual_info.npy'), allow_pickle=True)
-        r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npy'))
-        sl_mutual_info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'joint_encoding.npz'), allow_pickle=True)
+        r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npz'), allow_pickle=True)
+        sl_mutual_info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'joint_encoding.npz'))
 
 
 plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
