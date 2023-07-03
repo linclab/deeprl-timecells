@@ -51,6 +51,7 @@ def plot_mutual_information_across_seeds(info_dict):
     print("Plot mutual information across seeds...")
     info_arr = np.vstack(info_dict.values())
     n_total_neurons = np.shape(info_arr)[0]
+    print(f"n_total_neurons: {n_total_neurons}")
     stats = cbook.boxplot_stats(info_arr, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
     for i in range(len(stats)):
         stats[i]['whislo'] = np.min(info_arr[:,i], axis=0)

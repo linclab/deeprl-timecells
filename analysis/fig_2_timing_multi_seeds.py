@@ -63,6 +63,7 @@ def plot_mutual_information_across_seeds(info_dict):
             info_arr.append(info_dict[seed][stim_len])
     info_arr = np.vstack(info_arr)
     n_total_neurons = np.shape(info_arr)[0]
+    print(f"Total number of neurons: {n_total_neurons}")
     stats = cbook.boxplot_stats(info_arr, labels=['Stim x Time', r'$Stim x Rand(Time)$', r'$Time x Rand(Stim)$'], bootstrap=10000)
     for i in range(len(stats)):
         stats[i]['whislo'] = np.min(info_arr[:,i], axis=0)
@@ -127,6 +128,43 @@ def plot_r_across_seeds(r_dict):
     plt.savefig(os.path.join(save_dir, f"stim1_stim2_r_hist.png"))
 
 
+def plot_corr_vs_incorr_time_decode(decode_corr_dict, decode_incorr_dict):
+    print("Plot corr vs. incorr time decode...")
+    corr_list = []
+    incorr_list = []
+    for each_seed in decode_corr_dict.keys():
+        corr_list.append(decode_corr_dict[each_seed])
+        incorr_list.append(decode_incorr_dict[each_seed])
+    decoded_t_corr = np.vstack(corr_list)
+    decoded_t_incorr = np.vstack(incorr_list)
+    fig, ax = plt.subplots()
+    max_stim_len = 40
+    ax.plot(np.arange(max_stim_len), np.arange(max_stim_len), '--', color='gray', alpha=0.7,
+            label="Decoded = actual time")
+    ax.set_xlim([0, max_stim_len])
+    ax.set_ylim([0, max_stim_len])
+    ax.axis("on")
+    ax.plot(np.arange(max_stim_len), np.mean(decoded_t_corr, axis=0), linewidth=3, label="Decode on correct trials")
+    ax.plot(np.arange(max_stim_len), np.mean(decoded_t_incorr, axis=0), linewidth=3,
+            label="Decode on incorrect trials")
+    ax.fill_between(np.arange(max_stim_len), np.mean(decoded_t_corr, axis=0) + np.std(decoded_t_corr, axis=0),
+                    np.mean(decoded_t_corr, axis=0) - np.std(decoded_t_corr, axis=0), alpha=0.3)
+    ax.fill_between(np.arange(max_stim_len), np.mean(decoded_t_incorr, axis=0) + np.std(decoded_t_incorr, axis=0),
+                    np.mean(decoded_t_incorr, axis=0) - np.std(decoded_t_incorr, axis=0), alpha=0.3)
+    ax.set_xticks([5, 10, 15, 20, 25, 30, 35, 40])
+    ax.set_yticks([5, 10, 15, 20, 25, 30, 35, 40])
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Decoded Time")
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+    ax.legend(frameon=False)
+    # ax.set_title("Accuracy = "+str(np.mean(accuracy*100))+"%")
+    # ax.set_title(title)
+    plt.savefig(os.path.join(save_dir, f'compare_corr_vs_incorr.svg'))
+    plt.savefig(os.path.join(save_dir, f'compare_corr_vs_incorr.png'))
+
+
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
 seed_list = []
 for file in os.listdir(data_dir):
@@ -151,6 +189,8 @@ t_test_dict = {}
 t_test_pred_dict = {}
 info_dict = {}
 r_dict = {}
+decode_corr_dict = {}
+decode_incorr_dict = {}
 for i_seed, each_seed in enumerate(seed_list):
     # load each seed's dicts from seed_save_dir
     seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
@@ -159,19 +199,26 @@ for i_seed, each_seed in enumerate(seed_list):
             os.path.exists(os.path.join(seed_save_dir, 't_test_dict_seed.npy')) and \
             os.path.exists(os.path.join(seed_save_dir,  't_test_pred_dict_seed.npy')) and \
             os.path.exists(os.path.join(seed_save_dir, 'info_dict_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'r_dict_seed.npy')):
+            os.path.exists(os.path.join(seed_save_dir, 'decoded_t_corr.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir, 'decoded_t_incorr.npy')) and \
+            os.path.exists(os.path.join(seed_save_dir, 'r_arr.npy')):
+        print(f'Loading seed {each_seed}...')
         ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
         time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
         t_test_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_dict_seed.npy'), allow_pickle=True).item()
         t_test_pred_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_pred_dict_seed.npy'), allow_pickle=True).item()
         info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'info_dict_seed.npy'), allow_pickle=True).item()
         r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npy'), allow_pickle=True)
+        decode_corr_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'decoded_t_corr.npy'))
+        decode_incorr_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'decoded_t_incorr.npy'))
 
 # plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
 
 plot_r_across_seeds(r_dict)
 
 plot_mutual_information_across_seeds(info_dict)
+
+plot_corr_vs_incorr_time_decode(decode_corr_dict, decode_incorr_dict)
 
 # for label in ['stimulus_1', 'stimulus_2', 'delay']:
 #     plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, label)

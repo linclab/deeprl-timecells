@@ -6,7 +6,7 @@ import matplotlib.cbook as cbook
 import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis.utils_analysis import time_decode_lin_reg, sort_resp, plot_sorted_averaged_resp
-from analysis.utils_int_discrim import single_cell_temporal_tuning
+from analysis.utils_int_discrim import single_cell_temporal_tuning, compare_correct_vs_incorrect
 from analysis.utils_mutual_info import joint_encoding_information_time_stimulus
 from analysis.utils_time_ramp import ridge_to_background_varying_duration, lin_reg_ramping_varying_duration, \
     trial_reliability_vs_shuffle_score_varying_duration, plot_r_tuning_curves
@@ -67,11 +67,15 @@ for i_neuron in range(n_neurons):
     stim2_resp[:, :, i_neuron][np.isnan(stim2_resp[:, :, i_neuron])] = 0
     delay_resp[:, :, i_neuron][np.isnan(delay_resp[:, :, i_neuron])] = 0
 
+print("Compare correct vs incorrect...")
+decoded_t_corr, decoded_t_incorr = compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="decoding", resp2=stim2_resp, title='', save_dir=seed_save_dir, save=True)
+np.save(os.path.join(seed_save_dir, 'decoded_t_corr.npy'), decoded_t_corr)
+np.save(os.path.join(seed_save_dir, 'decoded_t_incorr.npy'), decoded_t_incorr)
+
 print("r analysis...")
 r_arr = plot_r_tuning_curves(stim1_resp, stim2_resp, 'stim_1', 'stim_2', save_dir=save_dir, varying_duration=True)
 # save the r_arr
 np.save(os.path.join(seed_save_dir, 'r_arr.npy'), r_arr)
-sys.exit()
 
 print("mutual information analysis...")
 info_dict_seed = {}

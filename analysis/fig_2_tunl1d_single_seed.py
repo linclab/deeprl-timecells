@@ -77,7 +77,7 @@ np.save(os.path.join(seed_save_dir, 'accuracies.npy'), accuracies)
 np.save(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), accuracies_shuff)
 
 
-'''
+
 # Sort and plot the response
 print("Sort and plot the response...")
 cell_nums, sorted_resp = sort_resp(delay_resp, norm=True)
@@ -94,7 +94,8 @@ t_test_seed, t_test_pred_seed = time_decode_lin_reg(delay_resp, len_delay, n_neu
 # Mutual Information
 print("Mutual Information...")
 info_seed = joint_encoding_information_time_stimulus(delay_resp, stim, save_dir=seed_save_dir,title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}', logInfo=False, save=True)
-'''
+np.save(os.path.join(seed_save_dir, 'info_seed.npy'), info_seed)
+
 time_cell_ids_seed = {}
 ramping_cell_ids_seed = {}
 
