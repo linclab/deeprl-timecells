@@ -208,7 +208,7 @@ def plot_sl_mutual_information_across_seeds(sl_mutual_info_dict):
 
 def plot_trajectory_decoding_across_seeds(trajectory_decoding_accuracy_dict):
     print("Plot trajectory decoding accuracy across seeds...")
-    accuracy = np.vstack([trajectory_decoding_accuracy_dict.values()]) # (n_seeds*10, 8)
+    accuracy = np.vstack([trajectory_decoding_accuracy_dict[seed] for seed in trajectory_decoding_accuracy_dict.keys()]) # (n_seeds*10, 8)
     mean_acc = np.mean(accuracy, axis=0)
     std_acc = np.std(accuracy, axis=0)
     X = [0,5,10,15,20,25,30,35]
