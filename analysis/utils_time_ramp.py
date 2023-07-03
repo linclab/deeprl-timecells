@@ -72,7 +72,7 @@ def correlation_between_tuning_curves(tuning_curve_A, tuning_curve_B):
     elif len(tuning_curve_A) < len(tuning_curve_B):
         r, pval = stats.pearsonr(tuning_curve_A, tuning_curve_B[:len(tuning_curve_A)])
     else:
-        r, pval = stats.pearsonr(tuning_curve_A[:len(tuning_curve_B)], tuning_curve_A)
+        r, pval = stats.pearsonr(tuning_curve_A[:len(tuning_curve_B)], tuning_curve_B)
     return r, pval
 
 
