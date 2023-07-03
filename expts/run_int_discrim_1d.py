@@ -165,7 +165,11 @@ for i_episode in tqdm(range(n_total_episodes)):
         if env.task_stage == 'choice_init':
             action_hist[i_episode] = act
             correct_trial[i_episode] = env.correct_trial
-    p_loss, v_loss = finish_trial(net, 1, optimizer)
+    if record_data: # No backprop
+        del net.rewards[:]
+        del net.saved_actions[:]
+    else:
+        p_loss, v_loss = finish_trial(net, 1, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
             print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(correct_trial[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(correct_trial[:i_episode+1])*100:.3f}% correct')
