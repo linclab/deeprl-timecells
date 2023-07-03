@@ -90,6 +90,7 @@ def compare_correct_vs_incorrect(resp, stim_all, correct_trial, title, save_dir,
             plt.savefig(os.path.join(save_dir, f'compare_corr_vs_incorr_{title}.svg'))
         else:
             plt.show()
+        return decoded_t_corr, decoded_t_incorr
 
     elif analysis == "single_unit":
         single_cell_temporal_tuning(stim_all, corr_resp, incorr_resp, save_dir, compare_correct=True)
