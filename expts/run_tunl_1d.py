@@ -118,8 +118,8 @@ if record_data:
 
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
-    env.reset()
     episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
+    env.reset()  # observation is set to episode_sample
     if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
         stim[i_episode] = 0
     elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
@@ -141,7 +141,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
                 elif hidden_type == 'rnn':
                     resp.append(net.hx[net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
         act, p, v = select_action(net, pol, val)
-        new_obs, reward, done = env.step(act, episode_sample)
+        new_obs, reward, done = env.step(act)
         net.rewards.append(reward)
         act_record.append(act)
     first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R

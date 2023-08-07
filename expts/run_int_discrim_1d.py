@@ -134,7 +134,7 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode,1] = env.second_stim
     while not done:
         pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0).to(device))  # forward
-        if env.task_stage in ['init', 'choice_init']:
+        if env.task_stage in ['choice_init']:
             act, p, v = select_action(net, pol, val)
             new_obs, reward, done = env.step(act)
             net.rewards.append(reward)

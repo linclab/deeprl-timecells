@@ -34,14 +34,14 @@ class IntervalDiscrimination(object):
 
     def reset(self):
         self.reward = 0
-        self.task_stage = 'init'
+        self.task_stage = 'first_stim'
         self.done = False
         self.first_stim = np.random.choice(self.stimulus_set)
         self.second_stim = self.select_second_stim()
         self.groundtruth = self.first_stim > self.second_stim  # 1 if L1>L2, 0 if L1<L2
         self.elapsed_t = 0
         self.correct_trial = False
-        self.observation = [1,1]
+        self.observation = [1,0]
 
     def step(self, action=None):
         """
@@ -49,34 +49,23 @@ class IntervalDiscrimination(object):
         :return: observation, reward, done, info
         """
 
-        if self.task_stage == "init":               # the agent needs to take an action
-            if action == 1:
-                self.task_stage = "first_stim"
-                self.observation = [1,0]
-                self.reward = 1
-            else:
-                self.reward = -1
+        if self.task_stage == "init":               # in no_cue branch, task_stage should not ever be "init"
+            raise ValueError("The agent needs to take an action to initiate the task.")
 
         elif self.task_stage == "first_stim":
             if self.elapsed_t >= self.first_stim:
-                self.task_stage = "delay_init"
-                self.observation = [1,1]
+                self.task_stage = "delay"
+                self.observation = [0,0]
                 self.elapsed_t = 0
             else:
                 self.elapsed_t += 1
-        elif self.task_stage == "delay_init":
-            self.task_stage = "delay"
-            self.observation = [0,0]
         elif self.task_stage == "delay":
             if self.elapsed_t >= self.delay_duration:
-                self.task_stage = "delay_end"
-                self.observation = [1,1]
+                self.task_stage = "second_stim"
+                self.observation = [0,1]
                 self.elapsed_t = 0
             else:
                 self.elapsed_t += 1
-        elif self.task_stage == "delay_end":
-            self.task_stage = "second_stim"
-            self.observation = [0,1]
         elif self.task_stage == "second_stim":
             if self.elapsed_t >= self.second_stim:
                 self.task_stage = "choice_init"
