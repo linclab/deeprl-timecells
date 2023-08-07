@@ -76,7 +76,7 @@ if p_dropout != 0:
     save_dir_str += f'_p{p_dropout}_{dropout_type}'
 save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
@@ -119,7 +119,7 @@ if record_data:
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
     episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
-    env.reset()  # observation is set to episode_sample
+    env.reset(episode_sample)  # observation is set to episode_sample
     if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
         stim[i_episode] = 0
     elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R

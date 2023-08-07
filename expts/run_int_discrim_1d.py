@@ -64,7 +64,7 @@ if p_dropout != 0:
     save_dir_str += f'_p{p_dropout}_{dropout_type}'
 save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
@@ -133,8 +133,10 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode,0] = env.first_stim
     stim[i_episode,1] = env.second_stim
     while not done:
+        act=None
         pol, val, lin_act = net.forward(torch.unsqueeze(torch.Tensor(env.observation).float(), dim=0).to(device))  # forward
-        if env.task_stage in ['choice_init']:
+        #print(env.task_stage)
+        if env.task_stage == 'choice_init':
             act, p, v = select_action(net, pol, val)
             new_obs, reward, done = env.step(act)
             net.rewards.append(reward)
@@ -162,7 +164,8 @@ for i_episode in tqdm(range(n_total_episodes)):
                 delay_resp[i_episode, env.elapsed_t-1, :] = net.cell_out[
                     net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze()
 
-        if env.task_stage == 'choice_init':
+        if env.task_stage == 'choice_init' and act is not None:
+            #breakpoint()
             action_hist[i_episode] = act
             correct_trial[i_episode] = env.correct_trial
     if record_data: # No backprop
