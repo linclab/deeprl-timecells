@@ -31,9 +31,9 @@ n_shuffle = 100
 percentile = 99
 
 if untrained:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d_untrained_weight_frozen'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/nocue_dim4/tunl1d_untrained_weight_frozen'
 else:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/nocue_dim4/tunl1d'
 os.makedirs(save_dir, exist_ok=True)
 
 ramping_cell_ids = {}
@@ -136,8 +136,8 @@ time_cell_ids_seed['total'] = np.union1d(time_cell_ids_seed['left'], time_cell_i
 
 # save the results
 print("Save the results...")
-# np.save(os.path.join(seed_save_dir, 't_test_seed.npy'), t_test_seed)
-# np.save(os.path.join(seed_save_dir, 't_test_pred_seed.npy'), t_test_pred_seed)
+np.save(os.path.join(seed_save_dir, 't_test_seed.npy'), t_test_seed)
+np.save(os.path.join(seed_save_dir, 't_test_pred_seed.npy'), t_test_pred_seed)
 # np.save(os.path.join(seed_save_dir, 'info_seed.npy'), info_seed)
 np.save(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), time_cell_ids_seed)
 np.save(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), ramping_cell_ids_seed)
