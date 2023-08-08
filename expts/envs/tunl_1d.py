@@ -206,3 +206,140 @@ class TunlEnv_nomem(object):
         self.delay_t = 0  # time since delay
         self.reward = 0
         self.done = False
+
+
+
+class TunlEnv_dim2(object):
+    def __init__(self, delay, seed=1):
+        """
+        No more initiation cues for trial start and choice phase.
+        The elements of the 2-dim observation space are left and right.
+        [1,0] = L touchscreen on
+        [0,1] = R touchscreen on
+        [0,0] = delay period, no signal
+        [1,1] = both L and R touchscreen on; this signals the animal to make a choice
+
+        The action space consists of 2 possible actions:
+        1 = choose L on the touchscreen
+        2 = choose R on the touchscreen
+        """
+        self.observation = None
+        self.sample = None
+        self.delay_t = 0  # time since delay;
+        self.delay_length = delay
+        self.action_space = spaces.Discrete(2)
+        self.observation_space = spaces.MultiBinary(2)
+        self.reward = 0
+        self.done = False
+        self.rng, self.np_seed = seeding.np_random(seed)
+
+    def step(self, action):
+
+        assert self.action_space.contains(action)
+
+        if np.all(self.observation == array([[1, 0]])):  # L touchscreen on
+            if action == 1:  # poke L to continue
+                self.observation = array([[0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 1]])):  # R touchscreen on
+            if action == 2:  # poke R to continue
+                self.observation = array([[0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0]])):  # delay period
+            if self.delay_t < self.delay_length:
+                self.delay_t += 1
+                self.done = False
+            else:
+                self.observation = array([[1, 1]])  # goes straight to choice phase
+                self.done = False
+        elif np.all(self.observation == array([[1, 1]])):  # choice phase
+            if (np.all(self.sample == array([[1, 0]])) and action == 2) or (
+                    np.all(self.sample == array([[0, 1]])) and action == 1):
+                self.reward = 1
+                self.done = True
+            elif (np.all(self.sample == array([[1, 0]])) and action == 1) or (
+                    np.all(self.sample == array([[0, 1]])) and action == 2):
+                self.reward = -1
+                self.done = False
+            else:
+                self.reward = 0
+                self.done = False
+        return self.observation, self.reward, self.done
+
+
+    def reset(self, episode_sample):
+        self.observation = episode_sample
+        self.sample = self.observation
+        self.delay_t = 0  # time since delay
+        self.reward = 0
+        self.done = False
+
+
+class TunlEnv_nomem_dim2(object):
+    '''
+    In choice phase, agent may poke L or R to receive a reward and end trial.
+
+    action space (2):
+    1 = touch left sample
+    2 = touch right sample
+
+    observation space: (4):
+    array([[1,0]]) = left sample
+    array([[0,1]]) = right sample
+    array([[1,1]]) = waiting for choice
+    array([[0,0]]) = delay
+
+    '''
+    def __init__(self, delay, seed=1):
+        self.observation = None
+        self.sample = None
+        self.delay_t = 0  # time since delay;
+        self.delay_length = delay
+        self.action_space = spaces.Discrete(2)
+        self.observation_space = spaces.MultiBinary(2)
+        self.reward = 0
+        self.done = False
+        self.rng, self.np_seed = seeding.np_random(seed)
+
+    def step(self, action):
+
+        assert self.action_space.contains(action)
+
+        if np.all(self.observation == array([[1, 0]])):  # L touchscreen on
+            if action == 1:  # poke L to continue
+                self.observation = array([[0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 1]])):  # R touchscreen on
+            if action == 2:  # poke R to continue
+                self.observation = array([[0, 0]])  # enters delay period
+                self.done = False
+            else:
+                self.done = False
+        elif np.all(self.observation == array([[0, 0]])):  # delay period
+            if self.delay_t < self.delay_length:
+                self.delay_t += 1
+                self.done = False
+            else:
+                self.observation = array([[1, 1]])  # goes straight to choice phase
+                self.done = False
+        elif np.all(self.observation == array([[1, 1]])):  # choice phase
+            if action == 1:  # poke L
+                self.reward = 1
+                self.done = True
+            else:
+                self.reward = 0
+                self.done = True
+        return self.observation, self.reward, self.done
+
+    def reset(self, episode_sample):
+        self.observation = episode_sample
+        self.sample = self.observation
+        self.delay_t = 0  # time since delay
+        self.reward = 0
+        self.done = False
