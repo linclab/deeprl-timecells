@@ -220,8 +220,8 @@ class TunlEnv_dim2(object):
         [1,1] = both L and R touchscreen on; this signals the animal to make a choice
 
         The action space consists of 2 possible actions:
-        1 = choose L on the touchscreen
-        2 = choose R on the touchscreen
+        0 = choose L on the touchscreen
+        1 = choose R on the touchscreen
         """
         self.observation = None
         self.sample = None
@@ -238,13 +238,13 @@ class TunlEnv_dim2(object):
         assert self.action_space.contains(action)
 
         if np.all(self.observation == array([[1, 0]])):  # L touchscreen on
-            if action == 1:  # poke L to continue
+            if action == 0:  # poke L to continue
                 self.observation = array([[0, 0]])  # enters delay period
                 self.done = False
             else:
                 self.done = False
         elif np.all(self.observation == array([[0, 1]])):  # R touchscreen on
-            if action == 2:  # poke R to continue
+            if action == 1:  # poke R to continue
                 self.observation = array([[0, 0]])  # enters delay period
                 self.done = False
             else:
@@ -257,17 +257,16 @@ class TunlEnv_dim2(object):
                 self.observation = array([[1, 1]])  # goes straight to choice phase
                 self.done = False
         elif np.all(self.observation == array([[1, 1]])):  # choice phase
-            if (np.all(self.sample == array([[1, 0]])) and action == 2) or (
-                    np.all(self.sample == array([[0, 1]])) and action == 1):
+            if (np.all(self.sample == array([[1, 0]])) and action == 1) or (
+                    np.all(self.sample == array([[0, 1]])) and action == 0):
                 self.reward = 1
                 self.done = True
-            elif (np.all(self.sample == array([[1, 0]])) and action == 1) or (
-                    np.all(self.sample == array([[0, 1]])) and action == 2):
+            elif (np.all(self.sample == array([[1, 0]])) and action == 0) or (
+                    np.all(self.sample == array([[0, 1]])) and action == 1):
                 self.reward = -1
                 self.done = False
             else:
-                self.reward = 0
-                self.done = False
+                raise ValueError("Impossible sample-action combination")
         return self.observation, self.reward, self.done
 
 
@@ -284,8 +283,8 @@ class TunlEnv_nomem_dim2(object):
     In choice phase, agent may poke L or R to receive a reward and end trial.
 
     action space (2):
-    1 = touch left sample
-    2 = touch right sample
+    0 = touch left sample
+    1 = touch right sample
 
     observation space: (4):
     array([[1,0]]) = left sample
@@ -310,13 +309,13 @@ class TunlEnv_nomem_dim2(object):
         assert self.action_space.contains(action)
 
         if np.all(self.observation == array([[1, 0]])):  # L touchscreen on
-            if action == 1:  # poke L to continue
+            if action == 0:  # poke L to continue
                 self.observation = array([[0, 0]])  # enters delay period
                 self.done = False
             else:
                 self.done = False
         elif np.all(self.observation == array([[0, 1]])):  # R touchscreen on
-            if action == 2:  # poke R to continue
+            if action == 1:  # poke R to continue
                 self.observation = array([[0, 0]])  # enters delay period
                 self.done = False
             else:
@@ -329,7 +328,7 @@ class TunlEnv_nomem_dim2(object):
                 self.observation = array([[1, 1]])  # goes straight to choice phase
                 self.done = False
         elif np.all(self.observation == array([[1, 1]])):  # choice phase
-            if action == 1:  # poke L
+            if action == 0:  # poke L
                 self.reward = 1
                 self.done = True
             else:
