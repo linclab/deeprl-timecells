@@ -243,32 +243,13 @@ class AC_Net(nn.Module):
                 self.cell_out.append(None)
 
 
-class AC_Net_separate_polval(nn.Module):
-    """
-    An actor-critic neural network class. Takes sensory inputs, pass it to two separate networks to generate a policy and a value estimate.
-    """
-    def __init__(self, input_dimensions, action_dimensions, batch_size, hidden_types, hidden_dimensions, p_dropout=0, dropout_type=None):
-
-        """
-        AC_Net(input_dimensions, action_dimensions, hidden_types=[], hidden_dimensions=[])
-        Create an actor-critic network class.
-        Required arguments:
-        - input_dimensions (int): the dimensions of the input space
-        - action_dimensions (int): the number of possible actions
-        Optional arguments:
-        - batch_size (int): the size of the batches (default = 4).
-        - hidden_types (list of strings): the type of hidden layers to use, options are 'linear', 'lstm', 'gru'.
-        If list is empty no hidden layers are used (default = []).
-        - hidden_dimensions (list of ints): the dimensions of the hidden layers. Must be a list of
-                                        equal length to hidden_types (default = []).
-        """
-
+class actor_Net(nn.Module):
+    def __init__(self, input_dimensions, action_dimensions, batch_size, hidden_types, hidden_dimensions):
         # call the super-class init
-        super(AC_Net_separate_polval, self).__init__()
+        super(actor_Net, self).__init__()
 
-        # store the input2 dimensions
+        # store the input dimensions
         self.input_d = input_dimensions
-
         # check input type
         assert (hidden_types[0] == 'linear' or hidden_types[0] == 'lstm' or hidden_types[0] == 'gru' or hidden_types[0] == 'rnn')
         self.input_type = 'vector'
@@ -287,21 +268,15 @@ class AC_Net_separate_polval(nn.Module):
         if not hidden_types:
             self.layers = [input_dimensions, action_dimensions]
             # no hidden layers, only input to output, create the actor and critic layers
-            self.output = nn.ModuleList([
-                nn.Linear(input_dimensions, action_dimensions),  # ACTOR
-                nn.Linear(input_dimensions, 1)])  # CRITIC
+            self.output = nn.Linear(input_dimensions, action_dimensions) # ACTOR
         else:
             # to store a record of the last hidden states
-            self.hx_actor = []
-            self.cx_actor = []
-            self.hx_critic = []
-            self.cx_critic = []
+            self.hx = []
+            self.cx = []
             # create the hidden layers
-            self.hidden_actor = nn.ModuleList()
-            self.hidden_critic = nn.ModuleList()
+            self.hidden = nn.ModuleList()
             ## for recording pre-relu linear cell activity
-            self.cell_out_actor = [] ##
-            self.cell_out_critic = []
+            self.cell_out = [] ##
             for i, htype in enumerate(hidden_types):
                 # check if hidden layer type is correct
                 assert htype in ['linear', 'lstm', 'gru', 'rnn']
@@ -311,41 +286,25 @@ class AC_Net_separate_polval(nn.Module):
                     input_d = input_dimensions
                     output_d = hidden_dimensions[i]
                     if htype == 'linear':
-                        self.hidden_actor.append(nn.Linear(input_d, output_d))
-                        self.hidden_critic.append(nn.Linear(input_d, output_d))
-                        self.cell_out_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
-                        self.cell_out_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
-                        self.hx_actor.append(None) ##
-                        self.cx_actor.append(None) ##
-                        self.hx_critic.append(None) ##
-                        self.cx_critic.append(None) ##
+                        self.hidden.append(nn.Linear(input_d, output_d))
+                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
+                        self.hx.append(None) ##
+                        self.cx.append(None) ##
                     elif htype == 'lstm':
-                        self.hidden_actor.append(nn.LSTMCell(input_d, output_d))
-                        self.hidden_critic.append(nn.LSTMCell(input_d, output_d))
-                        self.cell_out_actor.append(None) ##
-                        self.cell_out_critic.append(None) ##
-                        self.hx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.hx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.hidden.append(nn.LSTMCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     elif htype == 'gru':
-                        self.hidden_actor.append(nn.GRUCell(input_d, output_d))
-                        self.hidden_critic.append(nn.GRUCell(input_d, output_d))
-                        self.cell_out_actor.append(None) ##
-                        self.cell_out_critic.append(None) ##
-                        self.hx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_actor.append(None)
-                        self.hx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_critic.append(None)
+                        self.hidden.append(nn.GRUCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
                     elif htype == 'rnn':
-                        self.hidden_actor.append(nn.RNNCell(input_d, output_d))
-                        self.hidden_critic.append(nn.RNNCell(input_d, output_d))
-                        self.cell_out_actor.append(None) ##
-                        self.cell_out_critic.append(None) ##
-                        self.hx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_actor.append(None)
-                        self.hx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_critic.append(None)
+                        self.hidden.append(nn.RNNCell(input_d, output_d))
+                        self.cell_out.append(None)
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
                 # second hidden layer onwards
                 else:
                     input_d = hidden_dimensions[i - 1]
@@ -353,61 +312,39 @@ class AC_Net_separate_polval(nn.Module):
                     output_d = hidden_dimensions[i]
                     # construct the layer
                     if htype == 'linear':
-                        self.hidden_actor.append(nn.Linear(input_d, output_d))
-                        self.hidden_critic.append(nn.Linear(input_d, output_d))
-                        self.cell_out_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
-                        self.cell_out_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
-                        self.hx_actor.append(None) ##
-                        self.cx_actor.append(None) ##
-                        self.hx_critic.append(None) ##
-                        self.cx_critic.append(None) ##
+                        self.hidden.append(nn.Linear(input_d, output_d))
+                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
+                        self.hx.append(None)
+                        self.cx.append(None)
                     elif htype == 'lstm':
-                        self.hidden_actor.append(nn.LSTMCell(input_d, output_d))
-                        self.hidden_critic.append(nn.LSTMCell(input_d, output_d))
-                        self.cell_out_actor.append(None) ##
-                        self.cell_out_critic.append(None) ##
-                        self.hx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.hx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.hidden.append(nn.LSTMCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     elif htype == 'gru':
-                        self.hidden_actor.append(nn.GRUCell(input_d, output_d))
-                        self.hidden_critic.append(nn.GRUCell(input_d, output_d))
-                        self.cell_out_actor.append(None) ##
-                        self.cell_out_critic.append(None) ##
-                        self.hx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_actor.append(None)
-                        self.hx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_critic.append(None)
+                        self.hidden.append(nn.GRUCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
                     elif htype == 'rnn':
-                        self.hidden_actor.append(nn.RNNCell(input_d, output_d))
-                        self.hidden_critic.append(nn.RNNCell(input_d, output_d))
-                        self.cell_out_actor.append(None) ##
-                        self.cell_out_critic.append(None) ##
-                        self.hx_actor.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_actor.append(None)
-                        self.hx_critic.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
-                        self.cx_critic.append(None)
+                        self.hidden.append(nn.RNNCell(input_d, output_d))
+                        self.cell_out.append(None)
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
         # create the actor and critic layers
         self.layers = [input_dimensions] + hidden_dimensions + [action_dimensions]
-        self.output = nn.ModuleList([
-            nn.Linear(output_d, action_dimensions),  # actor
-            nn.Linear(output_d, 1)  # critic
-        ])
+        self.output = nn.Linear(output_d, action_dimensions)  # actor only
         # store the output dimensions
         self.output_d = output_d
         # to store a record of actions and rewards
         self.saved_actions = []
         self.rewards = []
-        self.p_dropout = p_dropout
-        self.dropout = nn.Dropout(p=self.p_dropout)
-        self.dropout_type = dropout_type
         self.to(self.device)
 
     def forward(self, x, temperature=1, lesion_idx=None):
         '''
         forward(x):
-        Runs a forward pass of the same input x through the separate networks to get a policy and value.
+        Runs a forward pass through the network to get a policy and value.
         Required arguments:
           - x (torch.Tensor): sensory input to the network, should be of size batch x input_d
           - lesion_idx: if not None, set hx and cx of LSTM cells to 0 before passing input through LSTM layer
@@ -416,170 +353,260 @@ class AC_Net_separate_polval(nn.Module):
         # check the inputs
         assert x.shape[-1] == self.input_d
 
-        # pass the data through each hidden layer of the actor
-        for i, layer in enumerate(self.hidden_actor):
+        # pass the data through each hidden layer
+        for i, layer in enumerate(self.hidden):
             # run input through the layer depending on type
             if isinstance(layer, nn.Linear): ##
-                if self.dropout_type == 1:
-                    x = self.dropout(x)  # will affect linear only
-                self.cell_out_actor[i] = layer(x)
-                x = F.relu(self.cell_out_actor[i])
+                self.cell_out[i] = layer(x)
+                x = F.relu(self.cell_out[i])
                 lin_activity = x
             elif isinstance(layer, nn.LSTMCell):
                 if lesion_idx is None:
-                    if self.dropout_type == 2:
-                        x = self.dropout(x) # dropout on input to LSTM. will affect LSTM
-                    x, cx = layer(x, (self.hx_actor[i], self.cx_actor[i]))
-                    if self.dropout_type == 3:
-                        x = self.dropout(x)  # will affect both LSTM and linear
-                    self.hx_actor[i] = x.clone()
-                    self.cx_actor[i] = cx.clone()
+                    x, cx = layer(x, (self.hx[i], self.cx[i]))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
                 else:
-                    hx_copy = self.hx_actor[i].clone().detach()
-                    cx_copy = self.cx_actor[i].clone().detach()
+                    hx_copy = self.hx[i].clone().detach()
+                    cx_copy = self.cx[i].clone().detach()
                     hx_copy[:,lesion_idx] = 0
                     cx_copy[:,lesion_idx] = 0
                     x, cx = layer(x, (hx_copy, cx_copy))
-                    self.hx_actor[i] = x.clone()
-                    self.cx_actor[i] = cx.clone()
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
                     del hx_copy, cx_copy
             elif isinstance(layer, nn.GRUCell):
                 if lesion_idx is None:
-                    if self.dropout_type == 2:
-                        x = self.dropout(x) # dropout on input to GRU. will affect GRU
-                    x = layer(x, self.hx_actor[i])
-                    if self.dropout_type == 3:
-                        x = self.dropout(x)  # will affect both GRU and linear
-                    self.hx_actor[i] = x.clone()
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
                 else:
-                    hx_copy = self.hx_actor[i].clone().detach()
+                    hx_copy = self.hx[i].clone().detach()
                     hx_copy[:,lesion_idx] = 0
                     x = layer(x, hx_copy)
-                    self.hx_actor[i] = x.clone()
+                    self.hx[i] = x.clone()
                     del hx_copy
             elif isinstance(layer, nn.RNNCell):
                 if lesion_idx is None:
-                    if self.dropout_type == 2:
-                        x = self.dropout(x)  # dropout on input to RNN. will affect RNN
-                    x = layer(x, self.hx_actor[i])
-                    if self.dropout_type == 3:
-                        x = self.dropout(x)  # will affect both RNN and linear
-                    self.hx_actor[i] = x.clone()
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
                 else:
-                    hx_copy = self.hx_actor[i].clone().detach()
+                    hx_copy = self.hx[i].clone().detach()
                     hx_copy[:,lesion_idx] = 0
                     x = layer(x, hx_copy)
-                    self.hx_actor[i] = x.clone()
+                    self.hx[i] = x.clone()
                     del hx_copy
-            x_val = x
-
-        # pass the data through each hidden layer of the critic
-        for i, layer in enumerate(self.hidden_actor):
-            # run input through the layer depending on type
-            if isinstance(layer, nn.Linear): ##
-                if self.dropout_type == 1:
-                    x = self.dropout(x)  # will affect linear only
-                self.cell_out_actor[i] = layer(x)
-                x = F.relu(self.cell_out_actor[i])
-                lin_activity = x
-            elif isinstance(layer, nn.LSTMCell):
-                if lesion_idx is None:
-                    if self.dropout_type == 2:
-                        x = self.dropout(x) # dropout on input to LSTM. will affect LSTM
-                    x, cx = layer(x, (self.hx_critic[i], self.cx_critic[i]))
-                    if self.dropout_type == 3:
-                        x = self.dropout(x)  # will affect both LSTM and linear
-                    self.hx_critic[i] = x.clone()
-                    self.cx_critic[i] = cx.clone()
-                else:
-                    hx_copy = self.hx_critic[i].clone().detach()
-                    cx_copy = self.cx_critic[i].clone().detach()
-                    hx_copy[:,lesion_idx] = 0
-                    cx_copy[:,lesion_idx] = 0
-                    x, cx = layer(x, (hx_copy, cx_copy))
-                    self.hx_critic[i] = x.clone()
-                    self.cx_critic[i] = cx.clone()
-                    del hx_copy, cx_copy
-            elif isinstance(layer, nn.GRUCell):
-                if lesion_idx is None:
-                    if self.dropout_type == 2:
-                        x = self.dropout(x) # dropout on input to GRU. will affect GRU
-                    x = layer(x, self.hx_critic[i])
-                    if self.dropout_type == 3:
-                        x = self.dropout(x)  # will affect both GRU and linear
-                    self.hx_critic[i] = x.clone()
-                else:
-                    hx_copy = self.hx_critic[i].clone().detach()
-                    hx_copy[:,lesion_idx] = 0
-                    x = layer(x, hx_copy)
-                    self.hx_critic[i] = x.clone()
-                    del hx_copy
-            elif isinstance(layer, nn.RNNCell):
-                if lesion_idx is None:
-                    if self.dropout_type == 2:
-                        x = self.dropout(x)  # dropout on input to RNN. will affect RNN
-                    x = layer(x, self.hx_critic[i])
-                    if self.dropout_type == 3:
-                        x = self.dropout(x)  # will affect both RNN and linear
-                    self.hx_critic[i] = x.clone()
-                else:
-                    hx_copy = self.hx_critic[i].clone().detach()
-                    hx_copy[:,lesion_idx] = 0
-                    x = layer(x, hx_copy)
-                    self.hx_critic[i] = x.clone()
-                    del hx_copy
-            x_pol = x
-
-        # pass to the output layers
-        if self.dropout_type == 4:
-            x = self.dropout(x)
-        policy = F.softmax(self.output[0](x_pol) / temperature, dim=1)
-        value = self.output[1](x_val)
-        if isinstance(self.hidden_actor[-1], nn.Linear):
-            assert isinstance(self.hidden_critic[-1], nn.Linear)
-            return policy, value, lin_activity
+        # pass to the policy layer
+        policy = F.softmax(self.output(x) / temperature, dim=1)
+        if isinstance(self.hidden[-1], nn.Linear):
+            return policy, lin_activity
         else:
-            return policy, value
+            return policy
 
     def reinit_hid(self):
         # to store a record of the last hidden states
-        self.cell_out_actor = []
-        self.cell_out_critic = []
-        self.hx_actor = []
-        self.cx_actor = []
-        self.hx_critic = []
-        self.cx_critic = []
+        self.cell_out = []
+        self.hx = []
+        self.cx = []
 
         for i, layer in enumerate(self.hidden):
             if isinstance(layer, nn.Linear):
-                self.cell_out_actor.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device))
-                self.cell_out_critic.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device))
-                self.hx_actor.append(None)##
-                self.cx_actor.append(None)##
-                self.hx_critic.append(None)##
-                self.cx_critic.append(None)##
+                self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device)) ##
+                self.hx.append(None)##
+                self.cx.append(None)##
             elif isinstance(layer, nn.LSTMCell):
-                self.hx_actor.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx_actor.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.hx_critic.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx_critic.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cell_out_actor.append(None) ##
-                self.cell_out_critic.append(None) ##
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cell_out.append(None) ##
             elif isinstance(layer, nn.GRUCell):
-                self.hx_actor.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx_actor.append(None)
-                self.cell_out_actor.append(None)
-                self.hx_critic.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx_critic.append(None)
-                self.cell_out_critic.append(None)
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(None)
+                self.cell_out.append(None)##
             elif isinstance(layer, nn.RNNCell):
-                self.hx_actor.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx_actor.append(None)
-                self.cell_out_actor.append(None)
-                self.hx_critic.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx_critic.append(None)
-                self.cell_out_critic.append(None)
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(None)
+                self.cell_out.append(None)
 
+
+class critic_Net(nn.Module):
+    def __init__(self, input_dimensions, batch_size, hidden_types, hidden_dimensions):
+        # call the super-class init
+        super(critic_Net, self).__init__()
+
+        # store the input dimensions
+        self.input_d = input_dimensions
+        # check input type
+        assert (hidden_types[0] == 'linear' or hidden_types[0] == 'lstm' or hidden_types[0] == 'gru' or hidden_types[0] == 'rnn')
+        self.input_type = 'vector'
+        self.hidden_types = hidden_types
+
+        # store the batch size
+        self.batch_size = batch_size
+
+        # check that the correct number of hidden dimensions are specified
+        assert len(hidden_types) == len(hidden_dimensions)
+
+        # use gpu
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
+
+        # check whether we're using hidden layers
+        if not hidden_types:
+            self.layers = [input_dimensions, 1]
+            # no hidden layers, only input to output, create the actor and critic layers
+            self.output = nn.Linear(input_dimensions, 1) # CRITIC
+        else:
+            # to store a record of the last hidden states
+            self.hx = []
+            self.cx = []
+            # create the hidden layers
+            self.hidden = nn.ModuleList()
+            ## for recording pre-relu linear cell activity
+            self.cell_out = [] ##
+            for i, htype in enumerate(hidden_types):
+                # check if hidden layer type is correct
+                assert htype in ['linear', 'lstm', 'gru', 'rnn']
+                # get the input dimensions
+                # first hidden layer
+                if i == 0:
+                    input_d = input_dimensions
+                    output_d = hidden_dimensions[i]
+                    if htype == 'linear':
+                        self.hidden.append(nn.Linear(input_d, output_d))
+                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
+                        self.hx.append(None) ##
+                        self.cx.append(None) ##
+                    elif htype == 'lstm':
+                        self.hidden.append(nn.LSTMCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                    elif htype == 'gru':
+                        self.hidden.append(nn.GRUCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
+                    elif htype == 'rnn':
+                        self.hidden.append(nn.RNNCell(input_d, output_d))
+                        self.cell_out.append(None)
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
+                # second hidden layer onwards
+                else:
+                    input_d = hidden_dimensions[i - 1]
+                    # get the output dimension
+                    output_d = hidden_dimensions[i]
+                    # construct the layer
+                    if htype == 'linear':
+                        self.hidden.append(nn.Linear(input_d, output_d))
+                        self.cell_out.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device)) ##
+                        self.hx.append(None)
+                        self.cx.append(None)
+                    elif htype == 'lstm':
+                        self.hidden.append(nn.LSTMCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                    elif htype == 'gru':
+                        self.hidden.append(nn.GRUCell(input_d, output_d))
+                        self.cell_out.append(None) ##
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
+                    elif htype == 'rnn':
+                        self.hidden.append(nn.RNNCell(input_d, output_d))
+                        self.cell_out.append(None)
+                        self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
+                        self.cx.append(None)
+        # create the actor and critic layers
+        self.layers = [input_dimensions] + hidden_dimensions + [1]
+        self.output = nn.Linear(output_d, 1)  # critic only
+        # store the output dimensions
+        self.output_d = output_d
+        # to store a record of actions and rewards
+        self.saved_actions = []
+        self.rewards = []
+        self.to(self.device)
+
+    def forward(self, x, lesion_idx=None):
+        '''
+        forward(x):
+        Runs a forward pass through the network to get a policy and value.
+        Required arguments:
+          - x (torch.Tensor): sensory input to the network, should be of size batch x input_d
+          - lesion_idx: if not None, set hx and cx of LSTM cells to 0 before passing input through LSTM layer
+        '''
+
+        # check the inputs
+        assert x.shape[-1] == self.input_d
+
+        # pass the data through each hidden layer
+        for i, layer in enumerate(self.hidden):
+            # run input through the layer depending on type
+            if isinstance(layer, nn.Linear): ##
+                self.cell_out[i] = layer(x)
+                x = F.relu(self.cell_out[i])
+                lin_activity = x
+            elif isinstance(layer, nn.LSTMCell):
+                if lesion_idx is None:
+                    x, cx = layer(x, (self.hx[i], self.cx[i]))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    cx_copy = self.cx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    cx_copy[:,lesion_idx] = 0
+                    x, cx = layer(x, (hx_copy, cx_copy))
+                    self.hx[i] = x.clone()
+                    self.cx[i] = cx.clone()
+                    del hx_copy, cx_copy
+            elif isinstance(layer, nn.GRUCell):
+                if lesion_idx is None:
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    x = layer(x, hx_copy)
+                    self.hx[i] = x.clone()
+                    del hx_copy
+            elif isinstance(layer, nn.RNNCell):
+                if lesion_idx is None:
+                    x = layer(x, self.hx[i])
+                    self.hx[i] = x.clone()
+                else:
+                    hx_copy = self.hx[i].clone().detach()
+                    hx_copy[:,lesion_idx] = 0
+                    x = layer(x, hx_copy)
+                    self.hx[i] = x.clone()
+                    del hx_copy
+        # pass to the value layer
+        value = self.output(x)
+        if isinstance(self.hidden[-1], nn.Linear):
+            return value, lin_activity
+        else:
+            return value
+
+    def reinit_hid(self):
+        # to store a record of the last hidden states
+        self.cell_out = []
+        self.hx = []
+        self.cx = []
+
+        for i, layer in enumerate(self.hidden):
+            if isinstance(layer, nn.Linear):
+                self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device)) ##
+                self.hx.append(None)##
+                self.cx.append(None)##
+            elif isinstance(layer, nn.LSTMCell):
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cell_out.append(None) ##
+            elif isinstance(layer, nn.GRUCell):
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(None)
+                self.cell_out.append(None)##
+            elif isinstance(layer, nn.RNNCell):
+                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                self.cx.append(None)
+                self.cell_out.append(None)
 
 
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
