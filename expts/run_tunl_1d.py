@@ -116,6 +116,9 @@ first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 if record_data:
     delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
 
+# initialize hidden state dict for saving hidden states
+hidden_state_dict = {}
+
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
     env.reset()
@@ -126,7 +129,10 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         stim[i_episode] = 1
     if record_data:
         resp = []
-    net.reinit_hid()
+    if i_episode == 0:
+        net.reinit_hid(saved_hidden=None)  # only initialize to 0 in the first episode
+    else:
+        net.reinit_hid(saved_hidden=hidden_state_dict)
     act_record = []
     while not done:
         pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float().to(device))
@@ -147,6 +153,12 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
     nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
     #nomem_perf[i_episode] = reward
+
+    # Save hidden states for reinitialization in the next episode
+    hidden_state_dict['cell_out'] = net.cell_out.clone().detach()
+    hidden_state_dict['hx'] = net.hx.clone().detach()
+    hidden_state_dict['cx'] = net.cx.clone().detach()
+
     if record_data:
         delay_resp[i_episode][:len(resp)] = np.asarray(resp)
         # for untrained agent, freeze weight

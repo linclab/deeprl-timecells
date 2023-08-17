@@ -126,10 +126,16 @@ if record_data:
     stim2_resp = np.zeros((n_total_episodes, 40, n_neurons), dtype=np.float32)
     delay_resp = np.zeros((n_total_episodes, 20, n_neurons), dtype=np.float32)
 
+# initialize hidden state dict for saving hidden states
+hidden_state_dict = {}
+
 for i_episode in tqdm(range(n_total_episodes)):
     done = False
     env.reset()
-    net.reinit_hid()
+    if i_episode == 0:
+        net.reinit_hid(saved_hidden=None)  # only initialize to 0 in the first episode
+    else:
+        net.reinit_hid(saved_hidden=hidden_state_dict)  # initialize to saved hidden state
     stim[i_episode,0] = env.first_stim
     stim[i_episode,1] = env.second_stim
     while not done:
@@ -165,6 +171,12 @@ for i_episode in tqdm(range(n_total_episodes)):
         if env.task_stage == 'choice_init':
             action_hist[i_episode] = act
             correct_trial[i_episode] = env.correct_trial
+
+    # Save hidden states for reinitialization in the next episode
+    hidden_state_dict['cell_out'] = net.cell_out.clone().detach()
+    hidden_state_dict['hx'] = net.hx.clone().detach()
+    hidden_state_dict['cx'] = net.cx.clone().detach()
+
     if record_data: # No backprop
         del net.rewards[:]
         del net.saved_actions[:]
