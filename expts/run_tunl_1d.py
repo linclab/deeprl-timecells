@@ -88,8 +88,10 @@ np.random.seed(seed)
 random.seed(seed)
 
 env = TunlEnv(len_delay, seed=seed) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
-net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout, dropout_type)
-optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
+pol_net = actor_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+val_net = critic_Net(4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons])
+pol_optimizer = torch.optim.Adam(pol_net.parameters(), lr=lr, weight_decay=weight_decay)
+val_optimizer = torch.optim.Adam(val_net.parameters(), lr=lr, weight_decay=weight_decay)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
 net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
@@ -99,6 +101,7 @@ net_title = 'LSTM' if hidden_type == 'lstm' else 'Feedforward'
 if load_model_path=='None':
     ckpt_name = f'seed_{seed}_untrained_agent_weight_frozen'  # placeholder ckptname in case we want to save data in the end
 else:
+    # load_model_path = 'mem_40_lstm_128_0.0001/seed_3_epi199999.pt'
     ckpt_name = load_model_path.replace('/', '_')
     pt_name = load_model_path.split('/')[1]  # seed_3_epi199999.pt
     pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
@@ -107,14 +110,18 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
+    pol_net_path = load_model_path.replace('.pt', '_policy.pt')
+    val_net_path = load_model_path.replace('.pt', '_value.pt')
+    pol_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', pol_net_path)))
+    val_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', val_net_path)))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
 first_action = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 #nomem_perf = np.zeros(n_total_episodes, dtype=np.int8)
 if record_data:
-    delay_resp = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)
+    delay_resp_pol = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # policy network
+    delay_resp_val = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # value network
 
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
@@ -125,35 +132,42 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
         stim[i_episode] = 1
     if record_data:
-        resp = []
-    net.reinit_hid()
+        resp_pol = []
+        resp_val = []
+    pol_net.reinit_hid()
+    val_net.reinit_hid()
     act_record = []
     while not done:
-        pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float().to(device))
+        pol, lin_act_pol = pol_net.forward(torch.as_tensor(env.observation).float().to(device))
+        val, lin_act_val = val_net.forward(torch.as_tensor(env.observation).float().to(device))
         if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
             if record_data:
                 if hidden_type == 'linear':
-                    resp.append(net.cell_out[net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
+                    resp_pol.append(pol_net.cell_out[pol_net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
+                    resp_val.append(val_net.cell_out[val_net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())
                 elif hidden_type == 'lstm':
-                    resp.append(net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
+                    resp_pol.append(pol_net.hx[pol_net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
+                    resp_val.append(val_net.hx[val_net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())
                 elif hidden_type == 'gru':
-                    resp.append(net.hx[net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())  # hidden state of GRU cell
+                    resp_pol.append(pol_net.hx[pol_net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())  # hidden state of GRU cell
+                    resp_val.append(val_net.hx[val_net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())
                 elif hidden_type == 'rnn':
-                    resp.append(net.hx[net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
-        act, p, v = select_action(net, pol, val)
+                    resp_pol.append(pol_net.hx[pol_net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
+                    resp_val.append(val_net.hx[val_net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
+        act, p, v = select_action(pol_net, pol, val)
         new_obs, reward, done = env.step(act, episode_sample)
-        net.rewards.append(reward)
+        val_net.rewards.append(reward)
         act_record.append(act)
-    first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
+    first_action[i_episode] = act_record[next((i for i, x in enumerate(val_net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
     nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
     #nomem_perf[i_episode] = reward
     if record_data:
-        delay_resp[i_episode][:len(resp)] = np.asarray(resp)
-        # for untrained agent, freeze weight
-        del net.rewards[:]
-        del net.saved_actions[:]
+        delay_resp_pol[i_episode][:len(resp_pol)] = np.asarray(resp_pol)
+        delay_resp_val[i_episode][:len(resp_val)] = np.asarray(resp_val)
+        del val_net.rewards[:]
+        del pol_net.saved_actions[:]
     else:
-        p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+        p_loss, v_loss = finish_trial(pol_net, val_net, 0.99, pol_optimizer, val_optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
             print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
@@ -163,9 +177,11 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
             #print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
             if load_model_path != 'None':
-                torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}.pt')
+                torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_policy.pt')
+                torch.save(val_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_value.pt')
             else:
-                torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
+                torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}_policy.pt')
+                torch.save(val_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}_value.pt')
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
 #binned_reward = bin_rewards(nomem_perf, window_size=window_size)
 
@@ -183,14 +199,14 @@ if save_performance_fig:
 
 # save data
 if record_data:
-    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, delay_resp=delay_resp)
+    np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, delay_resp_pol=delay_resp_pol, delay_resp_val=delay_resp_val)
     #np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, first_action=first_action, nomem_perf=nomem_perf, delay_resp=delay_resp)
 else:
     np.savez_compressed(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action)
     #np.savez_compressed(save_dir + f'/seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, first_action=first_action, nomem_perf=nomem_perf)
 
-del stim, nonmatch_perc, first_action, net, env, optimizer
+del stim, nonmatch_perc, first_action, pol_net, env, pol_optimizer, val_net, val_optimizer
 #del stim, nonmatch_perc, nomem_perf, first_action, net, env, optimizer
 if record_data:
-    del delay_resp
+    del delay_resp_pol, delay_resp_val
 

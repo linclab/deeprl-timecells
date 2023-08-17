@@ -338,7 +338,6 @@ class actor_Net(nn.Module):
         self.output_d = output_d
         # to store a record of actions and rewards
         self.saved_actions = []
-        self.rewards = []
         self.to(self.device)
 
     def forward(self, x, temperature=1, lesion_idx=None):
@@ -520,7 +519,6 @@ class critic_Net(nn.Module):
         # store the output dimensions
         self.output_d = output_d
         # to store a record of actions and rewards
-        self.saved_actions = []
         self.rewards = []
         self.to(self.device)
 
@@ -612,10 +610,10 @@ class critic_Net(nn.Module):
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 
-def select_action(model, policy_, value_):
+def select_action(pol_net, policy_, value_):
     a = Categorical(policy_)
     action = a.sample()
-    model.saved_actions.append(SavedAction(a.log_prob(action), value_))
+    pol_net.saved_actions.append(SavedAction(a.log_prob(action), value_))
     return action.item(), policy_.data[0], value_.item()
 
 
@@ -629,37 +627,43 @@ def discount_rwds(r, gamma):  # takes [1,1,1,1] and makes it [3.439,2.71,1.9,1]
     return disc_rwds
 
 
-def finish_trial(model, discount_factor, optimizer, scheduler=None, **kwargs):
+def finish_trial(pol_net, val_net, discount_factor, pol_optimizer, val_optimizer, scheduler=None, **kwargs):
     '''
     Finishes a given training trial and backpropagates.
     '''
 
     # set the return to zero
     R = 0
-    returns_ = discount_rwds(np.asarray(model.rewards), gamma=discount_factor)  # [1,1,1,1] into [3.439,2.71,1.9,1]
-    saved_actions = model.saved_actions
+    returns_ = discount_rwds(np.asarray(val_net.rewards), gamma=discount_factor)  # [1,1,1,1] into [3.439,2.71,1.9,1]
+    saved_actions = pol_net.saved_actions
 
     policy_losses = []
     value_losses = []
 
-    returns_ = torch.Tensor(returns_).to(model.device)
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu:0')
+    returns_ = torch.Tensor(returns_).to(device)
 
     for (log_prob, value), r in zip(saved_actions, returns_):
         rpe = r - value.item()
         policy_losses.append(-log_prob * rpe)
-        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(model.device))).unsqueeze(-1))
+        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(device))).unsqueeze(-1))
         #   return policy_losses, value_losses
-    optimizer.zero_grad() # clear gradient
+
     p_loss = (torch.cat(policy_losses).sum())
     v_loss = (torch.cat(value_losses).sum())
 
-    total_loss = p_loss + v_loss
-    total_loss.backward(retain_graph=True) # calculate gradient
-    optimizer.step()  # move down gradient
+    pol_optimizer.zero_grad() # clear gradient
+    p_loss.backward() # calculate gradient
+    pol_optimizer.step()  # move down gradient
+
+    val_optimizer.zero_grad() # clear gradient
+    v_loss.backward() # calculate gradient
+    val_optimizer.step()  # move down gradient
+
     if scheduler is not None:
         scheduler.step()
 
-    del model.rewards[:]
-    del model.saved_actions[:]
+    del val_net.rewards[:]
+    del pol_net.saved_actions[:]
 
     return p_loss, v_loss
