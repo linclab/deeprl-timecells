@@ -66,9 +66,9 @@ p_dropout = argsdict['p_dropout']
 dropout_type = argsdict['dropout_type']
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/separate_ac'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac'
 save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}'
 if weight_decay != 0:
     save_dir_str += f'_wd{weight_decay}'
@@ -76,7 +76,7 @@ if p_dropout != 0:
     save_dir_str += f'_p{p_dropout}_{dropout_type}'
 save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
@@ -112,8 +112,8 @@ else:
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
     pol_net_path = load_model_path.replace('.pt', '_policy.pt')
     val_net_path = load_model_path.replace('.pt', '_value.pt')
-    pol_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', pol_net_path)))
-    val_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', val_net_path)))
+    pol_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', pol_net_path)))
+    val_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', val_net_path)))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)

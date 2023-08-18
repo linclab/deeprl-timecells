@@ -20,21 +20,23 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--untrained', type=bool, default=False, help='whether to use untrained model')
+parser.add_argument('--model_seed', type=int)
 args = parser.parse_args()
 each_seed = args.seed
 untrained = args.untrained
-
-data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
+model_seed = args.model_seed
+#data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/lstm_128_1e-05'
+data_dir = f'/network/scratch/l/lindongy/timecell/data_collecting/timing/tunl1d_pretrained/lstm_128_1e-05/model_{model_seed}'
 if untrained:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d_untrained_weight_frozen'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/transfer/dnms_to_timing1d_untrained_weight_frozen'
 else:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/timing1d'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/transfer/dnms_to_timing1d'
 n_neurons = 128
 n_shuffle = 100
 percentile = 99
 
 print(f'====================== Analyzing seed {each_seed} ...======================================')
-seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
+seed_save_dir = os.path.join(save_dir, f'model_{model_seed}_seed_{each_seed}')
 if not os.path.exists(seed_save_dir):
     os.makedirs(seed_save_dir, exist_ok=True)
 # load the data
@@ -42,7 +44,7 @@ print("load the data...")
 if untrained:
     data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_weight_frozen_data.npz'), allow_pickle=True)
 else:
-    data = np.load(os.path.join(data_dir, f'lstm_128_1e-05_seed_{each_seed}_epi149999.pt_data.npz'), allow_pickle=True)
+    data = np.load(os.path.join(data_dir, f'seed_{each_seed}_epi149999.pt_data.npz'), allow_pickle=True)
 action_hist = data["action_hist"]
 correct_trials = data["correct_trial"]
 stim = data["stim"]
@@ -66,14 +68,14 @@ for i_neuron in range(n_neurons):
     stim1_resp[:, :, i_neuron][np.isnan(stim1_resp[:, :, i_neuron])] = 0
     stim2_resp[:, :, i_neuron][np.isnan(stim2_resp[:, :, i_neuron])] = 0
     delay_resp[:, :, i_neuron][np.isnan(delay_resp[:, :, i_neuron])] = 0
-
+'''
 print("Compare correct vs incorrect...")
 decoded_t_corr, decoded_t_incorr = compare_correct_vs_incorrect(stim1_resp, stim, correct_trials, analysis="decoding", resp2=stim2_resp, title='', save_dir=seed_save_dir, save=True)
 np.save(os.path.join(seed_save_dir, 'decoded_t_corr.npy'), decoded_t_corr)
 np.save(os.path.join(seed_save_dir, 'decoded_t_incorr.npy'), decoded_t_incorr)
-
+'''
 print("r analysis...")
-r_arr = plot_r_tuning_curves(stim1_resp, stim2_resp, 'stim_1', 'stim_2', save_dir=save_dir, varying_duration=True)
+r_arr = plot_r_tuning_curves(stim1_resp, stim2_resp, 'stim_1', 'stim_2', save_dir=seed_save_dir, varying_duration=True)
 # save the r_arr
 np.save(os.path.join(seed_save_dir, 'r_arr.npy'), r_arr)
 
@@ -89,11 +91,12 @@ for stim_len in stim_set:
 t_test_dict_seed = {}
 t_test_pred_dict_seed = {}
 for (resp, stimulus, label) in zip([stim1_resp,stim2_resp, delay_resp], [stim[:,0],stim[:,1], None], ['stimulus_1', 'stimulus_2', 'delay']):
+    '''
     # Decode time
     print(f"time decoding for {label}...")
     len_delay = 40 if label != 'delay' else 20
     t_test_dict_seed[label], t_test_pred_dict_seed[label] = time_decode_lin_reg(resp, len_delay, n_neurons, 1000, title=label+'_all_cells', save_dir=seed_save_dir, save=True)
-
+    '''
     # Sort and plot the response
     print(f"Sort and plot the response for {label}...")
     cell_nums, sorted_resp = sort_resp(resp, norm=True)
@@ -127,8 +130,8 @@ ramping_cell_ids_seed['total'] = np.union1d(ramping_cell_ids_seed['stimulus_1'],
 
 # save all the dicts as npy
 np.save(os.path.join(seed_save_dir, 'info_dict_seed.npy'), info_dict_seed)
-np.save(os.path.join(seed_save_dir, 't_test_dict_seed.npy'), t_test_dict_seed)
-np.save(os.path.join(seed_save_dir, 't_test_pred_dict_seed.npy'), t_test_pred_dict_seed)
+#np.save(os.path.join(seed_save_dir, 't_test_dict_seed.npy'), t_test_dict_seed)
+#np.save(os.path.join(seed_save_dir, 't_test_pred_dict_seed.npy'), t_test_pred_dict_seed)
 np.save(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), time_cell_ids_seed)
 np.save(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), ramping_cell_ids_seed)
 print("analysis complete")

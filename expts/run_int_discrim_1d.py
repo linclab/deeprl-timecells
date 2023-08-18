@@ -54,9 +54,9 @@ dropout_type = argsdict['dropout_type']
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/separate_ac'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/timing'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/timing/separate_ac'
 save_dir_str = f'{hidden_type}_{n_neurons}_{lr}'
 if weight_decay != 0:
     save_dir_str += f'_wd{weight_decay}'
@@ -64,7 +64,7 @@ if p_dropout != 0:
     save_dir_str += f'_p{p_dropout}_{dropout_type}'
 save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
