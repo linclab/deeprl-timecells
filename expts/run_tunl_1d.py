@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 from numpy import array
-from envs.tunl_1d import TunlEnv, TunlEnv_nomem
+from envs.tunl_1d import TunlEnv_dim2, TunlEnv_nomem_dim2
 from agents.model_1d import *
 import os
 from datetime import datetime
@@ -44,6 +44,7 @@ parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hid
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 parser.add_argument("--p_dropout", type=float, default=0.0, help="dropout probability")
 parser.add_argument("--dropout_type", type=int, default=None, help="location of dropout (could be 1,2,3,or 4)")
+parser.add_argument("--model_seed", type=int)
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -64,11 +65,13 @@ seed = argsdict["seed"]
 weight_decay = argsdict['weight_decay']
 p_dropout = argsdict['p_dropout']
 dropout_type = argsdict['dropout_type']
+model_seed = argsdict['model_seed']
+
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og_dim2/timing_pretrained'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/tunl1d_og_dim2/timing_pretrained'
 save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}'
 if weight_decay != 0:
     save_dir_str += f'_wd{weight_decay}'
@@ -87,8 +90,8 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-env = TunlEnv(len_delay, seed=seed) if env_type=='mem' else TunlEnv_nomem(len_delay, seed=seed)
-net = AC_Net(4, 4, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout, dropout_type)
+env = TunlEnv_dim2(len_delay, seed=seed) if env_type=='mem' else TunlEnv_nomem_dim2(len_delay, seed=seed)
+net = AC_Net(2, 2, 1, [hidden_type, 'linear'], [n_neurons, n_neurons], p_dropout, dropout_type)
 optimizer = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 env_title = 'Mnemonic' if env_type == 'mem' else 'Non-mnemonic'
@@ -100,14 +103,16 @@ if load_model_path=='None':
     ckpt_name = f'seed_{seed}_untrained_agent_weight_frozen'  # placeholder ckptname in case we want to save data in the end
 else:
     ckpt_name = load_model_path.replace('/', '_')
-    pt_name = load_model_path.split('/')[1]  # seed_3_epi199999.pt
-    pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
-    loaded_ckpt_seed = int(pt[1])
-    loaded_ckpt_episode = int(pt[2])
+    #pt_name = load_model_path.split('/')[1]  # seed_3_epi199999.pt
+    #pt = re.match("seed_(\d+)_epi(\d+).pt", pt_name)
+    #loaded_ckpt_seed = int(pt[1])
+    #loaded_ckpt_episode = int(pt[2])
     # assert loaded model has congruent hidden type and n_neurons
-    assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
-    assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
+    #assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
+    #assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
+    #net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og', load_model_path)))
+    loaded_ckpt_episode = 199999
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og_dim2/timing_pretrained/mem_40_lstm_128_5e-05', load_model_path)))
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
@@ -118,11 +123,11 @@ if record_data:
 
 for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     done = False
-    episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
+    episode_sample = random.choices((array([[1, 0]]), array([[0, 1]])))[0]
     env.reset(episode_sample)  # observation is set to episode_sample
-    if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
+    if np.all(episode_sample == array([[1, 0]])):  # L
         stim[i_episode] = 0
-    elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
+    elif np.all(episode_sample == array([[0, 1]])):  # R
         stim[i_episode] = 1
     if record_data:
         resp = []
@@ -130,7 +135,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
     act_record = []
     while not done:
         pol, val, lin_act = net.forward(torch.as_tensor(env.observation).float().to(device))
-        if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
+        if np.all(env.observation == array([[0, 0]])) and env.delay_t>0:
             if record_data:
                 if hidden_type == 'linear':
                     resp.append(net.cell_out[net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
@@ -144,7 +149,7 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         new_obs, reward, done = env.step(act)
         net.rewards.append(reward)
         act_record.append(act)
-    first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
+    first_action[i_episode] = act_record[next((i for i, x in enumerate(net.rewards) if x), 0)]  # The first choice that led to non-zero reward. 0=L, 1=R
     nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
     #nomem_perf[i_episode] = reward
     if record_data:

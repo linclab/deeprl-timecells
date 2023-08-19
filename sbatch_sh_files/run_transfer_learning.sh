@@ -32,7 +32,7 @@ load_model_path="model_${model_seed}/seed_${task_seed}_epi199999.pt" # collect d
 
 #python expts/run_int_discrim_1d.py --model_seed $model_seed --n_total_episodes 5000 --save_ckpt_per_episodes 2500 --load_model_path $load_model_path --n_neurons 128 --lr 0.00001 --seed $task_seed --hidden_type 'lstm' --record_data True
 
-python expts/run_tunl_1d.py --model_seed $model_seed --n_total_episodes 5000 --save_ckpt_per_episodes 2500 --load_model_path $load_model_path --n_neurons 128 --len_delay 40 --lr 0.00005 --seed $task_seed --env_type 'mem' --hidden_type 'lstm'
+python expts/run_tunl_1d.py --model_seed $model_seed --n_total_episodes 5000 --save_ckpt_per_episodes 2500 --load_model_path $load_model_path --n_neurons 128 --len_delay 40 --lr 0.00005 --seed $task_seed --env_type 'mem' --hidden_type 'lstm' --record_data True
 
 
 
