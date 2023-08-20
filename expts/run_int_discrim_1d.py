@@ -54,9 +54,9 @@ dropout_type = argsdict['dropout_type']
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
-    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing'
+    main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/timing/no_reset'
 else:
-    main_dir = '/network/scratch/l/lindongy/timecell/training/timing'
+    main_dir = '/network/scratch/l/lindongy/timecell/training/timing/no_reset'
 save_dir_str = f'{hidden_type}_{n_neurons}_{lr}'
 if weight_decay != 0:
     save_dir_str += f'_wd{weight_decay}'
@@ -64,7 +64,7 @@ if p_dropout != 0:
     save_dir_str += f'_p{p_dropout}_{dropout_type}'
 save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 print(f'Saved to {save_dir}')
 
 # Setting up cuda and seeds
@@ -98,7 +98,7 @@ else:
     # assert loaded model has congruent hidden type and n_neurons
     assert hidden_type in ckpt_name, 'Must load network with the same hidden type'
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
-    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing', load_model_path)))
+    net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/timing/no_reset', load_model_path)))
 
 
 # Define helper functions
@@ -173,10 +173,9 @@ for i_episode in tqdm(range(n_total_episodes)):
             correct_trial[i_episode] = env.correct_trial
 
     # Save hidden states for reinitialization in the next episode
-    hidden_state_dict['cell_out'] = net.cell_out.clone().detach()
-    hidden_state_dict['hx'] = net.hx.clone().detach()
-    hidden_state_dict['cx'] = net.cx.clone().detach()
-
+    hidden_state_dict['cell_out'] = [x.clone().detach() if x!=None else None for x in net.cell_out]
+    hidden_state_dict['hx'] = [x.clone().detach() if x!=None else None for x in net.hx]
+    hidden_state_dict['cx'] = [x.clone().detach() if x!=None else None for x in net.cx]
     if record_data: # No backprop
         del net.rewards[:]
         del net.saved_actions[:]
