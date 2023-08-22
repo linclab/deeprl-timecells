@@ -43,9 +43,9 @@ t_test_pred_dict = {}
 info_dict = {}
 
 print(f'====================== Analyzing seed {each_seed} ...======================================')
-seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
-if not os.path.exists(seed_save_dir):
-    os.makedirs(seed_save_dir, exist_ok=True)
+save_dir = os.path.join(save_dir, f'seed_{each_seed}')
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir, exist_ok=True)
 # load the data
 print("load the data...")
 if untrained:
@@ -60,7 +60,8 @@ delay_resp_val = data['delay_resp_val']
 
 # Normalize the delay response based on the maximum response of each neuron
 for delay_resp, label in zip([delay_resp_pol, delay_resp_val], ["pol", "val"]):
-    seed_save_dir = os.path.join(seed_save_dir, label)
+    print(f"analysing data from {label} network...")
+    seed_save_dir = os.path.join(save_dir, label)
     if not os.path.exists(seed_save_dir):
         os.makedirs(seed_save_dir, exist_ok=True)
 
@@ -117,10 +118,10 @@ for delay_resp, label in zip([delay_resp_pol, delay_resp_val], ["pol", "val"]):
 
     # Identify ramping cells
     print("Identify ramping cells...")
-    p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left')
+    p_result_l, slope_result_l, intercept_result_l, R_result_l = lin_reg_ramping(left_stim_resp, plot=True, save_dir=seed_save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left')
     ramp_cell_bool_l = np.logical_and(p_result_l<=0.05, np.abs(R_result_l)>=0.9)
     cell_nums_ramp_l = np.where(ramp_cell_bool_l)[0]
-    p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right')
+    p_result_r, slope_result_r, intercept_result_r, R_result_r = lin_reg_ramping(right_stim_resp, plot=True, save_dir=seed_save_dir, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right')
     ramp_cell_bool_r = np.logical_and(p_result_r<=0.05, np.abs(R_result_r)>=0.9)
     cell_nums_ramp_r = np.where(ramp_cell_bool_r)[0]
     ramping_cell_ids_seed['left'] = np.intersect1d(cell_nums_ramp_l, trial_reliable_cell_num_l)
@@ -130,10 +131,10 @@ for delay_resp, label in zip([delay_resp_pol, delay_resp_val], ["pol", "val"]):
 
     # Identify time cells
     print("Identify time cells...")
-    I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, ramp_cell_bool_l, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left', save_dir=save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)  # takes 8 hours to do 1000 shuffles for 256 neurons
+    I_result_l, I_threshold_result_l = skaggs_temporal_information(left_stim_resp, ramp_cell_bool_l, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_left', save_dir=seed_save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)  # takes 8 hours to do 1000 shuffles for 256 neurons
     high_temporal_info_cell_bool_l = I_result_l > I_threshold_result_l
     high_temporal_info_cell_nums_l = np.where(high_temporal_info_cell_bool_l)[0]
-    I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, ramp_cell_bool_r, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right', save_dir=save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)
+    I_result_r, I_threshold_result_r = skaggs_temporal_information(right_stim_resp, ramp_cell_bool_r, title=f'{each_seed}_{n_total_episodes}_{n_shuffle}_{percentile}_right', save_dir=seed_save_dir, n_shuff=n_shuffle, percentile=percentile, plot=True)
     high_temporal_info_cell_bool_r = I_result_r > I_threshold_result_r
     high_temporal_info_cell_nums_r = np.where(high_temporal_info_cell_bool_r)[0]
     time_cell_ids_seed['left'] = np.intersect1d(high_temporal_info_cell_nums_l, trial_reliable_cell_num_l)
@@ -143,7 +144,7 @@ for delay_resp, label in zip([delay_resp_pol, delay_resp_val], ["pol", "val"]):
 
     np.save(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), time_cell_ids_seed)
     np.save(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), ramping_cell_ids_seed)
-    print("analysis complete")
+print("analysis complete")
 
 
         
