@@ -112,8 +112,12 @@ else:
     assert str(n_neurons) in ckpt_name, 'Must load network with the same number of hidden neurons'
     pol_net_path = load_model_path.replace('.pt', '_policy.pt')
     val_net_path = load_model_path.replace('.pt', '_value.pt')
-    pol_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', pol_net_path)))
-    val_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', val_net_path)))
+    if os.path.exists(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', pol_net_path)):
+        pol_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', pol_net_path)))
+        val_net.load_state_dict(torch.load(os.path.join('/network/scratch/l/lindongy/timecell/training/tunl1d_og/separate_ac', val_net_path)))
+    else:
+        print(f"{load_model_path} doesn't exist")
+        sys.exit()
 
 stim = np.zeros(n_total_episodes, dtype=np.int8)  # 0=L, 1=R
 nonmatch_perc = np.zeros(n_total_episodes, dtype=np.int8)
