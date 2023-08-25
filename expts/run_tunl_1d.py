@@ -176,9 +176,13 @@ for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
         if load_model_path != 'None':
             print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
             #print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
+            if np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100 > 85:
+                print(f"We have a good seed! It's seed {seed}")
         else:
             print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
             #print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
+            if np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100 > 85:
+                print(f"We have a good seed! It's seed {seed}")
         if save_ckpts:
             if load_model_path != 'None':
                 torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_policy.pt')
