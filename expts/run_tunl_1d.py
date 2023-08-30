@@ -14,6 +14,7 @@ import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
+from memory_profiler import profile
 
 def bin_rewards(epi_rewards, window_size):
     """
@@ -127,65 +128,71 @@ if record_data:
     delay_resp_pol = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # policy network
     delay_resp_val = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # value network
 
-for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
-    done = False
-    env.reset()
-    episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
-    if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
-        stim[i_episode] = 0
-    elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
-        stim[i_episode] = 1
-    if record_data:
-        resp_pol = []
-        resp_val = []
-    pol_net.reinit_hid()
-    val_net.reinit_hid()
-    act_record = []
-    while not done:
-        pol, lin_act_pol = pol_net.forward(torch.as_tensor(env.observation).float().to(device))
-        val, lin_act_val = val_net.forward(torch.as_tensor(env.observation).float().to(device))
-        if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
-            if record_data:
-                if hidden_type == 'linear':
-                    resp_pol.append(pol_net.cell_out[pol_net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
-                    resp_val.append(val_net.cell_out[val_net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())
-                elif hidden_type == 'lstm':
-                    resp_pol.append(pol_net.hx[pol_net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
-                    resp_val.append(val_net.hx[val_net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())
-                elif hidden_type == 'gru':
-                    resp_pol.append(pol_net.hx[pol_net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())  # hidden state of GRU cell
-                    resp_val.append(val_net.hx[val_net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())
-                elif hidden_type == 'rnn':
-                    resp_pol.append(pol_net.hx[pol_net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
-                    resp_val.append(val_net.hx[val_net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
-        act, p, v = select_action(pol_net, pol, val)
-        new_obs, reward, done = env.step(act, episode_sample)
-        val_net.rewards.append(reward)
-        act_record.append(act)
-    first_action[i_episode] = act_record[next((i for i, x in enumerate(val_net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
-    nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
-    #nomem_perf[i_episode] = reward
-    if record_data:
-        delay_resp_pol[i_episode][:len(resp_pol)] = np.asarray(resp_pol)
-        delay_resp_val[i_episode][:len(resp_val)] = np.asarray(resp_val)
-        del val_net.rewards[:]
-        del pol_net.saved_actions[:]
-    else:
-        p_loss, v_loss = finish_trial(pol_net, val_net, 0.99, pol_optimizer, val_optimizer)
-    if (i_episode+1) % save_ckpt_per_episodes == 0:
-        if load_model_path != 'None':
-            print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
-            #print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
+
+@profile
+def train_agent():
+    for i_episode in tqdm(range(n_total_episodes)):  # one episode = one sample
+        done = False
+        env.reset()
+        episode_sample = random.choices((array([[0, 0, 1, 0]]), array([[0, 0, 0, 1]])))[0]
+        if np.all(episode_sample == array([[0, 0, 1, 0]])):  # L
+            stim[i_episode] = 0
+        elif np.all(episode_sample == array([[0, 0, 0, 1]])):  # R
+            stim[i_episode] = 1
+        if record_data:
+            resp_pol = []
+            resp_val = []
+        pol_net.reinit_hid()
+        val_net.reinit_hid()
+        act_record = []
+        while not done:
+            pol, lin_act_pol = pol_net.forward(torch.as_tensor(env.observation).float().to(device))
+            val, lin_act_val = val_net.forward(torch.as_tensor(env.observation).float().to(device))
+            if np.all(env.observation == array([[0, 0, 0, 0]])) and env.delay_t>0:
+                if record_data:
+                    if hidden_type == 'linear':
+                        resp_pol.append(pol_net.cell_out[pol_net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())  # pre-relu activity of first layer of linear cell
+                        resp_val.append(val_net.cell_out[val_net.hidden_types.index("linear")].clone().detach().cpu().numpy().squeeze())
+                    elif hidden_type == 'lstm':
+                        resp_pol.append(pol_net.hx[pol_net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())  # hidden state of LSTM cell
+                        resp_val.append(val_net.hx[val_net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())
+                    elif hidden_type == 'gru':
+                        resp_pol.append(pol_net.hx[pol_net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())  # hidden state of GRU cell
+                        resp_val.append(val_net.hx[val_net.hidden_types.index("gru")].clone().detach().cpu().numpy().squeeze())
+                    elif hidden_type == 'rnn':
+                        resp_pol.append(pol_net.hx[pol_net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
+                        resp_val.append(val_net.hx[val_net.hidden_types.index("rnn")].clone().detach().cpu().numpy().squeeze())
+            act, p, v = select_action(pol_net, pol, val)
+            new_obs, reward, done = env.step(act, episode_sample)
+            val_net.rewards.append(reward)
+            act_record.append(act)
+        first_action[i_episode] = act_record[next((i for i, x in enumerate(val_net.rewards) if x), 0)] - 1  # The first choice that led to non-zero reward. 0=L, 1=R
+        nonmatch_perc[i_episode] = 1 if stim[i_episode]+first_action[i_episode] == 1 else 0
+        #nomem_perf[i_episode] = reward
+        if record_data:
+            delay_resp_pol[i_episode][:len(resp_pol)] = np.asarray(resp_pol)
+            delay_resp_val[i_episode][:len(resp_val)] = np.asarray(resp_val)
+            del val_net.rewards[:]
+            del pol_net.saved_actions[:]
         else:
-            print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
-            #print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
-        if save_ckpts:
+            p_loss, v_loss = finish_trial(pol_net, val_net, 0.99, pol_optimizer, val_optimizer)
+        if (i_episode+1) % save_ckpt_per_episodes == 0:
             if load_model_path != 'None':
-                torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_policy.pt')
-                torch.save(val_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_value.pt')
+                print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+                #print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
             else:
-                torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}_policy.pt')
-                torch.save(val_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}_value.pt')
+                print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+                #print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
+            if save_ckpts:
+                if load_model_path != 'None':
+                    torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_policy.pt')
+                    torch.save(val_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}_value.pt')
+                else:
+                    torch.save(pol_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}_policy.pt')
+                    torch.save(val_net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}_value.pt')
+
+train_agent()
+
 binned_nonmatch_perc = bin_rewards(nonmatch_perc, window_size=window_size)
 #binned_reward = bin_rewards(nomem_perf, window_size=window_size)
 
