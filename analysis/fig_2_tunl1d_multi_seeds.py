@@ -20,7 +20,7 @@ args = parser.parse_args()
 untrained = args.untrained
 
 
-def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay):
+def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay, save_dir):
     print("Plot time decoding across seeds...")
     t_test_arr = np.array(list(t_test_dict.values())).flatten()
     t_test_pred_arr = np.array(list(t_test_pred_dict.values())).flatten()
@@ -47,7 +47,7 @@ def plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay):
     fig.savefig(os.path.join(save_dir, f'time_decoding_pooled_{len(t_test_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'), dpi=300)
 
 
-def plot_mutual_information_across_seeds(info_dict):
+def plot_mutual_information_across_seeds(info_dict,save_dir):
     print("Plot mutual information across seeds...")
     info_arr = np.vstack(info_dict.values())
     n_total_neurons = np.shape(info_arr)[0]
@@ -74,7 +74,7 @@ def plot_mutual_information_across_seeds(info_dict):
     plt.savefig(os.path.join(save_dir, f'joint_encoding_info_noline_pooled_{len(info_dict)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
-def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
+def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids,save_dir):
     time_cell_counts = []
     ramping_cell_counts = []
     both_cell_counts = []
@@ -102,7 +102,7 @@ def plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids):
     plt.savefig(os.path.join(save_dir, f'cell_type_count_{len(time_cell_ids)}seeds_{n_total_episodes}_{n_shuffle}_{percentile}.png'))
 
 
-def plot_r_across_seeds(r_dict):
+def plot_r_across_seeds(r_dict,save_dir):
     print("Plot r across seeds...")
     r_list = []
     for each_seed in r_dict.keys():
@@ -116,7 +116,7 @@ def plot_r_across_seeds(r_dict):
     plt.savefig(os.path.join(save_dir, f"left_right_r_hist.png"))
 
 
-def plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, pick_one=False):
+def plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, save_dir, pick_one=False):
     accuracy_arr = []
     accuracy_shuff_arr = []
     for each_seed in accuracies_dict.keys():
@@ -141,22 +141,24 @@ def plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_d
 
 
 
-data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/mem_40_lstm_128_0.0001'
-seed_list = []
-for file in os.listdir(data_dir):
-    if re.match(f'mem_40_lstm_128_0.0001_seed_\d+_epi199999.pt_data.npz', file):
-        seed_list.append(int(file.split('_')[6]))
-seed_list = sorted(seed_list)
+#data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/mem_40_lstm_128_0.0001'
+#seed_list = []
+#for file in os.listdir(data_dir):
+#    if re.match(f'mem_40_lstm_128_0.0001_seed_\d+_epi199999.pt_data.npz', file):
+#        seed_list.append(int(file.split('_')[6]))
+#seed_list = sorted(seed_list)
 n_total_episodes = 5000
 len_delay = 40
 n_neurons = 128
 n_shuffle = 100
 percentile = 99
 
+seed_list=[1017,1025,1057,1089,1119,119,1227,1229,124,1282,131,542,544,678,766,783,788,805]
+
 if untrained:
     save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d_untrained_weight_frozen'
 else:
-    save_dir = '/network/scratch/l/lindongy/timecell/figures/fig_2/tunl1d'
+    save_dir = '/network/scratch/l/lindongy/timecell/figures/separate_ac'
 
 ramping_cell_ids = {}
 time_cell_ids = {}
@@ -166,37 +168,34 @@ info_dict = {}
 r_dict = {}
 accuracies_dict = {}
 accuracies_shuff_dict = {}
-for i_seed, each_seed in enumerate(seed_list):
-    print(f'====================== Analyzing seed {each_seed} ...======================================')
-    seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
-    # load data
-    if os.path.exists(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 't_test_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir,  't_test_pred_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'info_seed.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'accuracies.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'accuracies_shuff.npy')) and \
-            os.path.exists(os.path.join(seed_save_dir, 'r_arr.npy')):
-        t_test_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_seed.npy'), allow_pickle=True)
-        t_test_pred_dict[each_seed] = np.load(os.path.join(seed_save_dir, 't_test_pred_seed.npy'), allow_pickle=True)
-        info_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'info_seed.npy'), allow_pickle=True)
-        time_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
-        ramping_cell_ids[each_seed] = np.load(os.path.join(seed_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
-        r_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'r_arr.npy'), allow_pickle=True)
-        accuracies_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'accuracies.npy'), allow_pickle=True)
-        accuracies_shuff_dict[each_seed] = np.load(os.path.join(seed_save_dir, 'accuracies_shuff.npy'), allow_pickle=True)
+for label in ['pol', 'val']:
+    fig_save_dir = os.path.join(save_dir, label)
+    for i_seed, each_seed in enumerate(seed_list):
+        print(f'====================== Analyzing seed {each_seed} ...======================================')
+        seed_save_dir = os.path.join(save_dir, f'seed_{each_seed}')
+        # load data
+        label_save_dir = os.path.join(seed_save_dir, label)
+        if os.path.exists(os.path.join(label_save_dir, 'ramping_cell_ids_seed.npy')) and \
+            os.path.exists(os.path.join(label_save_dir, 'time_cell_ids_seed.npy')) and \
+            os.path.exists(os.path.join(label_save_dir, 'info_seed.npy')) and \
+            os.path.exists(os.path.join(label_save_dir, 'accuracies.npy')) and \
+            os.path.exists(os.path.join(label_save_dir, 'accuracies_shuff.npy')) and \
+            os.path.exists(os.path.join(label_save_dir, 'r_arr.npy')):
+            info_dict[each_seed] = np.load(os.path.join(label_save_dir, 'info_seed.npy'), allow_pickle=True)
+            time_cell_ids[each_seed] = np.load(os.path.join(label_save_dir, 'time_cell_ids_seed.npy'), allow_pickle=True).item()
+            ramping_cell_ids[each_seed] = np.load(os.path.join(label_save_dir, 'ramping_cell_ids_seed.npy'), allow_pickle=True).item()
+            r_dict[each_seed] = np.load(os.path.join(label_save_dir, 'r_arr.npy'), allow_pickle=True)
+            accuracies_dict[each_seed] = np.load(os.path.join(label_save_dir, 'accuracies.npy'), allow_pickle=True)
+            accuracies_shuff_dict[each_seed] = np.load(os.path.join(label_save_dir, 'accuracies_shuff.npy'), allow_pickle=True)
+    plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids, save_dir=fig_save_dir)
+
+    plot_r_across_seeds(r_dict, save_dir=fig_save_dir)
+
+    plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, save_dir=fig_save_dir, pick_one=True)
+    plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, save_dir=fig_save_dir,pick_one=False)
 
 
-plot_count_time_and_ramping_cells(time_cell_ids, ramping_cell_ids)
-
-plot_r_across_seeds(r_dict)
-
-plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, pick_one=True)
-plot_stim_decoding_accuracy_across_seeds(accuracies_dict, accuracies_shuff_dict, pick_one=False)
-
-
-plot_mutual_information_across_seeds(info_dict)
+    plot_mutual_information_across_seeds(info_dict,save_dir=fig_save_dir)
 #
 # plot_time_decoding_across_seeds(t_test_dict, t_test_pred_dict, len_delay=len_delay)
 

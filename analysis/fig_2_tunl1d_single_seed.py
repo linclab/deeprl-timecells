@@ -18,10 +18,12 @@ utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=0)
+parser.add_argument('--epi',type=int, default=399999)
 parser.add_argument('--untrained', type=bool, default=False, help='whether to use untrained model')
 args = parser.parse_args()
 each_seed = args.seed
 untrained = args.untrained
+epi = args.epi
 
 data_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl1d_og/separate_ac/mem_40_lstm_128_0.0001'
 n_total_episodes = 5000
@@ -51,7 +53,7 @@ print("load the data...")
 if untrained:
     data = np.load(os.path.join(data_dir, f'seed_{each_seed}_untrained_agent_weight_frozen_data.npz'), allow_pickle=True)
 else:
-    data = np.load(os.path.join(data_dir, f'mem_40_lstm_128_0.0001_seed_{each_seed}_epi399999.pt_data.npz'), allow_pickle=True)
+    data = np.load(os.path.join(data_dir, f'mem_40_lstm_128_0.0001_seed_{each_seed}_epi{epi}.pt_data.npz'), allow_pickle=True)
     
 stim = data['stim']
 first_action = data['first_action']
