@@ -107,7 +107,7 @@ class run_to_reward_port(object):
                 self.current_loc = next_loc  # update location
                 self.observation[self.current_loc] += self.color["current_loc"]  # show on observation
             # if next location is incentive location, give incentive reward with probability incentive_probability
-            if self.current_loc == self.incentive_loc:
+            if self.current_loc == self.incentive_loc and np.all(self.observation[self.sample_loc] == [0,0,0]):
                 if self.rng.rand() < self.incentive_probability:
                     self.reward = self.incentive_magnitude
                     self.done = True
