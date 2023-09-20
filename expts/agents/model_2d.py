@@ -394,3 +394,56 @@ def calculate_temporal_coherence_penalty(beta, hid_activity):
     n_steps = hid_activity.shape[0]
     loss = beta / n_steps * total_diff
     return loss
+
+
+def finish_trial_td(model, discount_factor, optimizer, **kwargs):
+    """
+    Finish an episode and update actor-critic network using Temporal Difference (TD) learning.
+
+    Args:
+    - model: the actor-critic network which has .rewards and .saved_actions attributes
+    - optimizer: the optimizer to update the network parameters
+    - discount_factor: the discount factor for TD learning
+
+    Returns:
+    - total_loss: the combined loss of the actor and critic
+    """
+    R = 0
+    saved_actions = model.saved_actions
+    value_losses = []
+    policy_losses = []
+    returns = []
+
+    # Compute TD targets and push to returns
+    for r in model.rewards[::-1]:
+        R = r + discount_factor * R
+        returns.insert(0, R)
+
+    returns = torch.tensor(returns)
+    returns = (returns - returns.mean()) / (returns.std() + 1e-5)  # normalize returns
+
+    for (log_prob, value), R in zip(saved_actions, returns):
+        advantage = R - value.item()
+
+        # compute actor (policy) loss
+        policy_losses.append(-log_prob * advantage)
+
+        # compute critic (value) loss using L1 smooth loss
+        value_losses.append(torch.nn.functional.smooth_l1_loss(value, torch.tensor([R])))
+
+    # sum up the actor and critic losses
+    optimizer.zero_grad()
+    p_loss = torch.stack(policy_losses).sum()
+    v_loss = torch.stack(value_losses).sum()
+    loss = p_loss + v_loss
+    loss.backward()
+    optimizer.step()
+
+    # clear stored actions and rewards for the next episode
+    del model.rewards[:]
+    del model.saved_actions[:]
+
+    return p_loss.item(), v_loss.item()
+
+    # Assuming we've already set up our model and optimizer
+    # After each episode, you can call finish_trial(model, optimizer, 0.99) (assuming discount_factor is 0.99)

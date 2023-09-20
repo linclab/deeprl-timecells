@@ -6,6 +6,125 @@ from gym import spaces
 Trial-Unique, Delayed Nonmatch-to-Location (TUNL) task in a triangular arena. 
 Including the no-memory verion.
 '''
+class run_to_reward_port(object):
+    def __init__(self, len_edge, incentive_probability, incentive_magnitude, poke_reward, step_reward, rng_seed=1234):
+        """
+        In each episode, the agent starts from a random location and sees either left or right stimulus.
+        Agent must poke the stimulus to turn it off and run to the reward port at the back, which will administer a
+        reward of incentive_magnitude with incentive_probability.
+        :param len_edge: int -- length of long edge in triangle (minimum = 5)
+        :param incentive_probability: float -- probability of receiving incentive reward when reaching the reward port
+        :param incentive_magnitude: float -- size of incentive reward
+        :param poke_reward: float -- size of reward when poke correctly (eg. 1)
+        :param step_reward: float -- size of reward for each step (eg. -0.5)
+        :param rng_seed: int -- seed for rng that generates initial location (default=1234)
+        """
+        assert len_edge % 2 == 1
+        assert len_edge >= 5
+        self.h = (len_edge + 1) // 2 + 2
+        self.w = len_edge + 2
+
+        assert incentive_probability >= 0 and incentive_probability <= 1
+        assert incentive_magnitude >= 0
+        assert poke_reward >= 0
+        assert step_reward <= 0
+
+        self.walls = np.ones((self.h, self.w))  # 1 = wall
+        i = 1
+        while i < len_edge + 2 - i:
+            self.walls[i, i:self.w - i] = 0
+            i += 1
+        # Six possible actions:
+        # 0: UP
+        # 1: DOWN
+        # 2: LEFT
+        # 3: RIGHT
+        # 4: Remain at the same location
+        # 5: Poke stimulus
+        self.action_space = spaces.Discrete(6)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(self.h, self.w, 3), dtype=np.uint8)
+        self.directions = [np.array((-1, 0)), np.array((1, 0)), np.array((0, -1)), np.array((0, 1)),
+                           np.array((0, 0))]
+
+        # Random number generator
+        self.rng = np.random.RandomState(rng_seed)
+
+        # tuple locations for possible signals
+        self.incentive_loc = (self.h - 2, (self.w - 1) // 2)
+        self.left_loc = (1, 1)
+        self.right_loc = (1, self.w - 2)
+
+        # dict - key = loc, value = RGB values
+        self.color = {
+            "current_loc": [0, 0, 255],  # blue
+            "touchscreen_loc": [0, 255, 0],  # green
+            "walls": [255, 255, 255]  # white
+        }
+
+        # possible initial cells
+        self.init_row = np.where(self.walls == 0)[0]
+        self.init_col = np.where(self.walls == 0)[1]
+
+        self.reward = 0
+        self.nav_reward = 0  # keep a record of total navigation reward (movement & poking signals)
+        self.dist_to_sample = None
+        self.done = False
+        self.incentive_probability = incentive_probability
+        self.incentive_magnitude = incentive_magnitude
+        self.poke_reward = poke_reward
+        self.step_reward = step_reward
+        self.sample_loc = None
+        self.current_loc = None
+        self.observation = np.zeros((self.h, self.w, 3))  # black for empty spaces in arena
+        self.observation[self.walls == 1] = self.color["walls"]
+
+    def reset(self):
+        init_idx = self.rng.choice(np.arange(len(self.init_row)))
+        self.current_loc = (self.init_row[init_idx], self.init_col[init_idx])
+        self.sample_loc = random.choices((self.left_loc, self.right_loc))[0]
+        self.dist_to_sample = abs(self.current_loc[0] - self.sample_loc[0]) + abs(
+            self.current_loc[1] - self.sample_loc[1])
+        self.observation = np.zeros((self.h, self.w, 3))  # black for empty spaces in arena
+        self.observation[self.walls == 1] = self.color["walls"]
+        self.observation[self.current_loc] += self.color["current_loc"]  # show current location in observation
+        self.observation[self.sample_loc] += self.color["touchscreen_loc"]  # turn on sample touchscreen
+        self.reward = 0
+        self.nav_reward = 0  # keep a record of total navigation reward (movement & poking signals)
+        self.done = False
+
+    def step(self, action):
+        """
+        :param action: one of the six actions
+        :return: observation, reward, done, info
+        """
+        assert self.action_space.contains(action)
+        if action in [0, 1, 2, 3, 4]:  # movement
+            self.reward = self.step_reward
+            self.nav_reward += self.reward
+            next_loc = tuple(self.current_loc + self.directions[action])
+            if not self.walls[next_loc]:  # if next location is not walls
+                self.observation[self.current_loc] -= self.color["current_loc"]  # leave current location
+                self.current_loc = next_loc  # update location
+                self.observation[self.current_loc] += self.color["current_loc"]  # show on observation
+            # if next location is incentive location, give incentive reward with probability incentive_probability
+            if self.current_loc == self.incentive_loc:
+                if self.rng.rand() < self.incentive_probability:
+                    self.reward = self.incentive_magnitude
+                    self.done = True
+        else:  # poke
+            if np.sum(self.observation[self.current_loc]) > 255:  # currently at a signal location
+                if self.current_loc == self.sample_loc:  # currently at sample location
+                    self.observation[self.current_loc] -= self.color["touchscreen_loc"]  # turn signal off
+                    self.reward = self.poke_reward
+                    self.nav_reward += self.reward
+                else:
+                    self.reward = self.step_reward
+                    self.nav_reward += self.reward
+            else:
+                self.reward = self.step_reward
+                self.nav_reward += self.reward
+        return self.observation, self.reward, self.done, {}
+
 
 
 class Tunl(object):
