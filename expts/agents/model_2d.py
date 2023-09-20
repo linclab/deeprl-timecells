@@ -349,9 +349,9 @@ def select_action(model, policy_, value_):
 
 
 # calculate policy and value loss for updating network weights
-def finish_trial(model, discount_factor, optimizer, beta=0., hid_activity=None, **kwargs):
+def finish_trial_mc(model, discount_factor, optimizer, **kwargs):
     """
-    Finishes a given training trial and backpropagates.
+    Finishes a given training trial and backpropagates with Monte Carlo methods.
     """
 
     # set the return to zero
@@ -366,18 +366,14 @@ def finish_trial(model, discount_factor, optimizer, beta=0., hid_activity=None, 
     for (log_prob, value), r in zip(saved_actions, returns_):
         rpe = r - value.item()
         policy_losses.append(-log_prob * rpe)
-        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(model.device))).unsqueeze(-1))
+        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(model.device))))
         #   return policy_losses, value_losses
     optimizer.zero_grad()  # clear gradient
 
-    p_loss = (torch.cat(policy_losses).sum())
-    v_loss = (torch.cat(value_losses).sum())
-    if beta > 0:
-        t_loss = calculate_temporal_coherence_penalty(beta, hid_activity)
-    else:
-        t_loss = 0
+    p_loss = torch.stack(policy_losses).sum()
+    v_loss = torch.stack(value_losses).sum()
 
-    total_loss = p_loss + v_loss + t_loss
+    total_loss = p_loss + v_loss
 
     total_loss.backward(retain_graph=True)  # calculate gradient
     optimizer.step()
@@ -385,15 +381,7 @@ def finish_trial(model, discount_factor, optimizer, beta=0., hid_activity=None, 
     del model.rewards[:]
     del model.saved_actions[:]
 
-    return p_loss, v_loss
-
-
-def calculate_temporal_coherence_penalty(beta, hid_activity):
-    resp_diff = hid_activity[1,:] - hid_activity[:-1,:]
-    total_diff = np.sum(np.power(resp_diff, 2))
-    n_steps = hid_activity.shape[0]
-    loss = beta / n_steps * total_diff
-    return loss
+    return p_loss.item(), v_loss.item()
 
 
 def finish_trial_td(model, discount_factor, optimizer, **kwargs):
@@ -408,28 +396,29 @@ def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     Returns:
     - total_loss: the combined loss of the actor and critic
     """
-    R = 0
     saved_actions = model.saved_actions
     value_losses = []
     policy_losses = []
-    returns = []
 
-    # Compute TD targets and push to returns
-    for r in model.rewards[::-1]:
-        R = r + discount_factor * R
-        returns.insert(0, R)
-
-    returns = torch.tensor(returns)
-    returns = (returns - returns.mean()) / (returns.std() + 1e-5)  # normalize returns
-
-    for (log_prob, value), R in zip(saved_actions, returns):
-        advantage = R - value.item()
-
+    next_value = torch.tensor([model.rewards[-1]])  # set next_value to the last reward
+    for (log_prob, value), reward in zip(reversed(saved_actions[:-1]), reversed(model.rewards[:-1])):
+        # compute TD target
+        td_target = reward + discount_factor * next_value.item()
+        td_error = td_target - value.item()
         # compute actor (policy) loss
-        policy_losses.append(-log_prob * advantage)
-
+        policy_losses.append(
+            -log_prob * td_error)  # instead of multiplied by rpe(=return-value), use td_error(=reward+gamma*next_value-value)
         # compute critic (value) loss using L1 smooth loss
-        value_losses.append(torch.nn.functional.smooth_l1_loss(value, torch.tensor([R])))
+        value_losses.append(torch.nn.functional.smooth_l1_loss(value, torch.tensor([[td_target]]).to(
+            model.device)))  # instead of return, value is compared against td_target(=reward+gamma*next_value)
+        next_value = value
+
+    # handle the last action separately
+    log_prob, value = saved_actions[-1]
+    td_target = model.rewards[-1]
+    td_error = td_target - value.item()
+    policy_losses.append(-log_prob * td_error)
+    value_losses.append(torch.nn.functional.smooth_l1_loss(value, torch.tensor([[td_target]]).to(model.device)))
 
     # sum up the actor and critic losses
     optimizer.zero_grad()
@@ -444,6 +433,3 @@ def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     del model.saved_actions[:]
 
     return p_loss.item(), v_loss.item()
-
-    # Assuming we've already set up our model and optimizer
-    # After each episode, you can call finish_trial(model, optimizer, 0.99) (assuming discount_factor is 0.99)

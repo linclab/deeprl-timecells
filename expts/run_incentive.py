@@ -12,6 +12,7 @@ import sys
 sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
+from PIL import Image
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -154,8 +155,11 @@ stim = np.zeros((n_total_episodes, 2), dtype=np.int8)
 epi_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 epi_incentive_reward = np.zeros(n_total_episodes, dtype=np.float16)
 ideal_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
+p_losses = np.zeros(n_total_episodes, dtype=np.float16)
+v_losses = np.zeros(n_total_episodes, dtype=np.float16)
 # TODO: if record_data:
 
+render = False
 # Training loop
 for i_episode in tqdm(range(n_total_episodes)):
     done = False
@@ -163,7 +167,18 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode, :] = env.sample_loc
     ideal_nav_reward[i_episode] = ideal_nav_rwd(env, len_edge, step_reward, poke_reward)
     net.reinit_hid()
+    step = 0
     while not done:
+
+        # Render the observation as an image in the notebook
+        if render:
+            # Convert observation to PIL image
+            image = Image.fromarray(env.observation.astype('uint8'), 'RGB')
+            plt.imshow(image)
+            plt.axis('off')  # Turn off axis numbers and ticks
+            plt.title(f"Episode {i_episode + 1}, Step {step + 1}")
+            plt.pause(0.01)  # Briefly pause to update the display
+
         obs = torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
         pol, val = net.forward(obs)  # forward pass
         act, p, v = select_action(net, pol, val)
@@ -176,9 +191,9 @@ for i_episode in tqdm(range(n_total_episodes)):
         del net.saved_actions[:]
     else:
         if algo == 'td':
-            p_loss, v_loss = finish_trial_td(net, 0.99, optimizer)
+            p_losses[i_episode], v_losses[i_episode] = finish_trial_td(net, 0.99, optimizer)
         elif algo == 'mc':
-            p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+            p_losses[i_episode], v_losses[i_episode] = finish_trial_mc(net, 0.99, optimizer)
         else:
             raise ValueError('algo must be td or mc')
     if (i_episode+1) % save_ckpt_per_episodes == 0:
@@ -202,4 +217,6 @@ np.savez_compressed(
                  stim=stim,
                  epi_nav_reward=epi_nav_reward,
                  epi_incentive_reward=epi_incentive_reward,
-                 ideal_nav_reward=ideal_nav_reward)
+                 ideal_nav_reward=ideal_nav_reward,
+                 p_losses=p_losses,
+                v_losses=v_losses)
