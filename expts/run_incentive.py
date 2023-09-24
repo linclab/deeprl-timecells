@@ -162,7 +162,7 @@ if record_data:  # list of lists. Each sublist is data from one episode
     neural_activity = []
     action = []
     location = []
-    reward = []
+    rwd = []
 
 render = False
 # Training loop
@@ -177,7 +177,7 @@ for i_episode in tqdm(range(n_total_episodes)):
         neural_activity.append([])
         action.append([])
         location.append([])
-        reward.append([])
+        rwd.append([])
 
     while not done:
 
@@ -199,7 +199,7 @@ for i_episode in tqdm(range(n_total_episodes)):
             action[i_episode].append(act)
         new_obs, reward, done, info = env.step(act)
         if record_data:
-            reward[i_episode].append(reward)
+            rwd[i_episode].append(reward)
         net.rewards.append(reward)
         step += 1
     epi_nav_reward[i_episode] = env.nav_reward
@@ -254,4 +254,4 @@ if record_data:
         neural_activity=neural_activity,
         action=action,
         location=location,
-        reward=reward)
+        reward=rwd)
