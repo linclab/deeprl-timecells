@@ -111,6 +111,9 @@ class run_to_reward_port(object):
                 if self.rng.rand() < self.incentive_probability:
                     self.reward = self.incentive_magnitude
                     self.done = True
+                else:
+                    self.reward = 0
+                    self.done = True
         else:  # poke
             if np.sum(self.observation[self.current_loc]) > 255:  # currently at a signal location
                 if self.current_loc == self.sample_loc:  # currently at sample location

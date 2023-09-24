@@ -157,7 +157,12 @@ epi_incentive_reward = np.zeros(n_total_episodes, dtype=np.float16)
 ideal_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 p_losses = np.zeros(n_total_episodes, dtype=np.float16)
 v_losses = np.zeros(n_total_episodes, dtype=np.float16)
-# TODO: if record_data:
+
+if record_data:  # list of lists. Each sublist is data from one episode
+    neural_activity = []
+    action = []
+    location = []
+    reward = []
 
 render = False
 # Training loop
@@ -168,6 +173,12 @@ for i_episode in tqdm(range(n_total_episodes)):
     ideal_nav_reward[i_episode] = ideal_nav_rwd(env, len_edge, step_reward, poke_reward)
     net.reinit_hid()
     step = 0
+    if record_data:
+        neural_activity.append([])
+        action.append([])
+        location.append([])
+        reward.append([])
+
     while not done:
 
         # Render the observation as an image in the notebook
@@ -182,8 +193,15 @@ for i_episode in tqdm(range(n_total_episodes)):
         obs = torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
         pol, val = net.forward(obs)  # forward pass
         act, p, v = select_action(net, pol, val)
+        if record_data:
+            location[i_episode].append(env.current_loc)
+            neural_activity[i_episode].append(net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())
+            action[i_episode].append(act)
         new_obs, reward, done, info = env.step(act)
+        if record_data:
+            reward[i_episode].append(reward)
         net.rewards.append(reward)
+        step += 1
     epi_nav_reward[i_episode] = env.nav_reward
     epi_incentive_reward[i_episode] = env.reward
     if record_data:
@@ -209,14 +227,31 @@ for i_episode in tqdm(range(n_total_episodes)):
             else:
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode}.pt')
 
-# TODO: plot performance
 
 # Save data
+if load_model_path != 'None':
+    save_performance_name = f'seed_{argsdict["seed"]}_epi{loaded_ckpt_episode}_to_{n_total_episodes+loaded_ckpt_episode}_performance_data.npz'
+else:
+    save_performance_name = f'seed_{argsdict["seed"]}_epi0_to_{n_total_episodes}episodes_performance_data.npz'
+
 np.savez_compressed(
-    os.path.join(save_dir, f'seed_{argsdict["seed"]}_total_{n_total_episodes}episodes_performance_data.npz'),
+    os.path.join(save_dir, save_performance_name),
                  stim=stim,
                  epi_nav_reward=epi_nav_reward,
                  epi_incentive_reward=epi_incentive_reward,
                  ideal_nav_reward=ideal_nav_reward,
                  p_losses=p_losses,
                 v_losses=v_losses)
+
+if record_data:
+    if load_model_path != 'None':
+        save_data_name = f'seed_{argsdict["seed"]}_epi{loaded_ckpt_episode}_to_{n_total_episodes+loaded_ckpt_episode}_neural_data.npz'
+    else:
+        save_data_name = f'seed_{argsdict["seed"]}_epi0_to_{n_total_episodes}episodes_neural_data.npz'
+
+    np.savez_compressed(
+        os.path.join(save_dir, save_data_name),
+        neural_activity=neural_activity,
+        action=action,
+        location=location,
+        reward=reward)
