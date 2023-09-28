@@ -364,7 +364,7 @@ def finish_trial_mc(model, discount_factor, optimizer, **kwargs):
     returns_ = torch.Tensor(returns_).to(model.device)
 
     for (log_prob, value), r in zip(saved_actions, returns_):
-        rpe = r - value.item()
+        rpe = r - value.item()  # advantage
         policy_losses.append(-log_prob * rpe)
         value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(model.device))))
         #   return policy_losses, value_losses
@@ -404,7 +404,7 @@ def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     for (log_prob, value), reward in zip(reversed(saved_actions[:-1]), reversed(model.rewards[:-1])):
         # compute TD target
         td_target = reward + discount_factor * next_value.item()
-        td_error = td_target - value.item()
+        td_error = td_target - value.item()  # advantage
         # compute actor (policy) loss
         policy_losses.append(
             -log_prob * td_error)  # instead of multiplied by rpe(=return-value), use td_error(=reward+gamma*next_value-value)
@@ -429,6 +429,59 @@ def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     optimizer.step()
 
     # clear stored actions and rewards for the next episode
+    del model.rewards[:]
+    del model.saved_actions[:]
+
+    return p_loss.item(), v_loss.item()
+
+
+def finish_trial_td_truncated(model, gamma, optimizer, tbptt_step=200):
+    """
+    Update using truncated backpropagation through time (TBPTT).
+
+    Args:
+    - tbptt_step: Number of timesteps to backpropagate. Default is 200.
+    """
+    saved_actions = model.saved_actions
+    value_losses = []
+    policy_losses = []
+
+    next_value = torch.tensor([model.rewards[-1]])
+
+    for t in reversed(range(len(saved_actions))):
+        log_prob, value = saved_actions[t]
+        reward = model.rewards[t]
+
+        td_target = reward + gamma * next_value.item()
+        td_error = td_target - value.item()
+
+        policy_losses.append(-log_prob * td_error)
+        value_losses.append(torch.nn.functional.smooth_l1_loss(value, torch.tensor([[td_target]]).to(model.device)))
+
+        next_value = value
+
+        # Check if truncated backprop step is reached
+        if t % tbptt_step == 0:
+            optimizer.zero_grad()
+            p_loss = torch.stack(policy_losses).sum()
+            v_loss = torch.stack(value_losses).sum()
+            loss = p_loss + v_loss
+            loss.backward()
+            optimizer.step()
+
+            # Reset lists after each optimization step
+            value_losses = []
+            policy_losses = []
+
+    # If there are any remaining losses after the loop, process them as well
+    if value_losses or policy_losses:
+        optimizer.zero_grad()
+        p_loss = torch.stack(policy_losses).sum()
+        v_loss = torch.stack(value_losses).sum()
+        loss = p_loss + v_loss
+        loss.backward()
+        optimizer.step()
+
     del model.rewards[:]
     del model.saved_actions[:]
 
