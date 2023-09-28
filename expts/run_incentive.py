@@ -13,6 +13,7 @@ sys.path.insert(1,'/home/mila/l/lindongy/deeprl-timecells')
 from analysis import utils_linclab_plot
 utils_linclab_plot.linclab_plt_defaults(font="Arial", fontdir="analysis/fonts")
 from PIL import Image
+import gc
 
 # Define helper functions
 def bin_rewards(epi_rewards, window_size):
@@ -157,7 +158,7 @@ epi_incentive_reward = np.zeros(n_total_episodes, dtype=np.float16)
 ideal_nav_reward = np.zeros(n_total_episodes, dtype=np.float16)
 p_losses = np.zeros(n_total_episodes, dtype=np.float16)
 v_losses = np.zeros(n_total_episodes, dtype=np.float16)
-
+n_steps = np.zeros(n_total_episodes, dtype=np.int8)
 if record_data:  # list of lists. Each sublist is data from one episode
     neural_activity = []
     action = []
@@ -167,6 +168,8 @@ if record_data:  # list of lists. Each sublist is data from one episode
 render = False
 # Training loop
 for i_episode in tqdm(range(n_total_episodes)):
+    torch.cuda.empty_cache()
+    gc.collect()
     done = False
     env.reset()
     stim[i_episode, :] = env.sample_loc
@@ -204,6 +207,7 @@ for i_episode in tqdm(range(n_total_episodes)):
         step += 1
     epi_nav_reward[i_episode] = env.nav_reward
     epi_incentive_reward[i_episode] = env.reward
+    n_steps[i_episode] = step
     if record_data:
         del net.rewards[:]
         del net.saved_actions[:]
@@ -241,7 +245,8 @@ np.savez_compressed(
                  epi_incentive_reward=epi_incentive_reward,
                  ideal_nav_reward=ideal_nav_reward,
                  p_losses=p_losses,
-                v_losses=v_losses)
+                v_losses=v_losses,
+                n_steps=n_steps)
 
 if record_data:
     if load_model_path != 'None':
