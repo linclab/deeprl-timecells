@@ -56,6 +56,7 @@ parser.add_argument("--incentive_mag", type=float, default=10, help="Magnitude o
 parser.add_argument("--incentive_prob", type=float, default=1, help="Number of steps before agent can receive incentive reward")
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 parser.add_argument("--algo", type=str, default='td', help="td or mc")
+parser.add_argument("--truncate_epi", type=int, default=200, help="truncate BPTT frequency")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -77,6 +78,7 @@ seed = argsdict['seed']
 incentive_mag = argsdict['incentive_mag']
 incentive_prob = argsdict['incentive_prob']
 algo = argsdict['algo']
+truncate_epi = argsdict['truncate_epi']
 
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/td_incentive'
@@ -166,6 +168,10 @@ if record_data:  # list of lists. Each sublist is data from one episode
     rwd = []
 
 render = False
+
+# initialize hidden state dict for saving hidden states
+hidden_state_dict = {}
+
 # Training loop
 for i_episode in tqdm(range(n_total_episodes)):
     torch.cuda.empty_cache()
@@ -174,7 +180,7 @@ for i_episode in tqdm(range(n_total_episodes)):
     env.reset()
     stim[i_episode, :] = env.sample_loc
     ideal_nav_reward[i_episode] = ideal_nav_rwd(env, len_edge, step_reward, poke_reward)
-    net.reinit_hid()
+    net.reinit_hid(saved_hidden=None)  # initialize to 0 at the beginning of each episode
     step = 0
     if record_data:
         neural_activity.append([])
@@ -205,9 +211,19 @@ for i_episode in tqdm(range(n_total_episodes)):
             rwd[i_episode].append(reward)
         net.rewards.append(reward)
         step += 1
+
+        if algo == 'td' and (step+1) % truncate_epi == 0:
+            # Save hidden states for reinitialization in the next episode
+            hidden_state_dict['cell_out'] = net.cell_out.clone().detach()
+            hidden_state_dict['hx'] = net.hx.clone().detach()
+            hidden_state_dict['cx'] = net.cx.clone().detach()
+            p_loss, v_loss = finish_trial_td(net, 0.99, optimizer)
+            net.reinit_hid(hidden_state_dict)
+
     epi_nav_reward[i_episode] = env.nav_reward
     epi_incentive_reward[i_episode] = env.reward
     n_steps[i_episode] = step
+    print(f"Episode {i_episode}, {step} steps")
     if record_data:
         del net.rewards[:]
         del net.saved_actions[:]

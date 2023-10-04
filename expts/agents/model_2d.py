@@ -264,37 +264,42 @@ class AC_Net(nn.Module):
         return policy, value
 
     # ===============================
-    def reinit_hid(self):
-        # to store a record of the last hidden states
-        self.cell_out = []
-        self.hx = []
-        self.cx = []
+    def reinit_hid(self, saved_hidden=None):
+        if saved_hidden is None:
+            # to store a record of the last hidden states
+            self.cell_out = []
+            self.hx = []
+            self.cx = []
 
-        for i, layer in enumerate(self.hidden):
-            if isinstance(layer, nn.Linear):
-                self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device))
-                self.hx.append(None)
-                self.cx.append(None)
-            elif isinstance(layer, nn.LSTMCell):
-                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cell_out.append(None)
-            elif isinstance(layer, nn.GRUCell):
-                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx.append(None)
-                self.cell_out.append(None)
-            elif isinstance(layer, nn.RNNCell):
-                self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
-                self.cx.append(None)
-                self.cell_out.append(None)
-            elif isinstance(layer, nn.Conv2d):
-                self.cell_out.append(None)
-                self.hx.append(None)
-                self.cx.append(None)
-            elif isinstance(layer, nn.MaxPool2d):
-                self.cell_out.append(None)
-                self.hx.append(None)
-                self.cx.append(None)
+            for i, layer in enumerate(self.hidden):
+                if isinstance(layer, nn.Linear):
+                    self.cell_out.append(Variable(torch.zeros(self.batch_size, layer.out_features)).to(self.device))
+                    self.hx.append(None)
+                    self.cx.append(None)
+                elif isinstance(layer, nn.LSTMCell):
+                    self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                    self.cx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                    self.cell_out.append(None)
+                elif isinstance(layer, nn.GRUCell):
+                    self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                    self.cx.append(None)
+                    self.cell_out.append(None)
+                elif isinstance(layer, nn.RNNCell):
+                    self.hx.append(Variable(torch.zeros(self.batch_size, layer.hidden_size)).to(self.device))
+                    self.cx.append(None)
+                    self.cell_out.append(None)
+                elif isinstance(layer, nn.Conv2d):
+                    self.cell_out.append(None)
+                    self.hx.append(None)
+                    self.cx.append(None)
+                elif isinstance(layer, nn.MaxPool2d):
+                    self.cell_out.append(None)
+                    self.hx.append(None)
+                    self.cx.append(None)
+        else:
+            self.cell_out = saved_hidden['cell_out']
+            self.hx = saved_hidden['hx']
+            self.cx = saved_hidden['cx']
 
 
 # =====================================
