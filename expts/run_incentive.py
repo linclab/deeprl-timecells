@@ -214,9 +214,9 @@ for i_episode in tqdm(range(n_total_episodes)):
 
         if algo == 'td' and (step+1) % truncate_epi == 0:
             # Save hidden states for reinitialization in the next episode
-            hidden_state_dict['cell_out'] = net.cell_out.clone().detach()
-            hidden_state_dict['hx'] = net.hx.clone().detach()
-            hidden_state_dict['cx'] = net.cx.clone().detach()
+            hidden_state_dict['cell_out'] = [x.clone().detach() if x!=None else None for x in net.cell_out]
+            hidden_state_dict['hx'] = [x.clone().detach() if x!=None else None for x in net.hx]
+            hidden_state_dict['cx'] = [x.clone().detach() if x!=None else None for x in net.cx]
             p_loss, v_loss = finish_trial_td(net, 0.99, optimizer)
             net.reinit_hid(hidden_state_dict)
 
