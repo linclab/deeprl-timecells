@@ -17,6 +17,23 @@ def to_device(list_of_arrays):
     return [torch.Tensor(array).to(device) for array in list_of_arrays]
 
 
+def init_lstm_cell(lstm_cell):
+    """Initialize weights and biases for LSTMCell with Xavier."""
+    # Get hidden size for bias initialization
+    hidden_size = lstm_cell.hidden_size
+    sqrt_k = (1.0 / hidden_size) ** 0.5
+    # Weight initialization
+    for name, param in lstm_cell.named_parameters():
+        if 'weight' in name:
+            nn.init.xavier_uniform_(param)
+        elif 'bias' in name:
+            # PyTorch default bias initialization for biases not in the forget gate
+            nn.init.uniform_(param, -sqrt_k, sqrt_k)
+            # Optionally, initialize forget gate biases to 1 for better convergence in some cases
+            if 'hf' in name or 'hi' in name:  # forget gate bias
+                param.data[lstm_cell.hidden_size:2 * lstm_cell.hidden_size].fill_(1.)
+
+
 class AC_Net(nn.Module):
     '''
     An actor-critic neural network class. Takes sensory inputs and generates a policy and a value estimate.
@@ -126,7 +143,9 @@ class AC_Net(nn.Module):
                     self.hx.append(None)
                     self.cx.append(None)
                 elif htype == 'lstm':
-                    self.hidden.append(nn.LSTMCell(input_d, output_d))
+                    lstm_cell = nn.LSTMCell(input_d, output_d)
+                    init_lstm_cell(lstm_cell)
+                    self.hidden.append(lstm_cell)
                     self.cell_out.append(None)
                     self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
