@@ -51,12 +51,12 @@ parser.add_argument("--seed", type=int, default=1, help="seed to ensure reproduc
 parser.add_argument("--hidden_type", type=str, default='lstm', help='type of hidden layer in the second last layer: lstm or linear')
 parser.add_argument("--len_edge", type=int, default=7, help="Length of the longer edge of the triangular arena. Must be odd number >=5")
 parser.add_argument("--step_reward", type=float, default=-0.1, help="Magnitude of reward for each action agent takes, to ensure shortest path")
-parser.add_argument("--poke_reward", type=float, default=5, help="Magnitude of reward when agent pokes signal to proceed")
+parser.add_argument("--poke_reward", type=float, default=1, help="Magnitude of reward when agent pokes signal to proceed")
 parser.add_argument("--incentive_mag", type=float, default=10, help="Magnitude of reward when agent moves to reward port")
 parser.add_argument("--incentive_prob", type=float, default=1, help="Number of steps before agent can receive incentive reward")
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 parser.add_argument("--algo", type=str, default='td', help="td or mc")
-parser.add_argument("--truncate_epi", type=int, default=200, help="truncate BPTT frequency")
+parser.add_argument("--truncate_step", type=int, default=200, help="truncate BPTT frequency")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -78,13 +78,13 @@ seed = argsdict['seed']
 incentive_mag = argsdict['incentive_mag']
 incentive_prob = argsdict['incentive_prob']
 algo = argsdict['algo']
-truncate_epi = argsdict['truncate_epi']
+truncate_step = argsdict['truncate_step']
 
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/td_incentive'
 else:
     main_dir = '/network/scratch/l/lindongy/timecell/training/td_incentive'
-save_dir_str = f'{hidden_type}_N{n_neurons}_{lr}_{algo}_len{len_edge}_R{incentive_mag}_P{incentive_prob}'
+save_dir_str = f'{hidden_type}_N{n_neurons}_{lr}_{algo}_truncate{truncate_step}_len{len_edge}_R{incentive_mag}_P{incentive_prob}'
 save_dir = os.path.join(main_dir, save_dir_str)
 if not os.path.exists(save_dir):
     os.makedirs(save_dir, exist_ok=True)
@@ -212,7 +212,7 @@ for i_episode in tqdm(range(n_total_episodes)):
         net.rewards.append(reward)
         step += 1
 
-        if algo == 'td' and (step+1) % truncate_epi == 0:
+        if algo == 'td' and (step+1) % truncate_step == 0:
             # Save hidden states for reinitialization in the next episode
             hidden_state_dict['cell_out'] = [x.clone().detach() if x!=None else None for x in net.cell_out]
             hidden_state_dict['hx'] = [x.clone().detach() if x!=None else None for x in net.hx]
@@ -229,7 +229,8 @@ for i_episode in tqdm(range(n_total_episodes)):
         del net.saved_actions[:]
     else:
         if algo == 'td':
-            p_losses[i_episode], v_losses[i_episode] = finish_trial_td(net, 0.99, optimizer)
+            if (step+1) % truncate_step != 0:
+                p_losses[i_episode], v_losses[i_episode] = finish_trial_td(net, 0.99, optimizer)
         elif algo == 'mc':
             p_losses[i_episode], v_losses[i_episode] = finish_trial_mc(net, 0.99, optimizer)
         else:
