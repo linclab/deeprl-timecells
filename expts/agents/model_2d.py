@@ -450,6 +450,8 @@ def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     v_loss = torch.stack(value_losses).sum()
     loss = p_loss + v_loss
     loss.backward()
+    # Gradient clipping
+    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
     optimizer.step()
 
     # clear stored actions and rewards for the next episode
