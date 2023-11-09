@@ -113,7 +113,7 @@ np.random.seed(argsdict["seed"])
 
 
 #env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed)
-env = Tunl_incentive(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed, p_small_reward, a_small_reward)
+env = Tunl_incentive(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, p_small_reward, a_small_reward, rng_seed=seed)
 
 rfsize = 2
 padding = 0
@@ -206,17 +206,17 @@ for i_episode in tqdm(range(n_total_episodes)):
         if env.indelay:
             small_reward.append(env.reward)
         net.rewards.append(reward)
-    epi_small_reward[i_episode] = np.sum(small_reward)
+    epi_small_reward[i_episode] = np.sum(small_reward[1:])
     choice[i_episode] = env.current_loc
     if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
         nonmatch_perc[i_episode] = 1  # check
     nomem_perf[i_episode] = 1 if reward == rwd else 0  # Touch L to get reward
     epi_nav_reward[i_episode] = env.nav_reward
-    if record_data and load_model_path == 'None':
+    if record_data:
         del net.rewards[:]
         del net.saved_actions[:]
     else:
-        p_loss, v_loss = finish_trial_mc(net, 0.99, optimizer)
+        p_loss, v_loss = finish_trial(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
             # report epi_small_reward

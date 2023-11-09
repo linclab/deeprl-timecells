@@ -1,0 +1,83 @@
+
+======== GPU REPORT ========
+
+==============NVSMI LOG==============
+
+Timestamp                                 : Thu Sep 28 18:24:34 2023
+Driver Version                            : 535.86.10
+CUDA Version                              : 12.2
+
+Attached GPUs                             : 1
+GPU 00000000:C4:00.0
+    Accounting Mode                       : Enabled
+    Accounting Mode Buffer Size           : 4000
+    Accounted Processes
+        Process ID                        : 46379
+            GPU Utilization               : 1 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1140 MiB
+            Time                          : 23791 ms
+            Is Running                    : 0
+        Process ID                        : 50541
+            GPU Utilization               : 1 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1140 MiB
+            Time                          : 39402 ms
+            Is Running                    : 0
+        Process ID                        : 62800
+            GPU Utilization               : 1 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1134 MiB
+            Time                          : 28059 ms
+            Is Running                    : 0
+        Process ID                        : 63816
+            GPU Utilization               : 0 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1134 MiB
+            Time                          : 53136 ms
+            Is Running                    : 0
+        Process ID                        : 65008
+            GPU Utilization               : 0 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1134 MiB
+            Time                          : 188584 ms
+            Is Running                    : 0
+        Process ID                        : 3224
+            GPU Utilization               : 1 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1140 MiB
+            Time                          : 36302 ms
+            Is Running                    : 0
+        Process ID                        : 5310
+            GPU Utilization               : 1 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1134 MiB
+            Time                          : 23680 ms
+            Is Running                    : 0
+        Process ID                        : 6127
+            GPU Utilization               : 2 %
+            Memory Utilization            : 0 %
+            Max memory usage              : 1140 MiB
+            Time                          : 29041 ms
+            Is Running                    : 0
+
+Thu Sep 28 18:24:35 2023       
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.86.10              Driver Version: 535.86.10    CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  Quadro RTX 8000                On  | 00000000:C4:00.0 Off |                  Off |
+| 33%   24C    P8              10W / 260W |      1MiB / 49152MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+                                                                                         
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|  No running processes found                                                           |
++---------------------------------------------------------------------------------------+

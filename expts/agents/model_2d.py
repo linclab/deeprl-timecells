@@ -400,14 +400,60 @@ def finish_trial_mc(model, discount_factor, optimizer, **kwargs):
 
     total_loss = p_loss + v_loss
 
+    total_loss.backward()  # calculate gradient
+    optimizer.step()
+
+    del model.rewards[:]
+    del model.saved_actions[:]
+
+    return p_loss, v_loss
+
+# calculate policy and value loss for updating network weights
+def finish_trial(model, discount_factor, optimizer, beta=0., hid_activity=None, **kwargs):
+    """
+    Finishes a given training trial and backpropagates.
+    """
+
+    # set the return to zero
+    returns_ = discount_rwds(np.asarray(model.rewards), gamma=discount_factor)
+    saved_actions = model.saved_actions
+
+    policy_losses = []
+    value_losses = []
+
+    returns_ = torch.Tensor(returns_).to(model.device)
+
+    for (log_prob, value), r in zip(saved_actions, returns_):
+        rpe = r - value.item()
+        policy_losses.append(-log_prob * rpe)
+        value_losses.append(F.smooth_l1_loss(value, Variable(torch.Tensor([[r]]).to(model.device))).unsqueeze(-1))
+        #   return policy_losses, value_losses
+    optimizer.zero_grad()  # clear gradient
+
+    p_loss = (torch.cat(policy_losses).sum())
+    v_loss = (torch.cat(value_losses).sum())
+    if beta > 0:
+        t_loss = calculate_temporal_coherence_penalty(beta, hid_activity)
+    else:
+        t_loss = 0
+
+    total_loss = p_loss + v_loss + t_loss
+
     total_loss.backward(retain_graph=True)  # calculate gradient
     optimizer.step()
 
     del model.rewards[:]
     del model.saved_actions[:]
 
-    return p_loss.item(), v_loss.item()
+    return p_loss, v_loss
 
+
+def calculate_temporal_coherence_penalty(beta, hid_activity):
+    resp_diff = hid_activity[1,:] - hid_activity[:-1,:]
+    total_diff = np.sum(np.power(resp_diff, 2))
+    n_steps = hid_activity.shape[0]
+    loss = beta / n_steps * total_diff
+    return loss
 
 def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     """

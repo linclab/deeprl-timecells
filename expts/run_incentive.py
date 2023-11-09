@@ -214,9 +214,10 @@ for i_episode in tqdm(range(n_total_episodes)):
 
         if algo == 'td' and (step+1) % truncate_step == 0:
             # Save hidden states for reinitialization in the next episode
-            hidden_state_dict['cell_out'] = [x.clone().detach() if x!=None else None for x in net.cell_out]
-            hidden_state_dict['hx'] = [x.clone().detach() if x!=None else None for x in net.hx]
-            hidden_state_dict['cx'] = [x.clone().detach() if x!=None else None for x in net.cx]
+            with torch.no_grad():
+                hidden_state_dict['cell_out'] = [x.clone().detach() if x!=None else None for x in net.cell_out]
+                hidden_state_dict['hx'] = [x.clone().detach() if x!=None else None for x in net.hx]
+                hidden_state_dict['cx'] = [x.clone().detach() if x!=None else None for x in net.cx]
             p_loss, v_loss = finish_trial_td(net, 0.99, optimizer)
             net.reinit_hid(hidden_state_dict)
 
