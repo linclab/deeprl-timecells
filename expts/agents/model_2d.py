@@ -143,9 +143,10 @@ class AC_Net(nn.Module):
                     self.hx.append(None)
                     self.cx.append(None)
                 elif htype == 'lstm':
-                    lstm_cell = nn.LSTMCell(input_d, output_d)
-                    init_lstm_cell(lstm_cell)
-                    self.hidden.append(lstm_cell)
+                    #lstm_cell = nn.LSTMCell(input_d, output_d)
+                    #init_lstm_cell(lstm_cell)
+                    #self.hidden.append(lstm_cell)
+                    self.hidden.append(nn.LSTMCell(input_d, output_d))
                     self.cell_out.append(None)
                     self.hx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
                     self.cx.append(Variable(torch.zeros(self.batch_size, output_d)).to(self.device))
@@ -450,6 +451,8 @@ def finish_trial_td(model, discount_factor, optimizer, **kwargs):
     v_loss = torch.stack(value_losses).sum()
     loss = p_loss + v_loss
     loss.backward()
+    # Gradient clipping
+    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
     optimizer.step()
 
     # clear stored actions and rewards for the next episode
