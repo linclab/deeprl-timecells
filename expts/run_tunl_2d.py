@@ -1,6 +1,6 @@
 import random
 import os
-from envs.tunl_2d import Tunl, Tunl_nomem
+from envs.tunl_2d import Tunl, Tunl_nomem, Tunl_incentive
 from agents.model_2d import *
 import numpy as np
 import torch
@@ -60,6 +60,8 @@ parser.add_argument("--poke_reward", type=int, default=5, help="Magnitude of rew
 parser.add_argument("--save_performance_fig", type=bool, default=False, help="If False, don't pass anything. If true, pass True.")
 parser.add_argument("--p_dropout", type=float, default=0.0, help="dropout probability")
 parser.add_argument("--dropout_type", type=int, default=None, help="location of dropout (could be 1,2,3,or 4)")
+parser.add_argument("--p_small_reward", type=float, default=0.0, help="probability of small reward")
+parser.add_argument("--a_small_reward", type=int, default=3, help="magnitude of small reward, which is 1/a of nonmatch reward")
 args = parser.parse_args()
 argsdict = args.__dict__
 print(argsdict)
@@ -85,13 +87,15 @@ seed = argsdict['seed']
 weight_decay = argsdict['weight_decay']
 p_dropout = argsdict['p_dropout']
 dropout_type = argsdict['dropout_type']
+p_small_reward = argsdict['p_small_reward']
+a_small_reward = argsdict['a_small_reward']
 
 # Make directory in /training or /data_collecting to save data and model
 if record_data:
     main_dir = '/network/scratch/l/lindongy/timecell/data_collecting/tunl2d'
 else:
     main_dir = '/network/scratch/l/lindongy/timecell/training/tunl2d'
-save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}'
+save_dir_str = f'{env_type}_{len_delay}_{hidden_type}_{n_neurons}_{lr}_smallrwd{p_small_reward}_{a_small_reward}'
 if weight_decay != 0:
     save_dir_str += f'_wd{weight_decay}'
 if p_dropout != 0:
@@ -108,7 +112,8 @@ torch.manual_seed(argsdict["seed"])
 np.random.seed(argsdict["seed"])
 
 
-env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed)
+#env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed)
+env = Tunl_incentive(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed, p_small_reward, a_small_reward)
 
 rfsize = 2
 padding = 0
@@ -176,7 +181,7 @@ if record_data:
     delay_loc = np.zeros((n_total_episodes, len_delay, 2), dtype=np.int16)  # location during delay
     delay_resp_hx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # hidden states during delay
     delay_resp_cx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # cell states during delay
-
+epi_small_reward = np.zeros(n_total_episodes, dtype=np.float16)
 
 for i_episode in tqdm(range(n_total_episodes)):
     done = False
@@ -186,6 +191,7 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode] = env.sample_loc
     if env_type=='mem':
         ct[i_episode] = int(env.correction_trial)
+    small_reward = []
     while not done:
         obs = torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
         pol, val = net.forward(obs)  # forward
@@ -197,7 +203,10 @@ for i_episode in tqdm(range(n_total_episodes)):
                 net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
         act, p, v = select_action(net, pol, val)
         new_obs, reward, done, info = env.step(act)
+        if env.indelay:
+            small_reward.append(env.reward)
         net.rewards.append(reward)
+    epi_small_reward[i_episode] = np.sum(small_reward)
     choice[i_episode] = env.current_loc
     if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
         nonmatch_perc[i_episode] = 1  # check
@@ -207,14 +216,22 @@ for i_episode in tqdm(range(n_total_episodes)):
         del net.rewards[:]
         del net.saved_actions[:]
     else:
-        p_loss, v_loss = finish_trial(net, 0.99, optimizer)
+        p_loss, v_loss = finish_trial_mc(net, 0.99, optimizer)
     if (i_episode+1) % save_ckpt_per_episodes == 0:
         if load_model_path != 'None':
-            # print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
-            print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
+            # report epi_small_reward
+            print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(epi_small_reward[i_episode+1-save_ckpt_per_episodes:i_episode+1])} avg small reward in the last {save_ckpt_per_episodes} episodes, avg {np.mean(epi_small_reward[:i_episode+1])} avg small reward')
+            if env_type == 'mem':
+                print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            else:
+                print(f'Episode {i_episode+loaded_ckpt_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         else:
-            # print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
-            print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
+            # report epi_small_reward
+            print(f'Episode {i_episode}, {np.mean(epi_small_reward[i_episode+1-save_ckpt_per_episodes:i_episode+1])} avg small reward in the last {save_ckpt_per_episodes} episodes, avg {np.mean(epi_small_reward[:i_episode+1])} avg small reward')
+            if env_type == 'mem':
+                print(f'Episode {i_episode}, {np.mean(nonmatch_perc[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% nonmatch in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nonmatch_perc[:i_episode+1])*100:.3f}% nonmatch')
+            else:
+                print(f'Episode {i_episode}, {np.mean(nomem_perf[i_episode+1-save_ckpt_per_episodes:i_episode+1])*100:.3f}% correct in the last {save_ckpt_per_episodes} episodes, avg {np.mean(nomem_perf[:i_episode+1])*100:.3f}% correct')
         if save_ckpts:
             if load_model_path != 'None':
                 torch.save(net.state_dict(), save_dir + f'/seed_{argsdict["seed"]}_epi{i_episode+loaded_ckpt_episode}.pt')
@@ -250,20 +267,24 @@ if record_data:
                             delay_resp_hx=delay_resp_hx,
                             delay_resp_cx=delay_resp_cx,
                             epi_nav_reward=epi_nav_reward,
-                            ideal_nav_rwds=ideal_nav_rwds)
+                            ideal_nav_rwds=ideal_nav_rwds,
+                            epi_small_reward=epi_small_reward)
     else:
         np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_loc=delay_loc,
                             delay_resp_hx=delay_resp_hx,
                             delay_resp_cx=delay_resp_cx,
                             epi_nav_reward=epi_nav_reward,
-                            ideal_nav_rwds=ideal_nav_rwds)
+                            ideal_nav_rwds=ideal_nav_rwds,
+                            epi_small_reward=epi_small_reward)
 else:
     if env_type=='mem':
         np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
                             ct=ct,
                             epi_nav_reward=epi_nav_reward,
-                            ideal_nav_rwds=ideal_nav_rwds)
+                            ideal_nav_rwds=ideal_nav_rwds,
+                            epi_small_reward=epi_small_reward)
     else:
         np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
                             epi_nav_reward=epi_nav_reward,
-                            ideal_nav_rwds=ideal_nav_rwds)
+                            ideal_nav_rwds=ideal_nav_rwds,
+                            epi_small_reward=epi_small_reward)
