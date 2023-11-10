@@ -939,6 +939,7 @@ class Tunl_incentive(object):
         self.done = False
         self.sample = "undefined"
         self.incentivized = False  # whether the agent has received small reward during delay or not. To make sure agent only gets one small reward per trial
+        self.to_incentivize = self.rng.rand() < self.p  # whether to incentivize the agent during this trial
         if not self.correction_trial:
             self.sample_loc = random.choices((self.left_loc, self.right_loc))[0]
 
@@ -1013,12 +1014,12 @@ class Tunl_incentive(object):
                 self.observation[self.initiation_loc] += self.color["initiation_loc"]  # turn on initiation signal
                 self.indelay = False
 
-            # If the agent navigates to the incentive location, then it gets a small reward with probability p
-            if self.current_loc == self.initiation_loc and self.rng.rand() < self.p and not self.incentivized:
+            # If the agent navigates to the incentive location, then it gets a small reward with probability p if it hasn't been incentivized yet in this trial
+            if self.current_loc == self.initiation_loc and self.to_incentivize and not self.incentivized:
                 self.reward = self.rwd / self.a
                 self.incentivized = True
             else:
-                if not (self.delay_t == 1 and self.indelay is True):  # unless just poked sample, in which case self.reward=5
+                if not (self.delay_t == 1):  # unless just poked sample, in which case self.reward=5
                     self.reward = 0
 
         return self.observation, self.reward, self.done, {}
