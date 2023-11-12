@@ -1,6 +1,6 @@
 import random
 import os
-from envs.tunl_2d import Tunl, Tunl_nomem, Tunl_incentive
+from envs.tunl_2d import Tunl_incentive, Tunl_nomem_incentive
 from agents.model_2d import *
 import numpy as np
 import torch
@@ -113,7 +113,7 @@ np.random.seed(argsdict["seed"])
 
 
 #env = Tunl(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed) if env_type=='mem' else Tunl_nomem(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, seed)
-env = Tunl_incentive(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, p_small_reward, a_small_reward, rng_seed=seed)
+env = Tunl_incentive(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, p_small_reward, a_small_reward, rng_seed=seed) if env_type=='mem' else Tunl_nomem_incentive(len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, p_small_reward, a_small_reward, rng_seed=seed)
 
 rfsize = 2
 padding = 0
