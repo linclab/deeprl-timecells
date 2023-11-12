@@ -182,11 +182,13 @@ if record_data:
     delay_resp_hx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # hidden states during delay
     delay_resp_cx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # cell states during delay
 epi_small_reward = np.zeros(n_total_episodes, dtype=np.float16)
+epi_to_incentivize = np.zeros(n_total_episodes, dtype=np.float16)
 
 for i_episode in tqdm(range(n_total_episodes)):
     done = False
     env.reset()
     ideal_nav_rwds[i_episode] = ideal_nav_rwd(env, len_edge, env.len_delay, step_rwd, poke_rwd)
+    epi_to_incentivize[i_episode] = env.to_incentivize
     net.reinit_hid()
     stim[i_episode] = env.sample_loc
     if env_type=='mem':
@@ -268,23 +270,27 @@ if record_data:
                             delay_resp_cx=delay_resp_cx,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds,
-                            epi_small_reward=epi_small_reward)
+                            epi_small_reward=epi_small_reward,
+                            epi_to_incentivize=epi_to_incentivize)
     else:
         np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_loc=delay_loc,
                             delay_resp_hx=delay_resp_hx,
                             delay_resp_cx=delay_resp_cx,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds,
-                            epi_small_reward=epi_small_reward)
+                            epi_small_reward=epi_small_reward,
+                            epi_to_incentivize=epi_to_incentivize)
 else:
     if env_type=='mem':
         np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
                             ct=ct,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds,
-                            epi_small_reward=epi_small_reward)
+                            epi_small_reward=epi_small_reward,
+                            epi_to_incentivize=epi_to_incentivize)
     else:
         np.savez_compressed(save_dir + f'/seed_{seed}_total_{n_total_episodes}episodes_performance_data.npz', stim=stim, choice=choice,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds,
-                            epi_small_reward=epi_small_reward)
+                            epi_small_reward=epi_small_reward,
+                            epi_to_incentivize=epi_to_incentivize)
