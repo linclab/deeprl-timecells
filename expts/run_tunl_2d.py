@@ -177,10 +177,11 @@ nonmatch_perc = np.zeros(n_total_episodes, dtype=np.float16)
 choice = np.zeros((n_total_episodes, 2), dtype=np.int8)  # record the location when done
 ideal_nav_rwds = np.zeros(n_total_episodes, dtype=np.float16)
 nomem_perf = np.zeros(n_total_episodes, dtype=np.float16)
-if record_data:
-    delay_loc = np.zeros((n_total_episodes, len_delay, 2), dtype=np.int16)  # location during delay
-    delay_resp_hx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # hidden states during delay
-    delay_resp_cx = np.zeros((n_total_episodes, len_delay, n_neurons), dtype=np.float32)  # cell states during delay
+if record_data:  # list of lists. Each sublist is data from one episode
+    neural_activity = []
+    action = []
+    location = []
+    rwd = []
 epi_small_reward = np.zeros(n_total_episodes, dtype=np.float16)
 epi_to_incentivize = np.zeros(n_total_episodes, dtype=np.float16)
 
@@ -193,18 +194,23 @@ for i_episode in tqdm(range(n_total_episodes)):
     stim[i_episode] = env.sample_loc
     if env_type=='mem':
         ct[i_episode] = int(env.correction_trial)
+    if record_data:
+        neural_activity.append([])
+        action.append([])
+        location.append([])
+        rwd.append([])
     small_reward = []
     while not done:
         obs = torch.unsqueeze(torch.Tensor(np.reshape(env.observation, (3, env.h, env.w))), dim=0).float().to(device)
         pol, val = net.forward(obs)  # forward
-        if record_data and env.indelay:  # record location and neural responses
-            delay_loc[i_episode, env.delay_t - 1, :] = np.asarray(env.current_loc)
-            delay_resp_hx[i_episode, env.delay_t - 1, :] = net.hx[
-                net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
-            delay_resp_cx[i_episode, env.delay_t - 1, :] = net.cx[
-                net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze()
         act, p, v = select_action(net, pol, val)
+        if record_data:
+            location[i_episode].append(env.current_loc)
+            neural_activity[i_episode].append(net.hx[net.hidden_types.index("lstm")].clone().detach().cpu().numpy().squeeze())
+            action[i_episode].append(act)
         new_obs, reward, done, info = env.step(act)
+        if record_data:
+            rwd[i_episode].append(reward)
         if env.indelay:
             small_reward.append(env.reward)
         net.rewards.append(reward)
@@ -265,17 +271,21 @@ if save_performance_fig:
 # save data
 if record_data:
     if env_type=='mem':
-        np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, ct=ct, delay_loc=delay_loc,
-                            delay_resp_hx=delay_resp_hx,
-                            delay_resp_cx=delay_resp_cx,
+        np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, ct=ct,
+                            neural_activity=neural_activity,
+                            action=action,
+                            location=location,
+                            reward=rwd,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds,
                             epi_small_reward=epi_small_reward,
                             epi_to_incentivize=epi_to_incentivize)
     else:
-        np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice, delay_loc=delay_loc,
-                            delay_resp_hx=delay_resp_hx,
-                            delay_resp_cx=delay_resp_cx,
+        np.savez_compressed(save_dir + f'/{ckpt_name}_data.npz', stim=stim, choice=choice,
+                            neural_activity=neural_activity,
+                            action=action,
+                            location=location,
+                            reward=rwd,
                             epi_nav_reward=epi_nav_reward,
                             ideal_nav_rwds=ideal_nav_rwds,
                             epi_small_reward=epi_small_reward,
