@@ -216,9 +216,11 @@ for i_episode in tqdm(range(n_total_episodes)):
         net.rewards.append(reward)
     epi_small_reward[i_episode] = np.sum(small_reward[1:])
     choice[i_episode] = env.choice_loc
+    #print(f"stim: {stim[i_episode]}, choice: {choice[i_episode]}")
     if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
         nonmatch_perc[i_episode] = 1  # check
-    nomem_perf[i_episode] = 1 if reward == rwd else 0  # Touch L to get reward
+    if np.all(choice[i_episode] == [1,1]):  # Touch L to get reward
+        nomem_perf[i_episode] = 1
     epi_nav_reward[i_episode] = env.nav_reward
     if record_data:
         del net.rewards[:]
