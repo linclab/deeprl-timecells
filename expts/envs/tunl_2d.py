@@ -839,6 +839,11 @@ class Tunl_nomem_vd(object):
 class Tunl_incentive(object):
     """
     Same as Tunl, but during the delay period there's a chance (with probability p) of getting a small reward (1/a of the final reward).
+    Added 11/24:
+    1. self.choice_loc for tracking behaviour;
+    2. if choose incorrectly then punish and end trial right away.
+    2.5. if choose correctly then turns off signal, wait until navigate to initiation signal, then give reward and end trial.
+    3. slightly punish during delay until incentivized.
     """
     def __init__(self, len_delay, len_edge, rwd, inc_rwd, step_rwd, poke_rwd, p, a, rng_seed=1234):
         """
@@ -922,6 +927,7 @@ class Tunl_incentive(object):
             self.p = p
             self.a = a
             self.incentivized = False
+            self.choice_loc = None
 
     def reset(self):
         init_idx = self.rng.choice(np.arange(len(self.init_row)))
@@ -938,6 +944,7 @@ class Tunl_incentive(object):
         self.nav_reward = 0
         self.done = False
         self.sample = "undefined"
+        self.choice_loc = None
         self.incentivized = False  # whether the agent has received small reward during delay or not. To make sure agent only gets one small reward per trial
         self.to_incentivize = self.rng.rand() < self.p  # whether to incentivize the agent during this trial
         if not self.correction_trial:
@@ -980,11 +987,13 @@ class Tunl_incentive(object):
                     elif self.sample == "L": # poked incorrectly at match location
                         self.reward = self.inc_rwd
                         self.correction_trial = True  # set the flag so the next trial gets the same sample_loc
+                        self.choice_loc = self.current_loc
                         self.done = True
                     elif self.sample == "R":  # poked correctly at nonmatch location
-                        self.reward = self.rwd
+                        self.reward = self.poke_rwd
+                        self.nav_reward += self.reward
                         self.correction_trial = False  # reset correction_trial Flag
-                        self.done = True
+                        self.choice_loc = self.current_loc
                 elif self.current_loc == self.right_loc:  # currently at the right touchscreen
                     self.observation[self.current_loc] -= self.color[
                         "touchscreen_loc"]  # turn off touchscreen signal
@@ -996,15 +1005,21 @@ class Tunl_incentive(object):
                     elif self.sample == "R":  # poked incorrectly at match location
                         self.reward = self.inc_rwd
                         self.correction_trial = True  # set the flag so the next trial gets the same sample_loc
+                        self.choice_loc = self.current_loc
                         self.done = True
                     elif self.sample == "L":  # poked correctly at nonmatch location
-                        self.reward = self.rwd
+                        self.reward = self.poke_rwd
+                        self.nav_reward += self.reward
                         self.correction_trial = False  # reset correction_trial Flag
-                        self.done = True
+                        self.choice_loc = self.current_loc
             else:
                 if not self.indelay:
-                    self.reward = self.step_rwd  # lightly punish unnecessary poke actions unless during delay
-                    self.nav_reward += self.reward
+                    if self.current_loc == self.initiation_loc and self.choice_loc is not None:
+                        self.reward = self.rwd
+                        self.done = True
+                    else:
+                        self.reward = self.step_rwd  # lightly punish unnecessary poke actions unless during delay
+                        self.nav_reward += self.reward
 
         if self.indelay:  # delay period
 
@@ -1020,7 +1035,10 @@ class Tunl_incentive(object):
                 self.incentivized = True
             else:
                 if not (self.delay_t == 1):  # unless just poked sample, in which case self.reward=5
-                    self.reward = 0
+                    if not self.incentivized:
+                        self.reward = self.step_rwd
+                    else:
+                        self.reward = 0
 
         return self.observation, self.reward, self.done, {}
 
@@ -1108,6 +1126,7 @@ class Tunl_nomem_incentive(object):
         self.p = p
         self.a = a
         self.incentivized = False
+        self.choice_loc = None
 
     def reset(self):
         init_idx = self.rng.choice(np.arange(len(self.init_row)))
@@ -1127,6 +1146,7 @@ class Tunl_nomem_incentive(object):
         self.done = False
         self.incentivized = False  # whether the agent has received small reward during delay or not. To make sure agent only gets one small reward per trial
         self.to_incentivize = self.rng.rand() < self.p  # whether to incentivize the agent during this trial
+        self.choice_loc = None
 
     def step(self, action):
         """
@@ -1163,8 +1183,9 @@ class Tunl_nomem_incentive(object):
                         self.reward = self.poke_rwd
                         self.nav_reward += self.reward
                     elif self.sample == "R" or self.sample == "L":  # Choose L is correct regardless of sample
-                        self.reward = self.rwd
-                        self.done = True
+                        self.reward = self.poke_rwd
+                        self.nav_reward += self.reward
+                        self.choice_loc = self.current_loc
                 elif self.current_loc == self.right_loc:  # currently at the right touchscreen
                     self.observation[self.current_loc] -= self.color[
                         "touchscreen_loc"]  # turn off touchscreen signal
@@ -1175,11 +1196,16 @@ class Tunl_nomem_incentive(object):
                         self.nav_reward += self.reward
                     elif self.sample == "L" or self.sample == "R":  # Choose R is incorrect regardless of sample
                         self.reward = self.inc_rwd
+                        self.choice_loc = self.current_loc
                         self.done = True
             else:
                 if not self.indelay:
-                    self.reward = self.step_rwd  # lightly punish unnecessary poke actions unless during delay
-                    self.nav_reward += self.reward
+                    if self.current_loc == self.initiation_loc and self.choice_loc is not None:
+                        self.reward = self.rwd
+                        self.done = True
+                    else:
+                        self.reward = self.step_rwd  # lightly punish unnecessary poke actions unless during delay
+                        self.nav_reward += self.reward
         if self.indelay:  # delay period
             if self.delay_t < self.len_delay:
                 self.delay_t += 1
@@ -1193,6 +1219,9 @@ class Tunl_nomem_incentive(object):
                 self.incentivized = True
             else:
                 if not (self.delay_t == 1):  # unless just poked sample, in which case self.reward=5
-                    self.reward = 0
+                    if not self.incentivized:
+                        self.reward = self.step_rwd
+                    else:
+                        self.reward = 0
 
         return self.observation, self.reward, self.done, {}
