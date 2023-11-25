@@ -215,7 +215,7 @@ for i_episode in tqdm(range(n_total_episodes)):
             small_reward.append(env.reward)
         net.rewards.append(reward)
     epi_small_reward[i_episode] = np.sum(small_reward[1:])
-    choice[i_episode] = env.current_loc
+    choice[i_episode] = env.choice_loc
     if np.any(stim[i_episode] != choice[i_episode]):  # nonmatch
         nonmatch_perc[i_episode] = 1  # check
     nomem_perf[i_episode] = 1 if reward == rwd else 0  # Touch L to get reward
