@@ -28,7 +28,7 @@ n_neurons = 256
 n_shuffle = 100
 percentile = 99
 p_small_reward = 0.5
-a_small_reward = 3
+a_small_reward = int(data_dir[-1])
 small_rwd = 100/a_small_reward
 
 
@@ -81,14 +81,15 @@ for i_episode in tqdm(range(n_total_episodes)):
     poke_reward_timestamp = np.where(np.asarray(reward_episode) == 5)[0]
     if len(poke_reward_timestamp) == 4: # correct trial
         # assert trials with 4 poke_reward_timestamps are correct trials, for mem or nomem
-        if env_type == 'mem':
-            assert np.any(stim[i_episode] != choice[i_episode])
-        elif env_type == 'nomem':
-            assert np.all(choice[i_episode] == [1,1])
-        assert  reward_episode[-1] == 100
-
-        stim_init_idx, sample_poke_idx, choice_init_idx, choice_poke_idx = poke_reward_timestamp
-        timestamp_big_reward.append(len(reward_episode) - 1)  # the last item
+        if (env_type == 'mem' and np.any(stim[i_episode] != choice[i_episode])) or (env_type == 'nomem' and np.all(choice[i_episode] == [1,1])):  # good agent
+            assert  reward_episode[-1] == 100
+            stim_init_idx, sample_poke_idx, choice_init_idx, choice_poke_idx = poke_reward_timestamp
+            timestamp_big_reward.append(len(reward_episode) - 1)  # the last item
+        else:
+            assert reward_episode[-1] == -20
+            stim_init_idx, sample_poke_idx, choice_init_idx, _ = poke_reward_timestamp  # disregard poking the correct chice if it eventually goes to incorrect choice
+            # and then, len(reward_episode) - 1 corresponds to poking incorrect choice and receiving -20 reward
+            choice_poke_idx = len(reward_episode) - 1  # the last item
     elif len(poke_reward_timestamp) == 3: # incorrect trial
         # assert trials with 3 poke_reward_timestamps are incorrect trials, for mem or nomem
         if env_type == 'mem':
@@ -105,7 +106,9 @@ for i_episode in tqdm(range(n_total_episodes)):
     timestamp_initiate_choice.append(choice_init_idx)
     timestamp_poke_stimulus.append(sample_poke_idx)
     timestamp_poke_choice.append(choice_poke_idx)
-    timestamp_small_reward.append(np.where(np.isclose(reward_episode, small_rwd))[0][0])
+    if len(np.where(reward_episode==small_rwd)[0]) > 0:
+        timestamp_small_reward.append(np.where(reward_episode==small_rwd)[0][0])
+    # TODO: debug this. why len(timestamp_small_reward) is not the same as len(trial_idx_small_reward)?
 
 
 timestamp_initiate_stimulus = np.asarray(timestamp_initiate_stimulus)
@@ -130,55 +133,64 @@ trial_idx_right_choice = np.where(np.all(choice==[1,7], axis=1))[0] # incorrect 
 trial_idx_left_stimulus = np.where(np.all(stim==[1,1], axis=1))[0]
 trial_idx_right_stimulus = np.where(np.all(stim==[1,7], axis=1))[0]
 
+if env_type=="mem":
+    assert len(trial_idx_nonmatch) == len(timestamp_big_reward)
+else:
+    assert len(trial_idx_left_choice) == len(timestamp_big_reward)
 
 # identify neurons that fire significantly at different time steps
 print("identify neurons that fire significantly when collecting small reward...")
-small_reward_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_small_reward, timestamp=timestamp_small_reward, percentile=percentile)
+small_reward_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_small_reward, timestamp=timestamp_small_reward, percentile=percentile, n_shuffle=n_shuffle)
 print(f"Number of neurons that fire significantly when collecting small reward: {len(small_reward_cells_idx)}")
 
 print("identify neurons that fire significantly when initiating stimulus phase...")
-initiate_stimulus_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_initate_stimulus, timestamp=timestamp_initiate_stimulus, percentile=percentile)
+initiate_stimulus_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_initate_stimulus, timestamp=timestamp_initiate_stimulus, percentile=percentile, n_shuffle=n_shuffle)
 print(f"Number of neurons that fire significantly when initiating stimulus phase: {len(initiate_stimulus_cells_idx)}")
 
 print("identify neurons that fire significantly when initiating choice phase...")
-initiate_choice_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_intiate_choice, timestamp=timestamp_initiate_choice, percentile=percentile)
+initiate_choice_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_intiate_choice, timestamp=timestamp_initiate_choice, percentile=percentile, n_shuffle=n_shuffle)
 print(f"Number of neurons that fire significantly when initiating choice phase: {len(initiate_choice_cells_idx)}")
 
 print("identify neurons that fire significantly when collecting big reward...")
-big_reward_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp=timestamp_big_reward, percentile=percentile)
+big_reward_cells_idx = identify_significant_neurons(neural_activity, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp=timestamp_big_reward, percentile=percentile, n_shuffle=n_shuffle)
 print(f"Number of neurons that fire significantly when collecting big reward: {len(big_reward_cells_idx)}")
 
 print("identify neurons that fire significantly between poking stimulus and collecting incentive..")
-incentive_prediction_cells_idx = identify_significant_neurons_between_timestamps(neural_activity, trial_idx=trial_idx_small_reward, timestamp_start=timestamp_poke_stimulus, timestamp_end=timestamp_small_reward, percentile=percentile)
+incentive_prediction_cells_idx = identify_significant_neurons_between_timestamps(neural_activity, trial_idx=trial_idx_small_reward, timestamp_start=timestamp_poke_stimulus, timestamp_end=timestamp_small_reward, percentile=percentile, n_shuffle=n_shuffle)
 print(f"Number of neurons that fire significantly between poking stimulus and collecting incentive: {len(incentive_prediction_cells_idx)}")
 
 print("identify neurons that fire significantly between poking choice and collecting big reward..")
-reward_prediction_cells_idx = identify_significant_neurons_between_timestamps(neural_activity, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp_start=timestamp_poke_choice, timestamp_end=timestamp_big_reward, percentile=percentile)
+reward_prediction_cells_idx = identify_significant_neurons_between_timestamps(neural_activity, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp_start=timestamp_poke_choice, timestamp_end=timestamp_big_reward, percentile=percentile, n_shuffle=n_shuffle)
 print(f"Number of neurons that fire significantly between poking choice and collecting big reward: {len(reward_prediction_cells_idx)}")
 
 # for small_reward_cells, plot aggregated activity around small reward timestamp
 print("plot aggregated activity around small reward timestamp...")
 aggregated_activity = aggregate_neural_activity(neural_activity, trial_idx_small_reward, timestamp_small_reward, window_size=5, n_neurons=256)
-plot_aggregated_activity(aggregated_activity, small_reward_cells_idx, save_dir=os.path.join(save_dir, 'small_reward', 'first_100'), window_size=5, n_trials=100, random_trials=False)
-plot_aggregated_activity(aggregated_activity, small_reward_cells_idx, save_dir=os.path.join(save_dir, 'small_reward', 'random'), window_size=5, n_trials=100, random_trials=True)
+plot_aggregated_activity(aggregated_activity, small_reward_cells_idx, save_dir=os.path.join(seed_save_dir, 'small_reward', 'first_100'), window_size=5, n_trials=100, random_trials=False)
+plot_aggregated_activity(aggregated_activity, small_reward_cells_idx, save_dir=os.path.join(seed_save_dir, 'small_reward', 'random'), window_size=5, n_trials=100, random_trials=True)
 
 # for big_reward_cells, plot aggregated activity around big reward timestamp
 print("plot aggregated activity around big reward timestamp...")
 aggregated_activity = aggregate_neural_activity(neural_activity, trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp_big_reward, window_size=5, n_neurons=256)
-plot_aggregated_activity(aggregated_activity, big_reward_cells_idx, save_dir=os.path.join(save_dir, 'big_reward', 'first_100'), window_size=5, n_trials=100, random_trials=False)
-plot_aggregated_activity(aggregated_activity, big_reward_cells_idx, save_dir=os.path.join(save_dir, 'big_reward', 'random'), window_size=5, n_trials=100, random_trials=True)
+plot_aggregated_activity(aggregated_activity, big_reward_cells_idx, save_dir=os.path.join(seed_save_dir, 'big_reward', 'first_100'), window_size=5, n_trials=100, random_trials=False)
+plot_aggregated_activity(aggregated_activity, big_reward_cells_idx, save_dir=os.path.join(seed_save_dir, 'big_reward', 'random'), window_size=5, n_trials=100, random_trials=True)
 
 # for incentive_prediction_cells, plot aggregated activity between poking stimulus and collecting incentive
 print("plot aggregated activity between poking stimulus and collecting incentive...")
-aggregated_activity = aggregate_run_to_reward_activity(neural_activity, trial_idx_small_reward, timestamp_poke_stimulus, timestamp_small_reward, n_neurons=256)
-plot_aggregated_activity(aggregated_activity, incentive_prediction_cells_idx, save_dir=os.path.join(save_dir, 'incentive_prediction', 'first_100'), window_size=5, n_trials=100, random_trials=False)
-plot_aggregated_activity(aggregated_activity, incentive_prediction_cells_idx, save_dir=os.path.join(save_dir, 'incentive_prediction', 'random'), window_size=5, n_trials=100, random_trials=True)
+aggregated_activity_start_aligned, aggregated_activity_end_aligned = aggregate_run_to_reward_activity(neural_activity, trial_idx_small_reward, timestamp_poke_stimulus[trial_idx_small_reward], timestamp_small_reward, n_neurons=256)
+plot_aggregated_activity(aggregated_activity_start_aligned, incentive_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'incentive_prediction_start_aligned', 'first_100'), window_size=5, n_trials=100, random_trials=False)
+plot_aggregated_activity(aggregated_activity_start_aligned, incentive_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'incentive_prediction_start_aligned', 'random'), window_size=5, n_trials=100, random_trials=True)
+plot_aggregated_activity(aggregated_activity_end_aligned, incentive_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'incentive_prediction_end_aligned', 'first_100'), window_size=5, n_trials=100, random_trials=False)
+plot_aggregated_activity(aggregated_activity_end_aligned, incentive_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'incentive_prediction_end_aligned', 'random'), window_size=5, n_trials=100, random_trials=True)
 
 # for reward_prediction_cells, plot aggregated activity between poking choice and collecting big reward
 print("plot aggregated activity between poking choice and collecting big reward...")
-aggregated_activity = aggregate_run_to_reward_activity(neural_activity, trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp_poke_choice, timestamp_big_reward, n_neurons=256)
-plot_aggregated_activity(aggregated_activity, reward_prediction_cells_idx, save_dir=os.path.join(save_dir, 'reward_prediction', 'first_100'), window_size=5, n_trials=100, random_trials=False)
-plot_aggregated_activity(aggregated_activity, reward_prediction_cells_idx, save_dir=os.path.join(save_dir, 'reward_prediction', 'random'), window_size=5, n_trials=100, random_trials=True)
+aggregated_activity_start_aligned, aggregated_activity_end_aligned = aggregate_run_to_reward_activity(neural_activity, trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp_poke_choice[trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice], timestamp_big_reward, n_neurons=256)
+plot_aggregated_activity(aggregated_activity_start_aligned, reward_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'reward_prediction_start_aligned', 'first_100'), window_size=5, n_trials=100, random_trials=False)
+plot_aggregated_activity(aggregated_activity_start_aligned, reward_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'reward_prediction_start_aligned', 'random'), window_size=5, n_trials=100, random_trials=True)
+plot_aggregated_activity(aggregated_activity_end_aligned, reward_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'reward_prediction_end_aligned', 'first_100'), window_size=5, n_trials=100, random_trials=False)
+plot_aggregated_activity(aggregated_activity_end_aligned, reward_prediction_cells_idx, save_dir=os.path.join(seed_save_dir, 'reward_prediction_end_aligned', 'random'), window_size=5, n_trials=100, random_trials=True)
+
 
 
 

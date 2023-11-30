@@ -1012,6 +1012,7 @@ class Tunl_incentive(object):
                         self.nav_reward += self.reward
                         self.correction_trial = False  # reset correction_trial Flag
                         self.choice_loc = self.current_loc
+                        # Note: at this point, the agent should run to the back. But some dumb agents run to the match location and get punished
             else:
                 if not self.indelay:
                     if self.current_loc == self.initiation_loc and self.choice_loc is not None:

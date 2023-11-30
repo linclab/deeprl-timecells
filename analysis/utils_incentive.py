@@ -82,9 +82,9 @@ def get_trial_average_value_at_time_step_shuffled(neural_activity, trial_idx, ti
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
     for i_neuron in range(n_neurons):
         if shuffle == 'circular':
-            trial_average_value_shuffled[i_neuron] = np.mean([circular_shuffle_neural_activity(neural_activity[trial_idx[i_trial]].T)[i_neuron][timestamp[i_trial]] for i_trial in range(n_trials)])
+            trial_average_value_shuffled[i_neuron] = np.mean([circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]] for i_trial in range(n_trials)])
         elif shuffle == 'swap':
-            trial_average_value_shuffled[i_neuron] = np.mean([swap_shuffle_neural_activity(neural_activity[trial_idx[i_trial]].T)[i_neuron][timestamp[i_trial]] for i_trial in range(n_trials)])
+            trial_average_value_shuffled[i_neuron] = np.mean([swap_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]] for i_trial in range(n_trials)])
     return trial_average_value_shuffled  # n_neurons
 
 def get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, timestamp, window_size=5, n_neurons=256, shuffle='circular'):
@@ -95,9 +95,9 @@ def get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, t
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
     for i_neuron in range(n_neurons):
         if shuffle == 'circular':
-            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(neural_activity[trial_idx[i_trial]].T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
+            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
         elif shuffle == 'swap':
-            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(swap_shuffle_neural_activity(neural_activity[trial_idx[i_trial]].T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
+            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(swap_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
 
 def get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_idx, timestamp_start, timestamp_end, n_neurons=256, shuffle='circular'):
     # shuffle neural activity, then take average between timestamp_start and timestamp_end
@@ -107,9 +107,9 @@ def get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_i
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
     for i_neuron in range(n_neurons):
         if shuffle == 'circular':
-            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(neural_activity[trial_idx[i_trial]].T)[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]) for i_trial in range(n_trials)])
+            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]) for i_trial in range(n_trials)])
         elif shuffle == 'swap':
-            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(swap_shuffle_neural_activity(neural_activity[trial_idx[i_trial]].T)[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]) for i_trial in range(n_trials)])
+            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(swap_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]) for i_trial in range(n_trials)])
     return trial_average_value_shuffled  # n_neurons
 
 
@@ -120,7 +120,7 @@ def identify_significant_neurons(neural_activity, trial_idx, timestamp, use_wind
     else:
         trial_average_value = get_trial_average_value_at_time_step(neural_activity, trial_idx, timestamp, n_neurons=n_neurons)
     trial_average_value_shuffled = []
-    for i_shuffle in range(n_shuffle):
+    for i_shuffle in tqdm(range(n_shuffle)):
         if use_window_average:
             trial_average_value_shuffled.append(get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, timestamp, window_size=window_size, n_neurons=n_neurons, shuffle=shuffle))
         else:
@@ -130,7 +130,7 @@ def identify_significant_neurons(neural_activity, trial_idx, timestamp, use_wind
 def identify_significant_neurons_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end, n_shuffle=1000, n_neurons=256, percentile=99, shuffle='circular'):
     trial_average_value = get_trial_average_value_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end, n_neurons=n_neurons)
     trial_average_value_shuffled = []
-    for i_shuffle in range(n_shuffle):
+    for i_shuffle in tqdm(range(n_shuffle)):
         trial_average_value_shuffled.append(get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_idx, timestamp_start, timestamp_end, n_neurons=n_neurons, shuffle=shuffle))
     return np.where(trial_average_value > np.percentile(trial_average_value_shuffled, percentile))[0] # indices of neurons that are significantly higher than shuffled neurons
 
@@ -147,12 +147,12 @@ def aggregate_neural_activity(neural_activity, trial_idx, timestamp, window_size
         agg_activity = np.empty((n_trials, window_size*2+1))
         agg_activity[:] = np.nan
         for i_trial in range(n_trials):
-            trial_neural_activity = neural_activity[trial_idx[i_trial]].T # n_neurons x T_episode
+            trial_neural_activity = np.asarray(neural_activity[trial_idx[i_trial]]).T # n_neurons x T_episode
             timestamp_trial = timestamp[i_trial]
             if timestamp_trial - window_size < 0:  # eg. initate stimulus
                 agg_activity[i_trial][window_size-timestamp_trial:] = trial_neural_activity[i_neuron][:timestamp_trial+window_size+1]
             elif timestamp_trial + window_size > len(trial_neural_activity[i_neuron]):  # eg. poke choice
-                agg_activity[i_trial][:len(trial_neural_activity[i_neuron])-timestamp_trial+window_size+1] = trial_neural_activity[i_neuron][timestamp_trial-window_size:]
+                agg_activity[i_trial][:len(trial_neural_activity[i_neuron])-timestamp_trial+window_size+1] = trial_neural_activity[i_neuron][timestamp_trial-window_size-1:]
             else:
                 agg_activity[i_trial] = trial_neural_activity[i_neuron][timestamp_trial-window_size:timestamp_trial+window_size+1]
         aggregated_activity[:,:,i_neuron] = agg_activity
@@ -163,15 +163,21 @@ def aggregate_run_to_reward_activity(neural_activity, trial_idx, timestamp_start
     # trial_idx is all 5000 for sample-smallreward run, or all trial_idx_nonmatch or trial_idx_left_choice for choice-bigreward run
     n_trials = len(timestamp_start)
     assert n_trials == len(timestamp_end) == len(trial_idx)
-    aggregated_activity = np.zeros((n_trials, max(timestamp_end-timestamp_start), n_neurons))
+    aggregated_activity_start_aligned = np.zeros((n_trials, max(timestamp_end-timestamp_start), n_neurons))
+    aggregated_activity_end_aligned = np.zeros((n_trials, max(timestamp_end-timestamp_start), n_neurons))
     for i_neuron in range(n_neurons):
-        agg_activity = np.empty((n_trials, max(timestamp_end-timestamp_start)))
-        agg_activity[:] = np.nan
+        agg_activity_start_aligned = np.empty((n_trials, max(timestamp_end-timestamp_start)))
+        agg_activity_start_aligned[:] = np.nan
+        agg_activity_end_aligned = np.empty((n_trials, max(timestamp_end-timestamp_start)))
+        agg_activity_end_aligned[:] = np.nan
         for i_trial in range(n_trials):
-            trial_neural_activity = neural_activity[trial_idx[i_trial]].T # n_neurons x T_episode
-            agg_activity[i_trial] = trial_neural_activity[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]
-        aggregated_activity[:,:,i_neuron] = agg_activity
-    return aggregated_activity  # n_trials x max(timestamp_end-timestamp_start) x n_neurons
+            trial_neural_activity = np.asarray(neural_activity[trial_idx[i_trial]]).T # n_neurons x T_episode
+            length = timestamp_end[i_trial] - timestamp_start[i_trial]
+            agg_activity_start_aligned[i_trial][:length] = trial_neural_activity[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]
+            agg_activity_end_aligned[i_trial][-length:] = trial_neural_activity[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]
+        aggregated_activity_start_aligned[:,:,i_neuron] = agg_activity_start_aligned
+        aggregated_activity_end_aligned[:,:,i_neuron] = agg_activity_end_aligned
+    return aggregated_activity_start_aligned, aggregated_activity_end_aligned  # n_trials x max(timestamp_end-timestamp_start) x n_neurons
 
 
 # Plot each neurons's aggregated activity
