@@ -53,7 +53,6 @@ else:
 
 stim = data['stim']  # (n_episodes, 2)
 choice = data['choice'] # (n_episodes, 2)
-ct = data['ct'] # (n_episodes)
 neural_activity = data['neural_activity']  # (n_episodes,) array. Each element of the array is a list of length T_episode. Each element of the list is a numpy array of shape (n_neurons,).
 action = data['action'] # (n_episodes,) array. Each element of the array is a list of length T_episode. Each element of the list is an integer.
 location = data['location'] # (n_episodes,) array. Each element of the array is a list of length T_episode. Each element of the list is a numpy array of shape (2,).
