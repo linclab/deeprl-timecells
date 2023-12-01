@@ -195,16 +195,24 @@ def plot_aggregated_activity(aggregated_activity, neuron_idx, save_dir, window_s
                 trials_to_plot = np.sort(np.random.choice(trial_idx, size=n_trials, replace=False))
             else:
                 trials_to_plot = trial_idx[:n_trials]  # plot the first n_trials trials
-        nan_counts = np.sum(np.isnan(aggregated_activity[trials_to_plot, :, i_neuron]), axis=1)
-        # The number of floats in each row is the total number of columns minus the number of NaNs
-        float_counts = aggregated_activity[trials_to_plot, :, i_neuron].shape[1] - nan_counts
-        # Find the maximum count of floats in a row
-        length_to_plot = np.max(float_counts)
+
+        if align is not None:
+            assert align == 'start' or align == 'end'
+            nan_counts = np.sum(np.isnan(aggregated_activity[trials_to_plot, :, i_neuron]), axis=1)
+            # The number of floats in each row is the total number of columns minus the number of NaNs
+            float_counts = aggregated_activity[trials_to_plot, :, i_neuron].shape[1] - nan_counts
+            # Find the maximum count of floats in a row
+            length_to_plot = np.max(float_counts)
+
         if align=='start':
             heatmap = ax.imshow(aggregated_activity[trials_to_plot, :length_to_plot, i_neuron], cmap='viridis', aspect='auto',
                             interpolation='nearest')
         elif align=='end':
             heatmap = ax.imshow(aggregated_activity[trials_to_plot, -length_to_plot:, i_neuron], cmap='viridis', aspect='auto',
+                            interpolation='nearest')
+        else:
+            assert align is None
+            heatmap = ax.imshow(aggregated_activity[trials_to_plot, :, i_neuron], cmap='viridis', aspect='auto',
                             interpolation='nearest')
         ax.set_title(f'Neuron {i_neuron}')
         ax.set_xlabel('Time (bins)')
@@ -240,6 +248,12 @@ def plot_aggregated_activity(aggregated_activity, neuron_idx, save_dir, window_s
             avg_activity = np.nanmean(aggregated_activity[trials_to_plot, -length_to_plot:, i_neuron], axis=0)
             # Plot standard error of the mean
             std_activity = np.nanstd(aggregated_activity[trials_to_plot, -length_to_plot:, i_neuron], axis=0)
+        else:
+            assert align is None
+            # Plot average tuning curve
+            avg_activity = np.nanmean(aggregated_activity[trials_to_plot, :, i_neuron], axis=0)
+            # Plot standard error of the mean
+            std_activity = np.nanstd(aggregated_activity[trials_to_plot, :, i_neuron], axis=0)
         ax2.plot(np.arange(len(avg_activity)), avg_activity, label='Average Activity')
         ax2.fill_between(np.arange(len(avg_activity)), avg_activity - std_activity,
                          avg_activity + std_activity, alpha=0.2)
