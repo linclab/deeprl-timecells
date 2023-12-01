@@ -179,11 +179,13 @@ def aggregate_run_to_reward_activity(neural_activity, trial_idx, timestamp_start
         aggregated_activity_end_aligned[:,:,i_neuron] = agg_activity_end_aligned
     return aggregated_activity_start_aligned, aggregated_activity_end_aligned  # n_trials x max(timestamp_end-timestamp_start) x n_neurons
 
-
 # Plot each neurons's aggregated activity
-def plot_aggregated_activity(aggregated_activity, neuron_idx, save_dir, window_size=5, n_trials=100, random_trials=False):
-    for i_neuron in neuron_idx: #eg. for identified reward cells, or sample cells
-        fig, ax = plt.subplots(figsize=(10, 5))
+def plot_aggregated_activity(aggregated_activity, neuron_idx, save_dir, window_size=5, align=None, n_trials=100,
+                             random_trials=False):
+    for i_neuron in neuron_idx:
+        fig, (ax, ax2) = plt.subplots(2, 1, figsize=(10, 6), gridspec_kw={'height_ratios': [3, 2]})
+
+        # Plot heatmap
         if len(aggregated_activity) < n_trials:
             n_trials = len(aggregated_activity)
             trials_to_plot = np.arange(n_trials)
@@ -193,16 +195,133 @@ def plot_aggregated_activity(aggregated_activity, neuron_idx, save_dir, window_s
                 trials_to_plot = np.sort(np.random.choice(trial_idx, size=n_trials, replace=False))
             else:
                 trials_to_plot = trial_idx[:n_trials]  # plot the first n_trials trials
-        ax.imshow(aggregated_activity[trials_to_plot,:,i_neuron], cmap='viridis', aspect='auto',interpolation='nearest')
+        nan_counts = np.sum(np.isnan(aggregated_activity[trials_to_plot, :, i_neuron]), axis=1)
+        # The number of floats in each row is the total number of columns minus the number of NaNs
+        float_counts = aggregated_activity[trials_to_plot, :, i_neuron].shape[1] - nan_counts
+        # Find the maximum count of floats in a row
+        length_to_plot = np.max(float_counts)
+        if align=='start':
+            heatmap = ax.imshow(aggregated_activity[trials_to_plot, :length_to_plot, i_neuron], cmap='viridis', aspect='auto',
+                            interpolation='nearest')
+        elif align=='end':
+            heatmap = ax.imshow(aggregated_activity[trials_to_plot, -length_to_plot:, i_neuron], cmap='viridis', aspect='auto',
+                            interpolation='nearest')
         ax.set_title(f'Neuron {i_neuron}')
         ax.set_xlabel('Time (bins)')
         ax.set_ylabel('Trials')
-        ax.set_xticks(np.arange(0, window_size*2+1, 1))
-        ax.set_xticklabels(np.arange(-window_size, window_size+1, 1))
-        ax.set_yticks(np.arange(0, n_trials, 1))
-        ax.set_yticklabels(np.arange(1, n_trials+1, 1))
+        if window_size is not None:  # aggregated activity in a window around timestamp
+            assert align is None
+            ax.set_xticks(np.arange(0, window_size * 2 + 1, 1))
+            ax.set_xticklabels(np.arange(-window_size, window_size + 1, 1))
+        else:
+            assert window_size is None
+            if align == 'start': # aggregated activity aligned to timestamp_start, x ticks start from 0
+                ax.set_xticks(np.arange(0, length_to_plot, 20))
+                ax.set_xticklabels(np.arange(0, length_to_plot, 20))
+            elif align == 'end': # aggregated activity aligned to timestamp_end, x ticks ends with 0
+                ax.set_xticks(np.arange(-length_to_plot - (-length_to_plot % -20), 1, 20)+length_to_plot)
+                ax.set_xticklabels(
+                    np.arange(-length_to_plot - (-length_to_plot % -20), 1, 20))
+            else:
+                raise ValueError('align must be start or end')
+        ax.set_yticks(np.arange(0, n_trials, 20))
+        ax.set_yticklabels(np.arange(1, n_trials + 1, 20))
+
+        # Add colorbar
+        fig.colorbar(heatmap, ax=ax, orientation='vertical')
+        
+        if align=='start':
+            # Plot average tuning curve
+            avg_activity = np.nanmean(aggregated_activity[trials_to_plot, :length_to_plot, i_neuron], axis=0)
+            # Plot standard error of the mean
+            std_activity = np.nanstd(aggregated_activity[trials_to_plot, :length_to_plot, i_neuron], axis=0)
+        elif align=='end':
+            # Plot average tuning curve
+            avg_activity = np.nanmean(aggregated_activity[trials_to_plot, -length_to_plot:, i_neuron], axis=0)
+            # Plot standard error of the mean
+            std_activity = np.nanstd(aggregated_activity[trials_to_plot, -length_to_plot:, i_neuron], axis=0)
+        ax2.plot(np.arange(len(avg_activity)), avg_activity, label='Average Activity')
+        ax2.fill_between(np.arange(len(avg_activity)), avg_activity - std_activity,
+                         avg_activity + std_activity, alpha=0.2)
+        ax2.set_xlabel('Time (bins)')
+        ax2.set_ylabel('Average Activity')
+
+        if window_size is not None:  # aggregated activity in a window around timestamp
+            assert align is None
+            ax2.set_xticks(np.arange(0, window_size * 2 + 1, 1))
+            ax2.set_xticklabels(np.arange(-window_size, window_size + 1, 1))
+        else:
+            assert window_size is None
+            if align == 'start': # aggregated activity aligned to timestamp_start, x ticks start from 0
+                ax2.set_xticks(np.arange(0, length_to_plot, 20))
+                ax2.set_xticklabels(np.arange(0, length_to_plot, 20))
+            elif align == 'end': # aggregated activity aligned to timestamp_end, x ticks starts with ends with 0
+                ax2.set_xticks(np.arange(-length_to_plot - (-length_to_plot % -20), 1, 20)+length_to_plot)
+                ax2.set_xticklabels(np.arange(-length_to_plot - (-length_to_plot % -20), 1, 20))
+            else:
+                raise ValueError('align must be start or end')
+
+        ax2.legend()
+
+        # Save the figure
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
         plt.savefig(os.path.join(save_dir, f'neuron_{i_neuron}.png'))
         plt.close()
+
+# overlap the tuning curves for cells that fire for reward or to-reward run to see if activity rescale
+def plot_overlap_tuning_curves_for_two_aggregated_activity(aggregated_activity1, aggregated_activity2, label1, label2, neuron_idx, save_dir, align='start', window_size=None):
+    # note that agg_act1 and agg_act2 may come from different trials, hence length (i.e. number of trials) may be different
+    for i_neuron in neuron_idx:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+
+        avg_activity1 = np.nanmean(aggregated_activity1[:, :, i_neuron], axis=0)
+        std_activity1 = np.nanstd(aggregated_activity1[:, :, i_neuron], axis=0)
+        avg_activity2 = np.nanmean(aggregated_activity2[:, :, i_neuron], axis=0)
+        std_activity2 = np.nanstd(aggregated_activity2[:, :, i_neuron], axis=0)
+
+        if window_size is None:  # different durations for avg_activity1 and 2
+            length_to_plot = max(len(avg_activity1), len(avg_activity2))
+            if align=='start':  # align the two curves at the start
+
+                ax.plot(np.arange(len(avg_activity1)), avg_activity1, label=label1, color='blue')
+                ax.fill_between(np.arange(len(avg_activity1)), avg_activity1 - std_activity1,
+                                avg_activity1 + std_activity1, alpha=0.2, color='blue')
+                ax.plot(np.arange(len(avg_activity2)), avg_activity2, label=label2, color='orange')
+                ax.fill_between(np.arange(len(avg_activity2)), avg_activity2 - std_activity2,
+                                avg_activity2 + std_activity2, alpha=0.2, color='orange')
+                # add ax ticks
+                ax.set_xticks(np.arange(0, length_to_plot, 20))
+                ax.set_xticklabels(np.arange(0, length_to_plot, 20))
+
+            elif align=='end':  # align the two curves at the end
+
+                ax.plot(np.arange(-len(avg_activity1), 0)+length_to_plot, avg_activity1, label=label1, color='blue')
+                ax.fill_between(np.arange(-len(avg_activity1), 0)+length_to_plot, avg_activity1 - std_activity1,
+                                avg_activity1 + std_activity1, alpha=0.2, color='blue')
+                ax.plot(np.arange(-len(avg_activity2), 0)+length_to_plot, avg_activity2, label=label2, color='orange')
+                ax.fill_between(np.arange(-len(avg_activity2), 0)+length_to_plot, avg_activity2 - std_activity2,
+                                avg_activity2 + std_activity2, alpha=0.2, color='orange')
+                # add ax ticks
+                ax.set_xticks(np.arange(-length_to_plot - (-length_to_plot % -20), 1, 20)+length_to_plot)
+                ax.set_xticklabels(
+                    np.arange(-length_to_plot - (-length_to_plot % -20), 1, 20))
+        else:
+            ax.plot(np.arange(window_size*2+1), avg_activity1, label=label1, color='blue')
+            ax.fill_between(np.arange(window_size*2+1), avg_activity1 - std_activity1,
+                            avg_activity1 + std_activity1, alpha=0.2, color='blue')
+            ax.plot(np.arange(window_size*2+1), avg_activity2, label=label2, color='orange')
+            ax.fill_between(np.arange(window_size*2+1), avg_activity2 - std_activity2,
+                            avg_activity2 + std_activity2, alpha=0.2, color='orange')
+            ax.set_xticks(np.arange(0, window_size * 2 + 1, 1))
+            ax.set_xticklabels(np.arange(-window_size, window_size + 1, 1))
+        ax.set_ylabel('Average Activity')
+        ax.set_xlabel('Time (bins)')
+        ax.legend()
+        # Save the figure
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, f'neuron_{i_neuron}.png'))
+        plt.close()
+
 
