@@ -49,7 +49,7 @@ def get_trial_average_value_at_time_step(neural_activity, trial_idx, timestamp, 
     assert n_trials == len(timestamp)
     trial_average_value = np.zeros(n_neurons)
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         trial_average_value[i_neuron] = np.mean([neural_activity[trial_idx[i_trial]][timestamp[i_trial]][i_neuron] for i_trial in range(n_trials)])
     return trial_average_value  # n_neurons
 
@@ -60,7 +60,7 @@ def get_trial_average_value_within_window(neural_activity, trial_idx, timestamp,
     assert n_trials == len(timestamp)
     trial_average_value = np.zeros(n_neurons)
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         trial_average_value[i_neuron] = np.mean([np.mean(neural_activity[trial_idx[i_trial]][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1][i_neuron]) for i_trial in range(n_trials)])
     return trial_average_value  # n_neurons
 
@@ -70,7 +70,7 @@ def get_trial_average_value_between_timestamps(neural_activity, trial_idx, times
     assert n_trials == len(timestamp_start) == len(timestamp_end)
     trial_average_value = np.zeros(n_neurons)
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         trial_average_value[i_neuron] = np.mean([np.mean(neural_activity[trial_idx[i_trial]][timestamp_start[i_trial]:timestamp_end[i_trial]][i_neuron]) for i_trial in range(n_trials)])
     return trial_average_value  # n_neurons
 
@@ -80,7 +80,7 @@ def get_trial_average_value_at_time_step_shuffled(neural_activity, trial_idx, ti
     assert n_trials == len(timestamp)
     trial_average_value_shuffled = np.zeros(n_neurons)
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         if shuffle == 'circular':
             trial_average_value_shuffled[i_neuron] = np.mean([circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]] for i_trial in range(n_trials)])
         elif shuffle == 'swap':
@@ -93,7 +93,7 @@ def get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, t
     assert n_trials == len(timestamp)
     trial_average_value_shuffled = np.zeros(n_neurons)
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         if shuffle == 'circular':
             trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
         elif shuffle == 'swap':
@@ -105,7 +105,7 @@ def get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_i
     assert n_trials == len(timestamp_start) == len(timestamp_end)
     trial_average_value_shuffled = np.zeros(n_neurons)
     # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in range(n_neurons):
+    for i_neuron in tqdm(range(n_neurons)):
         if shuffle == 'circular':
             trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp_start[i_trial]:timestamp_end[i_trial]]) for i_trial in range(n_trials)])
         elif shuffle == 'swap':
@@ -113,25 +113,57 @@ def get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_i
     return trial_average_value_shuffled  # n_neurons
 
 
-def identify_significant_neurons(neural_activity, trial_idx, timestamp, use_window_average=False, window_size=5, n_shuffle=1000, n_neurons=256, percentile=99, shuffle='circular'):
+def identify_significant_neurons(neural_activity, trial_idx, timestamp, use_window_average=False, window_size=5, n_shuffle=1000, n_neurons=256, percentile=99, shuffle='circular', plot=True, save_dir=None):
     # identify if neuron's average activity at timestamp across trials is significantly (>99 percentile) higher than 1000 circularly shuffled average activities of this neuron at this timestamp across trials
     if use_window_average:
         trial_average_value = get_trial_average_value_within_window(neural_activity, trial_idx, timestamp, window_size=window_size, n_neurons=n_neurons)
     else:
         trial_average_value = get_trial_average_value_at_time_step(neural_activity, trial_idx, timestamp, n_neurons=n_neurons)
-    trial_average_value_shuffled = []
+    trial_average_value_shuffled = []  # n_shuffle x n_neurons
     for i_shuffle in tqdm(range(n_shuffle)):
         if use_window_average:
             trial_average_value_shuffled.append(get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, timestamp, window_size=window_size, n_neurons=n_neurons, shuffle=shuffle))
         else:
             trial_average_value_shuffled.append(get_trial_average_value_at_time_step_shuffled(neural_activity, trial_idx, timestamp, n_neurons=n_neurons, shuffle=shuffle))
+    trial_average_value_shuffled = np.asarray(trial_average_value_shuffled)  # n_shuffle x n_neurons
+    if plot:
+        # for each neuron, plot trial_average_value_shuffled as a histogram, and plot trial_average_value as a vertical line, and plot percentile as a vertical line
+        for i_neuron in range(n_neurons):
+            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+            ax.hist(trial_average_value_shuffled[:, i_neuron], bins=50)
+            ax.axvline(trial_average_value[i_neuron], color='red')
+            ax.axvline(np.percentile(trial_average_value_shuffled[i_neuron], percentile), color='green')
+            ax.set_xlabel('Average Activity')
+            ax.set_ylabel('Count')
+            ax.set_title(f'Neuron {i_neuron}')
+            if save_dir is not None:
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir, exist_ok=True)
+                plt.savefig(os.path.join(save_dir, f'neuron_{i_neuron}.png'))
+                plt.close()
     return np.where(trial_average_value > np.percentile(trial_average_value_shuffled, percentile))[0] # indices of neurons that are significantly higher than shuffled neurons
 
-def identify_significant_neurons_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end, n_shuffle=1000, n_neurons=256, percentile=99, shuffle='circular'):
+def identify_significant_neurons_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end, n_shuffle=1000, n_neurons=256, percentile=99, shuffle='circular', plot=True, save_dir=None):
     trial_average_value = get_trial_average_value_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end, n_neurons=n_neurons)
     trial_average_value_shuffled = []
     for i_shuffle in tqdm(range(n_shuffle)):
         trial_average_value_shuffled.append(get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_idx, timestamp_start, timestamp_end, n_neurons=n_neurons, shuffle=shuffle))
+    trial_average_value_shuffled = np.asarray(trial_average_value_shuffled)  # n_shuffle x n_neurons
+    if plot:
+        # for each neuron, plot trial_average_value_shuffled as a histogram, and plot trial_average_value as a vertical line, and plot percentile as a vertical line
+        for i_neuron in range(n_neurons):
+            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+            ax.hist(trial_average_value_shuffled[:, i_neuron], bins=50)
+            ax.axvline(trial_average_value[i_neuron], color='red')
+            ax.axvline(np.percentile(trial_average_value_shuffled[i_neuron], percentile), color='green')
+            ax.set_xlabel('Average Activity')
+            ax.set_ylabel('Count')
+            ax.set_title(f'Neuron {i_neuron}')
+            if save_dir is not None:
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir, exist_ok=True)
+                plt.savefig(os.path.join(save_dir, f'neuron_{i_neuron}.png'))
+                plt.close()
     return np.where(trial_average_value > np.percentile(trial_average_value_shuffled, percentile))[0] # indices of neurons that are significantly higher than shuffled neurons
 
 
