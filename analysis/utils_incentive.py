@@ -46,17 +46,16 @@ def get_trial_average_value_at_time_step(neural_activity, trial_idx, timestamp, 
     return trial_average_value  # n_neurons
 
 
-def get_trial_average_value_within_window(neural_activity, trial_idx, timestamp, window_size=5, n_neurons=256):
-    # get trial average value within window_size bins of timestamp
-    n_trials = len(trial_idx)
-    assert n_trials == len(timestamp)
-    trial_average_value = np.zeros(n_neurons)
-    # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in tqdm(range(n_neurons)):
-        trial_average_value[i_neuron] = np.mean([np.mean(neural_activity[trial_idx[i_trial]][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1][i_neuron]) for i_trial in range(n_trials)])
-    return trial_average_value  # n_neurons
+def get_trial_average_value_within_window(neural_activity, trial_idx, timestamp, window_size=5):
+    # Ensure neural_activity is a NumPy array padded with NaNs
+    windows = np.stack([
+        np.nanmean(neural_activity[idx, :, max(0, ts - window_size): min(neural_activity.shape[2], ts + window_size + 1)], axis=1)
+        for idx, ts in zip(trial_idx, timestamp)
+    ], axis=0)
+    trial_average_value = np.nanmean(windows, axis=0)  # (n_neurons,)
+    return trial_average_value
 
-def get_trial_average_value_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end, n_neurons=256):
+def get_trial_average_value_between_timestamps(neural_activity, trial_idx, timestamp_start, timestamp_end):
     # This function assumes that 'neural_activity' is padded with NaNs to handle variable lengths
     n_neurons = neural_activity.shape[1]
     trial_averages = np.zeros((len(trial_idx), n_neurons))
@@ -82,17 +81,20 @@ def get_trial_average_value_at_time_step_shuffled(neural_activity, trial_idx, ti
     return np.nanmean(shuffled_activity_at_timestamp, axis=0)  # (n_neurons,)
 
 
-def get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, timestamp, window_size=5, n_neurons=256, shuffle='circular'):
-    # shuffle neural activity, then take average within window_size bins of timestamp
-    n_trials = len(trial_idx)
-    assert n_trials == len(timestamp)
-    trial_average_value_shuffled = np.zeros(n_neurons)
-    # neural_activity: n_episodes, each element is a list of length T_episode, each element is a numpy array of shape (n_neurons,)
-    for i_neuron in tqdm(range(n_neurons)):
-        if shuffle == 'circular':
-            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(circular_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
-        elif shuffle == 'swap':
-            trial_average_value_shuffled[i_neuron] = np.mean([np.mean(swap_shuffle_neural_activity(np.asarray(neural_activity[trial_idx[i_trial]]).T)[i_neuron][timestamp[i_trial]-window_size:timestamp[i_trial]+window_size+1]) for i_trial in range(n_trials)])
+def get_trial_average_value_within_window_shuffled(neural_activity, trial_idx, timestamp, window_size=5, shuffle='circular'):
+    # This function assumes that 'neural_activity' is padded with NaNs to handle variable lengths
+    # Shuffle neural_activity before extracting windows
+    if shuffle == 'circular':
+        shuffled_activity = np.apply_along_axis(circular_shuffle_neural_activity, 2, neural_activity[trial_idx, :, :])
+    elif shuffle == 'swap':
+        shuffled_activity = np.apply_along_axis(swap_shuffle_neural_activity, 2, neural_activity[trial_idx, :, :])
+    windows = np.stack([
+        np.nanmean(shuffled_activity[i, :, max(0, ts - window_size): min(shuffled_activity.shape[2], ts + window_size + 1)], axis=1)
+        for i, ts in enumerate(timestamp)
+    ], axis=0)
+    trial_average_value_shuffled = np.nanmean(windows, axis=0)  # (n_neurons,)
+    return trial_average_value_shuffled
+
 
 def get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_idx, timestamp_start, timestamp_end, shuffle='circular'):
     assert len(trial_idx) == len(timestamp_start) == len(timestamp_end)
@@ -116,11 +118,17 @@ def get_trial_average_value_between_timestamps_shuffled(neural_activity, trial_i
 
 
 def identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx, timestamp, n_shuffle=1000, percentile=99,
-                                 shuffle='circular', plot=True, save_dir=None):
-    trial_average_value = get_trial_average_value_at_time_step(neural_activity, trial_idx, timestamp)
-    shuffled_values = np.array(
-        [get_trial_average_value_at_time_step_shuffled(neural_activity_padded, trial_idx, timestamp, shuffle) for _ in
-         tqdm(range(n_shuffle))])  # n_shuffle x n_neurons
+                                 shuffle='circular', plot=True, save_dir=None, use_window=True):
+    if use_window:
+        trial_average_value = get_trial_average_value_within_window(neural_activity, trial_idx, timestamp, window_size=5)
+        shuffled_values = np.array(
+            [get_trial_average_value_within_window_shuffled(neural_activity_padded, trial_idx, timestamp, shuffle=shuffle, window_size=5) for _ in
+             tqdm(range(n_shuffle))])
+    else:
+        trial_average_value = get_trial_average_value_at_time_step(neural_activity, trial_idx, timestamp)
+        shuffled_values = np.array(
+            [get_trial_average_value_at_time_step_shuffled(neural_activity_padded, trial_idx, timestamp, shuffle) for _ in
+             tqdm(range(n_shuffle))])  # n_shuffle x n_neurons
     significant_threshold = np.percentile(shuffled_values, percentile, axis=0)
     n_neurons = len(trial_average_value)
     if plot:

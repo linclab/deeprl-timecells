@@ -159,25 +159,24 @@ def main():
 
     neural_activity_padded = np.float16(neural_activity_padded)
 
-    # TODO: see if swap shuffle or using window changes things
 
     # Note: trial_idx should match timestamp length-wise
 
     # identify neurons that fire significantly at different time steps
     print("identify neurons that fire significantly when collecting small reward...")
-    small_reward_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_small_reward, timestamp=timestamp_small_reward, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'small_reward_cells'))
+    small_reward_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_small_reward, timestamp=timestamp_small_reward, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'small_reward_cells_window'))
     print(f"Number of neurons that fire significantly when collecting small reward: {len(small_reward_cells_idx)}")
 
     print("identify neurons that fire significantly when initiating stimulus phase...")
-    initiate_stimulus_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_initate_stimulus, timestamp=timestamp_initiate_stimulus, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'init_stim_cells'))
+    initiate_stimulus_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_initate_stimulus, timestamp=timestamp_initiate_stimulus, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'init_stim_cells_window'))
     print(f"Number of neurons that fire significantly when initiating stimulus phase: {len(initiate_stimulus_cells_idx)}")
 
     print("identify neurons that fire significantly when initiating choice phase...")
-    initiate_choice_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_intiate_choice, timestamp=timestamp_initiate_choice, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'init_choice_cells'))
+    initiate_choice_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_intiate_choice, timestamp=timestamp_initiate_choice, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'init_choice_cells_window'))
     print(f"Number of neurons that fire significantly when initiating choice phase: {len(initiate_choice_cells_idx)}")
 
     print("identify neurons that fire significantly when collecting big reward...")
-    big_reward_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp=timestamp_big_reward, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'big_reward_cells'))
+    big_reward_cells_idx = identify_significant_neurons(neural_activity, neural_activity_padded, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp=timestamp_big_reward, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'big_reward_cells_window'))
     print(f"Number of neurons that fire significantly when collecting big reward: {len(big_reward_cells_idx)}")
 
     print("identify neurons that fire significantly between poking stimulus and collecting incentive..")
@@ -188,12 +187,8 @@ def main():
     reward_prediction_cells_idx = identify_significant_neurons_between_timestamps(neural_activity_padded, trial_idx=trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice, timestamp_start=timestamp_poke_choice[trial_idx_nonmatch if env_type=="mem" else trial_idx_left_choice], timestamp_end=timestamp_big_reward, percentile=percentile, n_shuffle=n_shuffle, plot=True, save_dir=os.path.join(seed_save_dir, 'choice_to_reward_cells'))
     print(f"Number of neurons that fire significantly between poking choice and collecting big reward: {len(reward_prediction_cells_idx)}")
 
-    sys.exit()
-
-    big_reward_cells_idx = np.arange(256)
-    reward_prediction_cells_idx = np.arange(256)
-    small_reward_cells_idx = np.arange(256)
-    incentive_prediction_cells_idx = np.arange(256)
+    # Save the idx of identified cells to one file
+    np.savez(os.path.join(seed_save_dir, 'identified_cells_idx.npz'), small_reward_cells_idx=small_reward_cells_idx, initiate_stimulus_cells_idx=initiate_stimulus_cells_idx, initiate_choice_cells_idx=initiate_choice_cells_idx, big_reward_cells_idx=big_reward_cells_idx, incentive_prediction_cells_idx=incentive_prediction_cells_idx, reward_prediction_cells_idx=reward_prediction_cells_idx)
 
     # for small_reward_cells, plot aggregated activity around small reward timestamp
     print("plot aggregated activity around small reward timestamp...")
